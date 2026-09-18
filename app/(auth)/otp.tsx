@@ -1,5 +1,5 @@
-// OTP Verification → loginByOtp
-import React, { useState, useRef, useEffect } from 'react';
+// OTP → login hoặc form đăng ký khách
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,32 +16,41 @@ import {
   ApiError,
   saveSession,
   saveOtpSession,
+  normalizePhoneVn,
 } from '@/services/api';
 
 const OTP_LENGTH = 6;
 const RESEND_TIMEOUT = 60;
 
+function paramStr(v: string | string[] | undefined, fallback = ''): string {
+  if (Array.isArray(v)) return String(v[0] ?? fallback);
+  return v != null && v !== '' ? String(v) : fallback;
+}
+
 export default function OtpScreen() {
-  const params = useLocalSearchParams<{
-    phone: string;
-    otpId: string;
+  const raw = useLocalSearchParams<{
+    phone?: string;
+    otpId?: string;
     otpDebug?: string;
     intent?: string;
     otpGroup?: string;
   }>();
 
-  const phone = params.phone ?? '';
-  const isRegister = params.intent === 'register';
-  const otpGroup = params.otpGroup || (isRegister ? 'otp_register' : 'otp_general');
-  const [otpId, setOtpId] = useState(Number(params.otpId) || 0);
-  const [otp, setOtp] = useState(params.otpDebug ?? '');
+  const phone = normalizePhoneVn(paramStr(raw.phone));
+  const isRegister = paramStr(raw.intent) === 'register';
+  const otpGroup =
+    paramStr(raw.otpGroup) || (isRegister ? 'otp_register' : 'otp_general');
+
+  const [otpId, setOtpId] = useState(Number(paramStr(raw.otpId)) || 0);
+  const [otp, setOtp] = useState(paramStr(raw.otpDebug));
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(RESEND_TIMEOUT);
   const inputRef = useRef<TextInput>(null);
 
-  const formattedPhone = phone
-    ? `${phone.slice(0, 3)} ${phone.slice(3, 6)} ${phone.slice(6)}`
-    : '';
+  const formattedPhone = useMemo(() => {
+    if (!phone) return '';
+    return `${phone.slice(0, 3)} ${phone.slice(3, 6)} ${phone.slice(6)}`;
+  }, [phone]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -71,6 +80,10 @@ export default function OtpScreen() {
   };
 
   const goRegister = async (otpIdVal: number, authCode: string, group: string) => {
+    if (!authCode) {
+      Alert.alert('Lỗi OTP', 'Thiếu auth_code sau xác thực. Gửi lại OTP.');
+      return;
+    }
     await saveOtpSession({
       phone,
       country_code: '84',
@@ -79,14 +92,10 @@ export default function OtpScreen() {
       otp_group: group,
       intent: 'register',
     });
+    // Không đưa auth_code lên URL (dễ mất / cắt). Chỉ phone để hiển thị.
     router.replace({
       pathname: '/(auth)/register',
-      params: {
-        phone,
-        otpId: String(otpIdVal),
-        otpAuthCode: authCode,
-        otpGroup: group,
-      },
+      params: { phone },
     });
   };
 
@@ -103,36 +112,15 @@ export default function OtpScreen() {
       });
 
       const group = verified.group || otpGroup;
+      const authCode = verified.auth_code;
 
-      // Luồng đăng ký: sau OTP luôn vào form tạo tài khoản (trừ khi đã có TK)
+      if (!authCode) {
+        throw new ApiError(422, 'OTP verify không trả auth_code');
+      }
+
+      // Đăng ký: sau verify → form (không phụ thuộc loginotp)
       if (isRegister) {
-        const login = await authApi
-          .loginByOtp({
-            phone,
-            otpId: verified.id,
-            otpCode: otp,
-            otpAuthCode: verified.auth_code,
-            otpGroup: group,
-            countryCode: '84',
-          })
-          .catch(() => null);
-
-        if (
-          login &&
-          !('need_register' in login && login.need_register) &&
-          'token' in login &&
-          login.token
-        ) {
-          Alert.alert(
-            'Đã có tài khoản',
-            'Số này đã đăng ký — đăng nhập thành công.'
-          );
-          await saveSession(login.token, login);
-          router.replace('/(tabs)');
-          return;
-        }
-
-        await goRegister(verified.id, verified.auth_code, group);
+        await goRegister(verified.id, authCode, group);
         return;
       }
 
@@ -140,7 +128,7 @@ export default function OtpScreen() {
         phone,
         otpId: verified.id,
         otpCode: otp,
-        otpAuthCode: verified.auth_code,
+        otpAuthCode: authCode,
         otpGroup: group,
         countryCode: '84',
       });
@@ -173,10 +161,12 @@ export default function OtpScreen() {
         </Text>
         <Text style={styles.subtitle}>
           Mã OTP đã được gửi đến số{'\n'}
-          <Text style={styles.phoneHighlight}>{formattedPhone}</Text>
+          <Text style={styles.phoneHighlight}>+84 {formattedPhone}</Text>
         </Text>
-        {params.otpDebug ? (
-          <Text style={styles.debugHint}>OTP_DEBUG: {params.otpDebug}</Text>
+        {paramStr(raw.otpDebug) || otp ? (
+          <Text style={styles.debugHint}>
+            OTP_DEBUG: {paramStr(raw.otpDebug) || otp}
+          </Text>
         ) : null}
       </View>
 
@@ -191,7 +181,7 @@ export default function OtpScreen() {
             style={[
               styles.otpBox,
               otp.length === i && styles.otpBoxActive,
-              d && styles.otpBoxFilled,
+              d ? styles.otpBoxFilled : null,
             ]}
           >
             <Text style={styles.otpDigit}>{d}</Text>

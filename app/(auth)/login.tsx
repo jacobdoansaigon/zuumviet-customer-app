@@ -15,7 +15,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { Button } from '@/components/ui/Button';
 import { PhoneInput } from '@/components/ui/PhoneInput';
-import { authApi, ApiError, saveOtpSession } from '@/services/api';
+import { authApi, ApiError, saveOtpSession, normalizePhoneVn } from '@/services/api';
 
 export default function LoginScreen() {
   const { intent } = useLocalSearchParams<{ intent?: string }>();
@@ -25,15 +25,16 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const isValid = phone.length >= 9 && phone.length <= 11;
+  const phoneNorm = normalizePhoneVn(phone);
+  const isValid = phoneNorm.length >= 9 && phoneNorm.length <= 10;
 
   const handleContinue = async () => {
     if (!isValid || loading) return;
     setLoading(true);
     try {
-      const otp = await authApi.sendOtp(phone, otpGroup, '84');
+      const otp = await authApi.sendOtp(phoneNorm, otpGroup, '84');
       await saveOtpSession({
-        phone,
+        phone: phoneNorm,
         country_code: '84',
         otp_group: otpGroup,
         otp_id: otp.id,
@@ -43,7 +44,7 @@ export default function LoginScreen() {
       router.push({
         pathname: '/(auth)/otp',
         params: {
-          phone,
+          phone: phoneNorm,
           otpId: String(otp.id),
           otpDebug: otp.otp_debug ?? '',
           intent: isRegister ? 'register' : 'login',

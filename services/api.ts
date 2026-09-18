@@ -16,6 +16,28 @@ const STORAGE_KEYS = {
   otpSession: '@zv/customer/otpSession',
 } as const;
 
+/** VN: bỏ số 0 đầu nếu có (090x → 90x), chỉ giữ digits */
+export function normalizePhoneVn(phone: string): string {
+  let digits = String(phone || '').replace(/\D/g, '');
+  if (digits.startsWith('84') && digits.length > 10) {
+    digits = digits.slice(2);
+  }
+  if (digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+  return digits;
+}
+
+export type OtpSessionData = {
+  phone: string;
+  country_code: string;
+  otp_id: number;
+  otp_auth_code?: string;
+  otp_group: string;
+  otp_debug?: string;
+  intent?: 'login' | 'register';
+};
+
 export type CustomerProfile = {
   id: number;
   fullname?: string;
@@ -113,11 +135,13 @@ export async function getStoredCustomer(): Promise<CustomerProfile | null> {
   }
 }
 
-export async function saveOtpSession(data: Record<string, unknown>) {
-  await AsyncStorage.setItem(STORAGE_KEYS.otpSession, JSON.stringify(data));
+export async function saveOtpSession(data: OtpSessionData | Record<string, unknown>) {
+  const phone = normalizePhoneVn(String((data as OtpSessionData).phone ?? ''));
+  const payload = { ...data, phone };
+  await AsyncStorage.setItem(STORAGE_KEYS.otpSession, JSON.stringify(payload));
 }
 
-export async function getOtpSession<T = Record<string, unknown>>(): Promise<T | null> {
+export async function getOtpSession<T = OtpSessionData>(): Promise<T | null> {
   const raw = await AsyncStorage.getItem(STORAGE_KEYS.otpSession);
   if (!raw) return null;
   try {
@@ -203,7 +227,7 @@ export const authApi = {
       method: 'POST',
       auth: false,
       body: {
-        phone,
+        phone: normalizePhoneVn(phone),
         country_code: countryCode,
         otp_group: otpGroup,
       },
@@ -220,7 +244,7 @@ export const authApi = {
       method: 'POST',
       auth: false,
       body: {
-        phone: params.phone,
+        phone: normalizePhoneVn(params.phone),
         country_code: params.countryCode ?? DEFAULT_COUNTRY,
         otp_group: params.otpGroup ?? 'otp_general',
         otp_id: params.otpId,
@@ -240,7 +264,7 @@ export const authApi = {
       method: 'POST',
       auth: false,
       body: {
-        phone: params.phone,
+        phone: normalizePhoneVn(params.phone),
         country_code: params.countryCode ?? DEFAULT_COUNTRY,
         otp_group: params.otpGroup ?? 'otp_general',
         otp_id: params.otpId,
@@ -254,24 +278,26 @@ export const authApi = {
       method: 'POST',
       auth: false,
       body: {
-        login_account: phone,
+        login_account: normalizePhoneVn(phone),
         login_password: password,
         country_code: countryCode,
       },
     }),
 
-  register: (body: Record<string, unknown>) =>
-    request<CustomerProfile>('/site/customeraccounts', {
+  register: (body: Record<string, unknown>) => {
+    const phone = normalizePhoneVn(String(body.phone ?? ''));
+    return request<CustomerProfile>('/site/customeraccounts', {
       method: 'POST',
       auth: false,
-      body,
-    }),
+      body: { ...body, phone },
+    });
+  },
 
   checkExists: (phone: string, countryCode = DEFAULT_COUNTRY) =>
     request<{ id: number; phone: string; status: number }>('/site/customeraccounts/check', {
       method: 'POST',
       auth: false,
-      body: { phone, country_code: countryCode },
+      body: { phone: normalizePhoneVn(phone), country_code: countryCode },
     }),
 
   logout: () => clearSession(),

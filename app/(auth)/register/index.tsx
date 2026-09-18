@@ -1,6 +1,6 @@
-// Đăng ký khách — 1 bước: họ tên + mật khẩu (sau OTP)
+// Đăng ký khách — họ tên + mật khẩu (OTP đã verify, đọc từ AsyncStorage)
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -19,57 +19,76 @@ import {
   ApiError,
   getOtpSession,
   saveSession,
+  normalizePhoneVn,
+  type OtpSessionData,
 } from '@/services/api';
 
-/** TYPE_NORMAL = 1 trên BE */
 const CUSTOMER_TYPE_NORMAL = 1;
 
+function paramStr(v: string | string[] | undefined): string {
+  if (Array.isArray(v)) return String(v[0] ?? '');
+  return v != null ? String(v) : '';
+}
+
 export default function RegisterScreen() {
-  const params = useLocalSearchParams<{
-    phone?: string;
-    otpId?: string;
-    otpAuthCode?: string;
-    otpGroup?: string;
-  }>();
+  const raw = useLocalSearchParams<{ phone?: string }>();
+  const [phone, setPhone] = useState(normalizePhoneVn(paramStr(raw.phone)));
+  const [sessionReady, setSessionReady] = useState(false);
+  const [session, setSession] = useState<OtpSessionData | null>(null);
 
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    (async () => {
+      const s = await getOtpSession<OtpSessionData>();
+      if (!s?.otp_id || !s?.otp_auth_code) {
+        Alert.alert(
+          'Thiếu OTP',
+          'Vui lòng xác thực OTP trước khi đăng ký.',
+          [
+            {
+              text: 'OK',
+              onPress: () =>
+                router.replace({
+                  pathname: '/(auth)/login',
+                  params: { intent: 'register' },
+                }),
+            },
+          ]
+        );
+        return;
+      }
+      setSession(s);
+      setPhone(normalizePhoneVn(s.phone || phone));
+      setSessionReady(true);
+    })();
+  }, []);
+
   const canSubmit =
+    sessionReady &&
     fullName.trim().length >= 2 &&
     password.length >= 6 &&
     password === passwordConfirm;
 
   const handleRegister = async () => {
-    if (!canSubmit || loading) return;
+    if (!canSubmit || loading || !session) return;
     setLoading(true);
     try {
-      const session = await getOtpSession<{
-        phone?: string;
-        country_code?: string;
-        otp_id?: number;
-        otp_auth_code?: string;
-        otp_group?: string;
-      }>();
+      const otpId = Number(session.otp_id);
+      const otpAuthCode = String(session.otp_auth_code || '');
+      const otpGroup = session.otp_group || 'otp_register';
+      const phoneNorm = normalizePhoneVn(session.phone || phone);
 
-      const phone = params.phone || session?.phone || '';
-      const otpId = Number(params.otpId || session?.otp_id || 0);
-      const otpAuthCode =
-        params.otpAuthCode || session?.otp_auth_code || '';
-      const otpGroup =
-        params.otpGroup || session?.otp_group || 'otp_general';
-
-      if (!phone || !otpId || !otpAuthCode) {
-        Alert.alert('Thiếu OTP', 'Vui lòng xác thực OTP lại từ đầu.');
-        router.replace('/(auth)/login');
-        return;
+      if (!phoneNorm || !otpId || !otpAuthCode) {
+        throw new ApiError(422, 'Thiếu thông tin OTP — làm lại từ Đăng ký');
       }
 
       await authApi.register({
         full_name: fullName.trim(),
-        phone,
+        phone: phoneNorm,
         country_code: '84',
         password,
         email: '',
@@ -85,14 +104,33 @@ export default function RegisterScreen() {
         sub_region_id: 0,
       });
 
-      const byPass = await authApi.loginPassword(phone, password, '84');
-      await saveSession(byPass.token, byPass);
-      router.replace('/(tabs)');
+      try {
+        const byPass = await authApi.loginPassword(phoneNorm, password, '84');
+        await saveSession(byPass.token, byPass);
+        router.replace('/(tabs)');
+      } catch (loginErr) {
+        // Account đã tạo — vẫn cho vào app qua login lại
+        Alert.alert(
+          'Đăng ký thành công',
+          'Tài khoản đã tạo. Vui lòng đăng nhập bằng số điện thoại.',
+          [
+            {
+              text: 'Đăng nhập',
+              onPress: () =>
+                router.replace({
+                  pathname: '/(auth)/login',
+                  params: { intent: 'login' },
+                }),
+            },
+          ]
+        );
+      }
     } catch (e) {
-      Alert.alert(
-        'Đăng ký thất bại',
-        e instanceof ApiError ? e.message : 'Vui lòng thử lại'
-      );
+      const msg =
+        e instanceof ApiError
+          ? e.message
+          : 'Không đăng ký được. Thử lại hoặc gửi OTP mới.';
+      Alert.alert('Đăng ký thất bại', msg);
     } finally {
       setLoading(false);
     }
@@ -109,7 +147,7 @@ export default function RegisterScreen() {
       >
         <Text style={styles.title}>Đăng ký khách hàng</Text>
         <Text style={styles.sub}>
-          Nhập họ tên và mật khẩu để hoàn tất tạo tài khoản.
+          SĐT +84 {phone || '…'} đã xác thực OTP. Nhập họ tên và mật khẩu.
         </Text>
 
         <View style={styles.field}>
@@ -120,6 +158,7 @@ export default function RegisterScreen() {
             onChangeText={setFullName}
             placeholder="Nguyễn Văn A"
             placeholderTextColor={Colors.placeholder}
+            autoCapitalize="words"
           />
         </View>
 
@@ -153,7 +192,6 @@ export default function RegisterScreen() {
           disabled={!canSubmit || loading}
           loading={loading}
           variant={canSubmit ? 'primary' : 'secondary'}
-          style={{ marginTop: Spacing.xl }}
         />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -167,6 +205,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing['2xl'],
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.xl,
+    gap: 0,
   },
   title: {
     fontSize: Typography.fontSize['2xl'],
