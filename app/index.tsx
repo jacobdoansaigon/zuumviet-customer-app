@@ -1,4 +1,4 @@
-// Splash — ZUUMCUSTOMER (khách đặt giao hàng)
+// Splash — ZUUMCUSTOMER
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
@@ -28,7 +28,7 @@ export default function WelcomeScreen() {
       <View style={styles.headlineContainer}>
         <Text style={styles.headline}>Đặt giao hàng dễ dàng</Text>
         <Text style={styles.subtitle}>
-          Gửi hàng nhanh trong thành phố — theo dõi tài xế{'\n'}
+          Gửi hàng nhanh trong thành phố — theo dõi đơn{'\n'}
           và nhận hàng đúng điểm đến.
         </Text>
       </View>
@@ -36,8 +36,20 @@ export default function WelcomeScreen() {
       <View style={styles.ctaContainer}>
         <Button
           title="Đăng nhập bằng số điện thoại"
-          onPress={() => router.push('/(auth)/login')}
+          onPress={() =>
+            router.push({ pathname: '/(auth)/login', params: { intent: 'login' } })
+          }
           variant="primary"
+        />
+        <Button
+          title="Đăng ký khách hàng"
+          onPress={() =>
+            router.push({
+              pathname: '/(auth)/login',
+              params: { intent: 'register' },
+            })
+          }
+          variant="outline"
         />
 
         <View style={styles.termsContainer}>

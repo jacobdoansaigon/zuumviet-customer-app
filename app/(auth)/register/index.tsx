@@ -107,9 +107,9 @@ export default function RegisterScreen() {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>Tạo tài khoản khách</Text>
+        <Text style={styles.title}>Đăng ký khách hàng</Text>
         <Text style={styles.sub}>
-          Chỉ cần họ tên và mật khẩu để bắt đầu đặt giao hàng.
+          Nhập họ tên và mật khẩu để hoàn tất tạo tài khoản.
         </Text>
 
         <View style={styles.field}>
@@ -148,7 +148,7 @@ export default function RegisterScreen() {
         </View>
 
         <Button
-          title={loading ? 'Đang tạo...' : 'Hoàn tất đăng ký'}
+          title={loading ? 'Đang tạo...' : 'Đăng ký khách hàng'}
           onPress={handleRegister}
           disabled={!canSubmit || loading}
           loading={loading}

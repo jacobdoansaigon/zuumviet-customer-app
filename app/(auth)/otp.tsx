@@ -26,9 +26,13 @@ export default function OtpScreen() {
     phone: string;
     otpId: string;
     otpDebug?: string;
+    intent?: string;
+    otpGroup?: string;
   }>();
 
   const phone = params.phone ?? '';
+  const isRegister = params.intent === 'register';
+  const otpGroup = params.otpGroup || (isRegister ? 'otp_register' : 'otp_general');
   const [otpId, setOtpId] = useState(Number(params.otpId) || 0);
   const [otp, setOtp] = useState(params.otpDebug ?? '');
   const [loading, setLoading] = useState(false);
@@ -49,20 +53,41 @@ export default function OtpScreen() {
   const handleResend = async () => {
     if (countdown > 0) return;
     try {
-      const res = await authApi.sendOtp(phone, 'otp_general', '84');
+      const res = await authApi.sendOtp(phone, otpGroup, '84');
       setOtpId(res.id);
       setOtp(res.otp_debug ?? '');
       setCountdown(RESEND_TIMEOUT);
       await saveOtpSession({
         phone,
         country_code: '84',
-        otp_group: 'otp_general',
+        otp_group: otpGroup,
         otp_id: res.id,
         otp_debug: res.otp_debug,
+        intent: isRegister ? 'register' : 'login',
       });
     } catch (e) {
       Alert.alert('Lỗi', e instanceof ApiError ? e.message : 'Gửi lại OTP thất bại');
     }
+  };
+
+  const goRegister = async (otpIdVal: number, authCode: string, group: string) => {
+    await saveOtpSession({
+      phone,
+      country_code: '84',
+      otp_id: otpIdVal,
+      otp_auth_code: authCode,
+      otp_group: group,
+      intent: 'register',
+    });
+    router.replace({
+      pathname: '/(auth)/register',
+      params: {
+        phone,
+        otpId: String(otpIdVal),
+        otpAuthCode: authCode,
+        otpGroup: group,
+      },
+    });
   };
 
   const handleVerify = async () => {
@@ -73,36 +98,55 @@ export default function OtpScreen() {
         phone,
         otpId,
         otpCode: otp,
-        otpGroup: 'otp_general',
+        otpGroup,
         countryCode: '84',
       });
+
+      const group = verified.group || otpGroup;
+
+      // Luồng đăng ký: sau OTP luôn vào form tạo tài khoản (trừ khi đã có TK)
+      if (isRegister) {
+        const login = await authApi
+          .loginByOtp({
+            phone,
+            otpId: verified.id,
+            otpCode: otp,
+            otpAuthCode: verified.auth_code,
+            otpGroup: group,
+            countryCode: '84',
+          })
+          .catch(() => null);
+
+        if (
+          login &&
+          !('need_register' in login && login.need_register) &&
+          'token' in login &&
+          login.token
+        ) {
+          Alert.alert(
+            'Đã có tài khoản',
+            'Số này đã đăng ký — đăng nhập thành công.'
+          );
+          await saveSession(login.token, login);
+          router.replace('/(tabs)');
+          return;
+        }
+
+        await goRegister(verified.id, verified.auth_code, group);
+        return;
+      }
 
       const login = await authApi.loginByOtp({
         phone,
         otpId: verified.id,
         otpCode: otp,
         otpAuthCode: verified.auth_code,
-        otpGroup: verified.group || 'otp_general',
+        otpGroup: group,
         countryCode: '84',
       });
 
       if ('need_register' in login && login.need_register) {
-        await saveOtpSession({
-          phone,
-          country_code: '84',
-          otp_id: login.otp_id,
-          otp_auth_code: login.otp_auth_code,
-          otp_group: login.otp_group,
-        });
-        router.replace({
-          pathname: '/(auth)/register',
-          params: {
-            phone,
-            otpId: String(login.otp_id),
-            otpAuthCode: login.otp_auth_code,
-            otpGroup: login.otp_group,
-          },
-        });
+        await goRegister(login.otp_id, login.otp_auth_code, login.otp_group);
         return;
       }
 
@@ -124,7 +168,9 @@ export default function OtpScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Nhập mã xác thực</Text>
+        <Text style={styles.title}>
+          {isRegister ? 'Xác thực đăng ký' : 'Nhập mã xác thực'}
+        </Text>
         <Text style={styles.subtitle}>
           Mã OTP đã được gửi đến số{'\n'}
           <Text style={styles.phoneHighlight}>{formattedPhone}</Text>

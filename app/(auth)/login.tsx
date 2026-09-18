@@ -1,4 +1,4 @@
-// Login — SĐT → OTP (khách hàng)
+// Login / bắt đầu đăng ký — SĐT → OTP
 
 import React, { useState } from 'react';
 import {
@@ -8,15 +8,20 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TouchableOpacity,
   Alert,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { Button } from '@/components/ui/Button';
 import { PhoneInput } from '@/components/ui/PhoneInput';
 import { authApi, ApiError, saveOtpSession } from '@/services/api';
 
 export default function LoginScreen() {
+  const { intent } = useLocalSearchParams<{ intent?: string }>();
+  const isRegister = intent === 'register';
+  const otpGroup = isRegister ? 'otp_register' : 'otp_general';
+
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -26,13 +31,14 @@ export default function LoginScreen() {
     if (!isValid || loading) return;
     setLoading(true);
     try {
-      const otp = await authApi.sendOtp(phone, 'otp_general', '84');
+      const otp = await authApi.sendOtp(phone, otpGroup, '84');
       await saveOtpSession({
         phone,
         country_code: '84',
-        otp_group: 'otp_general',
+        otp_group: otpGroup,
         otp_id: otp.id,
         otp_debug: otp.otp_debug,
+        intent: isRegister ? 'register' : 'login',
       });
       router.push({
         pathname: '/(auth)/otp',
@@ -40,6 +46,8 @@ export default function LoginScreen() {
           phone,
           otpId: String(otp.id),
           otpDebug: otp.otp_debug ?? '',
+          intent: isRegister ? 'register' : 'login',
+          otpGroup,
         },
       });
     } catch (e) {
@@ -68,7 +76,11 @@ export default function LoginScreen() {
             <Text style={styles.logoText}>Z</Text>
           </View>
           <Text style={styles.appName}>ZUUMCUSTOMER</Text>
-          <Text style={styles.hint}>Đăng nhập hoặc tạo tài khoản khách</Text>
+          <Text style={styles.hint}>
+            {isRegister
+              ? 'Đăng ký tài khoản khách hàng'
+              : 'Đăng nhập bằng số điện thoại'}
+          </Text>
         </View>
 
         <View style={styles.fieldGroup}>
@@ -83,12 +95,50 @@ export default function LoginScreen() {
         <View style={{ flex: 1 }} />
 
         <Button
-          title={loading ? 'Đang gửi OTP...' : 'Nhận mã OTP'}
+          title={
+            loading
+              ? 'Đang gửi OTP...'
+              : isRegister
+                ? 'Đăng ký — nhận mã OTP'
+                : 'Đăng nhập — nhận mã OTP'
+          }
           onPress={handleContinue}
           variant={isValid ? 'primary' : 'secondary'}
           disabled={!isValid || loading}
           loading={loading}
         />
+
+        <View style={styles.switchRow}>
+          {isRegister ? (
+            <>
+              <Text style={styles.switchText}>Đã có tài khoản? </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  router.replace({
+                    pathname: '/(auth)/login',
+                    params: { intent: 'login' },
+                  })
+                }
+              >
+                <Text style={styles.switchLink}>Đăng nhập</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.switchText}>Chưa có tài khoản? </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  router.replace({
+                    pathname: '/(auth)/login',
+                    params: { intent: 'register' },
+                  })
+                }
+              >
+                <Text style={styles.switchLink}>Đăng ký khách hàng</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -129,11 +179,28 @@ const styles = StyleSheet.create({
   hint: {
     fontSize: Typography.fontSize.sm,
     color: Colors.textSecondary,
+    textAlign: 'center',
   },
   fieldGroup: { gap: Spacing.sm },
   label: {
     fontSize: Typography.fontSize.base,
     color: Colors.text,
     fontWeight: Typography.fontWeight.medium,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    flexWrap: 'wrap',
+  },
+  switchText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
+  },
+  switchLink: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.primary,
+    fontWeight: Typography.fontWeight.semiBold,
   },
 });
