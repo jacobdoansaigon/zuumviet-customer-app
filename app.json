@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "ZUUMCUSTOMER",
+    "slug": "zv-customer-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "zuumcustomer",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "vn.zuumviet.customer"
+    },
+    "android": {
+      "package": "vn.zuumviet.customer",
+      "adaptiveIcon": {
+        "backgroundColor": "#6B35D4",
+        "foregroundImage": "./assets/icon.png"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "\u1ee8ng d\u1ee5ng c\u1ea7n v\u1ecb tr\u00ed \u0111\u1ec3 hi\u1ec3n th\u1ecb b\u1ea3n \u0111\u1ed3 v\u00e0 giao h\u00e0ng.",
+          "locationAlwaysPermission": "\u1ee8ng d\u1ee5ng c\u1ea7n v\u1ecb tr\u00ed n\u1ec1n \u0111\u1ec3 t\u00e0i x\u1ebf c\u00f3 th\u1ec3 nh\u1eadn \u0111\u01a1n.",
+          "locationWhenInUsePermission": "\u1ee8ng d\u1ee5ng c\u1ea7n v\u1ecb tr\u00ed \u0111\u1ec3 \u0111i\u1ec1u h\u01b0\u1edbng giao h\u00e0ng.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#6B35D4",
+          "sounds": [
+            "./assets/notification.wav"
+          ]
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "\u1ee8ng d\u1ee5ng c\u1ea7n truy c\u1eadp \u1ea3nh \u0111\u1ec3 t\u1ea3i l\u00ean gi\u1ea5y t\u1edd t\u00e0i x\u1ebf.",
+          "cameraPermission": "\u1ee8ng d\u1ee5ng c\u1ea7n camera \u0111\u1ec3 ch\u1ee5p gi\u1ea5y t\u1edd t\u00e0i x\u1ebf."
+        }
+      ]
+    ]
+  }
+}
