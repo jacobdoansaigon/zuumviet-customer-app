@@ -1,16 +1,10 @@
-// Bottom tabs — ZUUMCUSTOMER
-// Tabs: Home | Orders | Wallet | Community | Account
+// Bottom tabs — ZUUMCUSTOMER: Home | Đơn | Ví | Tài khoản
 
 import { Tabs } from 'expo-router';
 import { Colors, Typography } from '@/constants/theme';
 import { Text } from 'react-native';
 
-type TabIconProps = {
-  focused: boolean;
-  emoji: string;
-};
-
-function TabIcon({ focused, emoji }: TabIconProps) {
+function TabIcon({ focused, emoji }: { focused: boolean; emoji: string }) {
   return (
     <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>
   );
@@ -55,13 +49,6 @@ export default function TabsLayout() {
         options={{
           title: 'Ví',
           tabBarIcon: ({ focused }) => <TabIcon focused={focused} emoji="💰" />,
-        }}
-      />
-      <Tabs.Screen
-        name="community"
-        options={{
-          title: 'Cộng đồng',
-          tabBarIcon: ({ focused }) => <TabIcon focused={focused} emoji="👥" />,
         }}
       />
       <Tabs.Screen

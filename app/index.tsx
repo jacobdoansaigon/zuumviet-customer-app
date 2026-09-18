@@ -1,15 +1,7 @@
-// Splash / Welcome screen — ZUUMCUSTOMER
-// Design: Figma [Driver] Sign In + Sign Up > Welcome screen
+// Splash — ZUUMCUSTOMER (khách đặt giao hàng)
 
-import React, { useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-  Linking,
-} from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -21,7 +13,6 @@ export default function WelcomeScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* Logo */}
       <View style={styles.logoContainer}>
         <View style={styles.logoBadge}>
           <Text style={styles.logoText}>Z</Text>
@@ -29,24 +20,19 @@ export default function WelcomeScreen() {
         <Text style={styles.appName}>ZUUMCUSTOMER</Text>
       </View>
 
-      {/* Illustration placeholder */}
       <View style={styles.illustrationContainer}>
-        <View style={styles.illustrationPlaceholder}>
-          {/* Illustration: people around a car — replace with actual SVG/Image */}
-          <Text style={styles.illustrationEmoji}>🚗</Text>
-          <Text style={styles.illustrationSubEmoji}>🧑‍🤝‍🧑</Text>
-        </View>
+        <Text style={styles.illustrationEmoji}>📦</Text>
+        <Text style={styles.illustrationSub}>Giao hàng tận nơi</Text>
       </View>
 
-      {/* Headline */}
       <View style={styles.headlineContainer}>
-        <Text style={styles.headline}>Hãy cùng zuumviet</Text>
+        <Text style={styles.headline}>Đặt giao hàng dễ dàng</Text>
         <Text style={styles.subtitle}>
-          Công việc tự do, thăng tiến dễ dàng, thu nhập{'\n'}gia tăng, nhận nhiều khoản thưởng
+          Gửi hàng nhanh trong thành phố — theo dõi tài xế{'\n'}
+          và nhận hàng đúng điểm đến.
         </Text>
       </View>
 
-      {/* CTA */}
       <View style={styles.ctaContainer}>
         <Button
           title="Đăng nhập bằng số điện thoại"
@@ -54,11 +40,10 @@ export default function WelcomeScreen() {
           variant="primary"
         />
 
-        {/* Terms */}
         <View style={styles.termsContainer}>
-          <Text style={styles.termsText}>Khi Đăng nhập hoặc Đăng ký, Tôi đã đồng ý với </Text>
+          <Text style={styles.termsText}>Khi tiếp tục, bạn đồng ý với </Text>
           <TouchableOpacity onPress={() => Linking.openURL('https://zuumviet.vn/terms')}>
-            <Text style={styles.termsLink}>Điều khoản dịch vụ</Text>
+            <Text style={styles.termsLink}>Điều khoản</Text>
           </TouchableOpacity>
           <Text style={styles.termsText}> và </Text>
           <TouchableOpacity onPress={() => Linking.openURL('https://zuumviet.vn/privacy')}>
@@ -76,8 +61,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     paddingHorizontal: Spacing['2xl'],
   },
-
-  // Logo
   logoContainer: {
     alignItems: 'center',
     marginTop: Spacing['2xl'],
@@ -90,9 +73,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    // Location pin shape via border
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
   },
   logoText: {
     fontSize: Typography.fontSize['3xl'],
@@ -105,26 +85,17 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     letterSpacing: 2,
   },
-
-  // Illustration
   illustrationContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  illustrationPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
     gap: Spacing.md,
   },
-  illustrationEmoji: {
-    fontSize: 80,
+  illustrationEmoji: { fontSize: 80 },
+  illustrationSub: {
+    fontSize: Typography.fontSize.md,
+    color: Colors.textSecondary,
   },
-  illustrationSubEmoji: {
-    fontSize: 48,
-  },
-
-  // Headline
   headlineContainer: {
     alignItems: 'center',
     gap: Spacing.sm,
@@ -142,8 +113,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: Typography.fontSize.md * 1.6,
   },
-
-  // CTA
   ctaContainer: {
     gap: Spacing.md,
     marginBottom: Spacing.xl,
@@ -157,7 +126,6 @@ const styles = StyleSheet.create({
   termsText: {
     fontSize: Typography.fontSize.sm,
     color: Colors.textSecondary,
-    textAlign: 'center',
   },
   termsLink: {
     fontSize: Typography.fontSize.sm,

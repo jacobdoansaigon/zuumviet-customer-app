@@ -1,4 +1,4 @@
-// Home — ZUUMCUSTOMER: đặt giao hàng
+// Home — khách đặt giao hàng
 
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/Button';
 import {
   getStoredCustomer,
   orderApi,
-  clearSession,
   type CustomerProfile,
   type DeliveryOrder,
 } from '@/services/api';
@@ -29,29 +28,36 @@ export default function HomeScreen() {
         const res = await orderApi.getOrders();
         setOrders(res.items ?? []);
       } catch {
-        // ignore until authenticated against live data
+        /* empty until first order */
       }
     })();
   }, []);
 
   const name =
-    customer?.full_name || customer?.fullname || customer?.phone || 'Khách hàng';
+    customer?.full_name || customer?.fullname || customer?.phone || 'bạn';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.brand}>ZUUMCUSTOMER</Text>
       <Text style={styles.hello}>Xin chào, {name}</Text>
-      <Text style={styles.sub}>Đặt giao hàng nhanh trong khu vực của bạn.</Text>
+      <Text style={styles.sub}>Bạn muốn gửi hàng đi đâu hôm nay?</Text>
 
       <Button
-        title="Đặt đơn mới"
+        title="Đặt giao hàng"
         onPress={() => router.push('/map')}
         style={{ marginTop: Spacing.lg }}
       />
 
+      <Pressable
+        style={styles.secondaryCta}
+        onPress={() => router.push('/(tabs)/orders')}
+      >
+        <Text style={styles.secondaryText}>Xem đơn của tôi →</Text>
+      </Pressable>
+
       <Text style={styles.section}>Đơn gần đây</Text>
       {orders.length === 0 ? (
-        <Text style={styles.empty}>Chưa có đơn hàng.</Text>
+        <Text style={styles.empty}>Chưa có đơn. Bấm “Đặt giao hàng” để bắt đầu.</Text>
       ) : (
         orders.slice(0, 5).map((o) => (
           <Pressable
@@ -59,21 +65,11 @@ export default function HomeScreen() {
             style={styles.card}
             onPress={() => router.push(`/map?orderId=${o.id}`)}
           >
-            <Text style={styles.cardTitle}>#{o.id}</Text>
+            <Text style={styles.cardTitle}>Đơn #{o.id}</Text>
             <Text style={styles.cardMeta}>Trạng thái: {String(o.status)}</Text>
           </Pressable>
         ))
       )}
-
-      <Pressable
-        onPress={async () => {
-          await clearSession();
-          router.replace('/(auth)/login');
-        }}
-        style={{ marginTop: Spacing.xl }}
-      >
-        <Text style={styles.logout}>Đăng xuất</Text>
-      </Pressable>
     </ScrollView>
   );
 }
@@ -93,6 +89,8 @@ const styles = StyleSheet.create({
     color: Colors.gray900,
   },
   sub: { marginTop: Spacing.xs, color: Colors.gray500 },
+  secondaryCta: { marginTop: Spacing.md, alignItems: 'center' },
+  secondaryText: { color: Colors.primary, fontWeight: Typography.fontWeight.medium },
   section: {
     marginTop: Spacing.xl,
     marginBottom: Spacing.sm,
@@ -109,5 +107,4 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontWeight: Typography.fontWeight.semibold },
   cardMeta: { color: Colors.gray500, marginTop: 4 },
-  logout: { color: Colors.primary, textAlign: 'center' },
 });

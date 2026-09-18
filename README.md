@@ -1,10 +1,12 @@
-# ZUUMCUSTOMER — React Native App
+# ZUUMCUSTOMER — App khách hàng ZuumViet
 
-App dành cho **khách hàng ZuumViet** (đặt giao hàng).
+Luồng **khách hàng** (không phải tài xế):
 
-## Tech
-
-Expo SDK 57 + Expo Router. API: `zv-customer` + `zv-delivery`.
+1. Welcome → SĐT → OTP  
+2. Nếu chưa có TK → đăng ký ngắn (họ tên + mật khẩu)  
+3. Home: **Đặt giao hàng**  
+4. Đơn hàng: xem / theo dõi / huỷ  
+5. Ví + Tài khoản khách  
 
 ## Chạy
 
@@ -14,4 +16,5 @@ cp .env.example .env
 npm start
 ```
 
-API URL mặc định: `https://zuumviet-api-production.up.railway.app`
+API: `https://zuumviet-api-production.up.railway.app`  
+`AppName: customer`

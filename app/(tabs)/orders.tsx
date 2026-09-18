@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
 import { Colors, Typography, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import {
   orderApi,
@@ -30,16 +30,16 @@ const TAB_OPTIONS: { label: string; value: TabValue }[] = [
 
 const STATUS_LABEL: Record<number, string> = {
   [ORDER_STATUS.NEW]: 'Mới',
-  [ORDER_STATUS.ASSIGNING]: 'Đang tìm TX',
-  [ORDER_STATUS.ACCEPTED]: 'Đã nhận',
-  [ORDER_STATUS.BOARDED]: 'Đã đến',
+  [ORDER_STATUS.ASSIGNING]: 'Đang tìm tài xế',
+  [ORDER_STATUS.ACCEPTED]: 'Tài xế đã nhận',
+  [ORDER_STATUS.BOARDED]: 'Đã đến lấy',
   [ORDER_STATUS.PICKED]: 'Đã lấy hàng',
   [ORDER_STATUS.STARTED]: 'Bắt đầu',
   [ORDER_STATUS.DELIVERING]: 'Đang giao',
   [ORDER_STATUS.COMPLETED]: 'Hoàn thành',
   [ORDER_STATUS.FAIL]: 'Thất bại',
-  [ORDER_STATUS.CUSTOMER_CANCELLED]: 'KH huỷ',
-  [ORDER_STATUS.DRIVER_CANCELLED]: 'TX huỷ',
+  [ORDER_STATUS.CUSTOMER_CANCELLED]: 'Bạn đã huỷ',
+  [ORDER_STATUS.DRIVER_CANCELLED]: 'Tài xế huỷ',
 };
 
 function statusColor(status: number) {
@@ -164,8 +164,18 @@ function OrderCard({ order }: { order: DeliveryOrder }) {
         ? `${Number(order.shipping_fee).toLocaleString('vi-VN')}đ`
         : '—';
 
+  const canCancel =
+    status > 0 &&
+    status < ORDER_STATUS.COMPLETED &&
+    status !== ORDER_STATUS.CUSTOMER_CANCELLED &&
+    status !== ORDER_STATUS.DRIVER_CANCELLED;
+
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.8}>
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.8}
+      onPress={() => router.push(`/map?orderId=${order.id}`)}
+    >
       <View style={styles.cardHeader}>
         <Text style={styles.orderId}>#{order.id}</Text>
         <View
@@ -198,6 +208,33 @@ function OrderCard({ order }: { order: DeliveryOrder }) {
 
       <View style={styles.cardFooter}>
         <Text style={styles.fee}>{fee}</Text>
+        {canCancel ? (
+          <TouchableOpacity
+            onPress={(e) => {
+              e.stopPropagation?.();
+              Alert.alert('Huỷ đơn', `Huỷ đơn #${order.id}?`, [
+                { text: 'Không', style: 'cancel' },
+                {
+                  text: 'Huỷ đơn',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await orderApi.cancelOrder(order.id);
+                      Alert.alert('Đã huỷ', 'Đơn đã được huỷ.');
+                    } catch (err) {
+                      Alert.alert(
+                        'Lỗi',
+                        err instanceof ApiError ? err.message : 'Không huỷ được'
+                      );
+                    }
+                  },
+                },
+              ]);
+            }}
+          >
+            <Text style={styles.cancelLink}>Huỷ đơn</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -296,7 +333,8 @@ const styles = StyleSheet.create({
   },
   cardFooter: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
@@ -305,5 +343,10 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.bold,
     color: Colors.primary,
+  },
+  cancelLink: {
+    color: Colors.error,
+    fontWeight: Typography.fontWeight.semibold,
+    fontSize: Typography.fontSize.sm,
   },
 });

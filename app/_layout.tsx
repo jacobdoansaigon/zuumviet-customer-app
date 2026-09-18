@@ -2,7 +2,6 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useNotifications } from '@/hooks/useNotifications';
-import { customerApi } from '@/services/api';
 
 function AppWithNotifications() {
   useNotifications({

@@ -1,7 +1,6 @@
-// Account screen — Tài khoản tài xế
-// Design: Figma [Driver] Tài khoản tài xế
+// Account — tài khoản khách hàng
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,8 +11,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Colors, Typography, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { authApi } from '@/services/api';
+import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { authApi, getStoredCustomer, type CustomerProfile } from '@/services/api';
 
 type MenuItem = {
   icon: string;
@@ -23,6 +22,12 @@ type MenuItem = {
 };
 
 export default function AccountScreen() {
+  const [customer, setCustomer] = useState<CustomerProfile | null>(null);
+
+  useEffect(() => {
+    getStoredCustomer().then(setCustomer);
+  }, []);
+
   const handleLogout = () => {
     Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất?', [
       { text: 'Huỷ', style: 'cancel' },
@@ -42,16 +47,14 @@ export default function AccountScreen() {
       title: 'Tài khoản',
       items: [
         { icon: '👤', label: 'Thông tin cá nhân', onPress: () => {} },
-        { icon: '🚗', label: 'Phương tiện của tôi', onPress: () => {} },
-        { icon: '📄', label: 'Giấy tờ & tài liệu', onPress: () => {} },
-        { icon: '⭐', label: 'Đánh giá của tôi', onPress: () => {} },
+        { icon: '📍', label: 'Địa chỉ đã lưu', onPress: () => {} },
+        { icon: '⭐', label: 'Tài xế yêu thích', onPress: () => {} },
       ],
     },
     {
       title: 'Cài đặt',
       items: [
         { icon: '🔔', label: 'Thông báo', onPress: () => {} },
-        { icon: '🔒', label: 'Bảo mật', onPress: () => {} },
         { icon: '🌐', label: 'Ngôn ngữ', badge: 'Tiếng Việt', onPress: () => {} },
       ],
     },
@@ -60,83 +63,59 @@ export default function AccountScreen() {
       items: [
         { icon: '🎧', label: 'Liên hệ hỗ trợ', onPress: () => {} },
         { icon: '📋', label: 'Điều khoản dịch vụ', onPress: () => {} },
-        { icon: '🛡️', label: 'Chính sách bảo mật', onPress: () => {} },
         { icon: 'ℹ️', label: 'Về ứng dụng', badge: 'v1.0.0', onPress: () => {} },
       ],
     },
   ];
 
+  const displayName =
+    customer?.full_name || customer?.fullname || 'Khách hàng';
+  const phone = customer?.phone
+    ? `+${customer.country_code || '84'} ${customer.phone}`
+    : '';
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Tài khoản</Text>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Profile card */}
+      <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.profileCard}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarEmoji}>🧑</Text>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {displayName.slice(0, 1).toUpperCase()}
+            </Text>
           </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Nguyễn Văn A</Text>
-            <Text style={styles.profilePhone}>0352 237 832</Text>
-            <View style={styles.ratingRow}>
-              <Text style={styles.ratingStar}>⭐</Text>
-              <Text style={styles.ratingValue}>5.0</Text>
-              <Text style={styles.ratingCount}>(120 đánh giá)</Text>
-            </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name}>{displayName}</Text>
+            {phone ? <Text style={styles.phone}>{phone}</Text> : null}
           </View>
-          <TouchableOpacity style={styles.editBtn}>
-            <Text style={styles.editBtnText}>✏️</Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Completion badge */}
-        <View style={styles.completionCard}>
-          <Text style={styles.completionTitle}>🏆 Tài xế xuất sắc</Text>
-          <Text style={styles.completionDesc}>Hoàn thành 1.234 đơn hàng</Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: '85%' }]} />
-          </View>
-          <Text style={styles.completionHint}>Còn 180 đơn để đạt Tài xế Vàng</Text>
-        </View>
-
-        {/* Menu groups */}
         {menuGroups.map((group) => (
-          <View key={group.title} style={styles.menuGroup}>
+          <View key={group.title} style={styles.group}>
             <Text style={styles.groupTitle}>{group.title}</Text>
-            <View style={styles.menuCard}>
-              {group.items.map((item, idx) => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={[
-                    styles.menuItem,
-                    idx < group.items.length - 1 && styles.menuItemBorder,
-                  ]}
-                  onPress={item.onPress}
-                >
-                  <Text style={styles.menuIcon}>{item.icon}</Text>
-                  <Text style={styles.menuLabel}>{item.label}</Text>
-                  <View style={styles.menuRight}>
-                    {item.badge && (
-                      <Text style={styles.menuBadge}>{item.badge}</Text>
-                    )}
-                    <Text style={styles.menuChevron}>›</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
+            {group.items.map((item) => (
+              <TouchableOpacity
+                key={item.label}
+                style={styles.row}
+                onPress={item.onPress}
+              >
+                <Text style={styles.rowIcon}>{item.icon}</Text>
+                <Text style={styles.rowLabel}>{item.label}</Text>
+                {item.badge ? (
+                  <Text style={styles.badge}>{item.badge}</Text>
+                ) : (
+                  <Text style={styles.chevron}>›</Text>
+                )}
+              </TouchableOpacity>
+            ))}
           </View>
         ))}
 
-        {/* Logout */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={styles.logoutText}>🚪 Đăng xuất</Text>
+        <TouchableOpacity style={styles.logout} onPress={handleLogout}>
+          <Text style={styles.logoutText}>Đăng xuất</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -144,10 +123,10 @@ export default function AccountScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
+  safeArea: { flex: 1, backgroundColor: Colors.white },
   header: {
-    paddingHorizontal: Spacing['2xl'],
-    paddingVertical: Spacing.base,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -156,160 +135,59 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.bold,
     color: Colors.text,
   },
-  content: {
-    padding: Spacing['2xl'],
-    gap: Spacing.base,
-    paddingBottom: Spacing['3xl'],
-  },
-
-  // Profile
+  content: { padding: Spacing.lg, paddingBottom: Spacing['3xl'] },
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.base,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Shadow.sm,
-  },
-  avatarCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
     backgroundColor: Colors.primaryBg,
+    marginBottom: Spacing.xl,
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: Colors.primaryLight,
   },
-  avatarEmoji: { fontSize: 32 },
-  profileInfo: { flex: 1, gap: 2 },
-  profileName: {
+  avatarText: {
+    color: Colors.white,
+    fontWeight: Typography.fontWeight.bold,
     fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
+  },
+  name: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: Typography.fontWeight.semibold,
     color: Colors.text,
   },
-  profilePhone: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.textSecondary,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  ratingStar: { fontSize: 14 },
-  ratingValue: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.text,
-  },
-  ratingCount: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.textSecondary,
-  },
-  editBtn: {
-    padding: Spacing.sm,
-  },
-  editBtnText: { fontSize: 20 },
-
-  // Completion
-  completionCard: {
-    backgroundColor: Colors.primaryBg,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.base,
-    gap: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.primaryLight,
-  },
-  completionTitle: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.primary,
-  },
-  completionDesc: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.primaryDark,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: Colors.gray200,
-    borderRadius: BorderRadius.full,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.full,
-  },
-  completionHint: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.textSecondary,
-  },
-
-  // Menu
-  menuGroup: { gap: Spacing.sm },
+  phone: { marginTop: 4, color: Colors.textSecondary },
+  group: { marginBottom: Spacing.lg },
   groupTitle: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semiBold,
     color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginBottom: Spacing.sm,
   },
-  menuCard: {
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.xl,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  menuItem: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
-    padding: Spacing.base,
-  },
-  menuItemBorder: {
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.gray200,
   },
-  menuIcon: { fontSize: 20 },
-  menuLabel: {
-    flex: 1,
-    fontSize: Typography.fontSize.base,
-    color: Colors.text,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  menuRight: {
-    flexDirection: 'row',
+  rowIcon: { fontSize: 18, marginRight: Spacing.md },
+  rowLabel: { flex: 1, fontSize: Typography.fontSize.base, color: Colors.text },
+  badge: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm },
+  chevron: { color: Colors.gray400, fontSize: 22 },
+  logout: {
+    marginTop: Spacing.lg,
     alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  menuBadge: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.textSecondary,
-  },
-  menuChevron: {
-    fontSize: 20,
-    color: Colors.gray400,
-  },
-
-  // Logout
-  logoutBtn: {
-    padding: Spacing.base,
-    borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.error + '40',
-    alignItems: 'center',
-    marginTop: Spacing.sm,
+    padding: Spacing.md,
   },
   logoutText: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semiBold,
     color: Colors.error,
+    fontWeight: Typography.fontWeight.semibold,
   },
 });

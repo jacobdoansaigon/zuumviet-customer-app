@@ -1,4 +1,5 @@
-// Login screen — Phone number → OTP
+// Login — SĐT → OTP (khách hàng)
+
 import React, { useState } from 'react';
 import {
   View,
@@ -7,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  TouchableOpacity,
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -20,7 +20,7 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const isValid = phone.length === 10;
+  const isValid = phone.length >= 9 && phone.length <= 11;
 
   const handleContinue = async () => {
     if (!isValid || loading) return;
@@ -43,11 +43,12 @@ export default function LoginScreen() {
         },
       });
     } catch (e) {
-      const msg =
+      Alert.alert(
+        'Lỗi',
         e instanceof ApiError
           ? e.message
-          : 'Không gửi được OTP. Kiểm tra EXPO_PUBLIC_API_URL / mạng.';
-      Alert.alert('Lỗi', msg);
+          : 'Không gửi được OTP. Kiểm tra mạng / API.'
+      );
     } finally {
       setLoading(false);
     }
@@ -67,39 +68,27 @@ export default function LoginScreen() {
             <Text style={styles.logoText}>Z</Text>
           </View>
           <Text style={styles.appName}>ZUUMCUSTOMER</Text>
+          <Text style={styles.hint}>Đăng nhập hoặc tạo tài khoản khách</Text>
         </View>
 
-        <View style={styles.form}>
-          <View style={styles.fieldGroup}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>Số điện thoại của tôi là</Text>
-              <Text style={styles.required}>(*)</Text>
-            </View>
-            <PhoneInput
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="077 996 3333"
-            />
-          </View>
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Số điện thoại</Text>
+          <PhoneInput
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="09xx xxx xxx"
+          />
         </View>
 
         <View style={{ flex: 1 }} />
 
-        <View style={styles.ctaContainer}>
-          <Button
-            title={loading ? 'Đang gửi OTP...' : 'Tiếp tục'}
-            onPress={handleContinue}
-            variant={isValid ? 'primary' : 'secondary'}
-            disabled={!isValid || loading}
-            loading={loading}
-          />
-          <View style={styles.registerRow}>
-            <Text style={styles.registerText}>Chưa có tài khoản? </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-              <Text style={styles.registerLink}>Đăng ký khách hàng →</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <Button
+          title={loading ? 'Đang gửi OTP...' : 'Nhận mã OTP'}
+          onPress={handleContinue}
+          variant={isValid ? 'primary' : 'secondary'}
+          disabled={!isValid || loading}
+          loading={loading}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -137,36 +126,14 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     letterSpacing: 2,
   },
-  form: { gap: Spacing.lg },
-  fieldGroup: { gap: Spacing.sm },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  hint: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
   },
+  fieldGroup: { gap: Spacing.sm },
   label: {
     fontSize: Typography.fontSize.base,
     color: Colors.text,
     fontWeight: Typography.fontWeight.medium,
-  },
-  required: {
-    fontSize: Typography.fontSize.base,
-    color: Colors.primary,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  ctaContainer: { gap: Spacing.md, marginTop: Spacing.xl },
-  registerRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  registerText: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.textSecondary,
-  },
-  registerLink: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.primary,
-    fontWeight: Typography.fontWeight.semiBold,
   },
 });

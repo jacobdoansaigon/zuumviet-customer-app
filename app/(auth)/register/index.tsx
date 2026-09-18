@@ -1,34 +1,102 @@
-// Đăng ký tài xế mới — Step 1: Thông tin cá nhân
-// Design: Figma [Driver] Sign In + Sign Up > Đk tài xế
+// Đăng ký khách — 1 bước: họ tên + mật khẩu (sau OTP)
 
 import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  Alert,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { Button } from '@/components/ui/Button';
-import { StepIndicator } from '@/components/ui/StepIndicator';
+import {
+  authApi,
+  ApiError,
+  getOtpSession,
+  saveSession,
+} from '@/services/api';
 
-export default function RegisterStep1() {
-  const [form, setForm] = useState({
-    fullName: '',
-    dateOfBirth: '',
-    gender: '' as 'male' | 'female' | '',
-    email: '',
-    referralCode: '',
-  });
+/** TYPE_NORMAL = 1 trên BE */
+const CUSTOMER_TYPE_NORMAL = 1;
 
-  const isValid = form.fullName.trim().length >= 2 && form.dateOfBirth.length === 10;
+export default function RegisterScreen() {
+  const params = useLocalSearchParams<{
+    phone?: string;
+    otpId?: string;
+    otpAuthCode?: string;
+    otpGroup?: string;
+  }>();
 
-  const update = (key: keyof typeof form, value: string) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
+  const [fullName, setFullName] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const canSubmit =
+    fullName.trim().length >= 2 &&
+    password.length >= 6 &&
+    password === passwordConfirm;
+
+  const handleRegister = async () => {
+    if (!canSubmit || loading) return;
+    setLoading(true);
+    try {
+      const session = await getOtpSession<{
+        phone?: string;
+        country_code?: string;
+        otp_id?: number;
+        otp_auth_code?: string;
+        otp_group?: string;
+      }>();
+
+      const phone = params.phone || session?.phone || '';
+      const otpId = Number(params.otpId || session?.otp_id || 0);
+      const otpAuthCode =
+        params.otpAuthCode || session?.otp_auth_code || '';
+      const otpGroup =
+        params.otpGroup || session?.otp_group || 'otp_general';
+
+      if (!phone || !otpId || !otpAuthCode) {
+        Alert.alert('Thiếu OTP', 'Vui lòng xác thực OTP lại từ đầu.');
+        router.replace('/(auth)/login');
+        return;
+      }
+
+      await authApi.register({
+        full_name: fullName.trim(),
+        phone,
+        country_code: '84',
+        password,
+        email: '',
+        type: CUSTOMER_TYPE_NORMAL,
+        otp_id: otpId,
+        otp_auth_code: otpAuthCode,
+        otp_group: otpGroup,
+        ref_aff_code: '',
+        avatar: 0,
+        gender: 0,
+        birthday: 0,
+        region_id: 0,
+        sub_region_id: 0,
+      });
+
+      const byPass = await authApi.loginPassword(phone, password, '84');
+      await saveSession(byPass.token, byPass);
+      router.replace('/(tabs)');
+    } catch (e) {
+      Alert.alert(
+        'Đăng ký thất bại',
+        e instanceof ApiError ? e.message : 'Vui lòng thử lại'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -39,100 +107,56 @@ export default function RegisterStep1() {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
-        <StepIndicator total={4} current={1} />
+        <Text style={styles.title}>Tạo tài khoản khách</Text>
+        <Text style={styles.sub}>
+          Chỉ cần họ tên và mật khẩu để bắt đầu đặt giao hàng.
+        </Text>
 
-        <Text style={styles.title}>Thông tin cá nhân</Text>
-        <Text style={styles.subtitle}>Điền đầy đủ thông tin để đăng ký tài xế</Text>
-
-        <View style={styles.form}>
-          <Field
-            label="Họ và tên (*)"
+        <View style={styles.field}>
+          <Text style={styles.label}>Họ và tên</Text>
+          <TextInput
+            style={styles.input}
+            value={fullName}
+            onChangeText={setFullName}
             placeholder="Nguyễn Văn A"
-            value={form.fullName}
-            onChangeText={(v) => update('fullName', v)}
+            placeholderTextColor={Colors.placeholder}
           />
-          <Field
-            label="Ngày sinh (*)"
-            placeholder="DD/MM/YYYY"
-            value={form.dateOfBirth}
-            onChangeText={(v) => update('dateOfBirth', v)}
-            keyboardType="number-pad"
-            maxLength={10}
-          />
+        </View>
 
-          {/* Gender select */}
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Giới tính</Text>
-            <View style={styles.genderRow}>
-              {(['male', 'female'] as const).map((g) => (
-                <Button
-                  key={g}
-                  title={g === 'male' ? '👨 Nam' : '👩 Nữ'}
-                  onPress={() => update('gender', g)}
-                  variant={form.gender === g ? 'primary' : 'outline'}
-                  size="md"
-                  fullWidth={false}
-                  style={styles.genderBtn}
-                />
-              ))}
-            </View>
-          </View>
-
-          <Field
-            label="Email (không bắt buộc)"
-            placeholder="example@email.com"
-            value={form.email}
-            onChangeText={(v) => update('email', v)}
-            keyboardType="email-address"
-            autoCapitalize="none"
+        <View style={styles.field}>
+          <Text style={styles.label}>Mật khẩu (≥ 6 ký tự)</Text>
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            placeholder="••••••"
+            placeholderTextColor={Colors.placeholder}
           />
-          <Field
-            label="Mã giới thiệu (nếu có)"
-            placeholder="ZUUM2024"
-            value={form.referralCode}
-            onChangeText={(v) => update('referralCode', v.toUpperCase())}
-            autoCapitalize="characters"
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Nhập lại mật khẩu</Text>
+          <TextInput
+            style={styles.input}
+            value={passwordConfirm}
+            onChangeText={setPasswordConfirm}
+            secureTextEntry
+            placeholder="••••••"
+            placeholderTextColor={Colors.placeholder}
           />
         </View>
 
         <Button
-          title="Tiếp theo →"
-          onPress={() =>
-            router.push({
-              pathname: '/(auth)/register/step2',
-              params: { ...form },
-            })
-          }
-          disabled={!isValid}
-          variant={isValid ? 'primary' : 'secondary'}
+          title={loading ? 'Đang tạo...' : 'Hoàn tất đăng ký'}
+          onPress={handleRegister}
+          disabled={!canSubmit || loading}
+          loading={loading}
+          variant={canSubmit ? 'primary' : 'secondary'}
+          style={{ marginTop: Spacing.xl }}
         />
       </ScrollView>
     </KeyboardAvoidingView>
-  );
-}
-
-function Field({
-  label, placeholder, value, onChangeText,
-  keyboardType, autoCapitalize, maxLength,
-}: {
-  label: string; placeholder: string; value: string;
-  onChangeText: (v: string) => void;
-  keyboardType?: any; autoCapitalize?: any; maxLength?: number;
-}) {
-  return (
-    <View style={styles.fieldGroup}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={styles.input}
-        placeholder={placeholder}
-        placeholderTextColor={Colors.placeholder}
-        value={value}
-        onChangeText={onChangeText}
-        keyboardType={keyboardType ?? 'default'}
-        autoCapitalize={autoCapitalize ?? 'words'}
-        maxLength={maxLength}
-      />
-    </View>
   );
 }
 
@@ -140,36 +164,34 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     backgroundColor: Colors.white,
-    padding: Spacing['2xl'],
-    gap: Spacing.lg,
-    paddingBottom: Spacing['3xl'],
+    paddingHorizontal: Spacing['2xl'],
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.xl,
   },
   title: {
     fontSize: Typography.fontSize['2xl'],
     fontWeight: Typography.fontWeight.bold,
     color: Colors.text,
   },
-  subtitle: {
-    fontSize: Typography.fontSize.sm,
+  sub: {
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xl,
     color: Colors.textSecondary,
-    marginTop: -Spacing.sm,
+    lineHeight: 22,
   },
-  form: { gap: Spacing.base },
-  fieldGroup: { gap: Spacing.xs },
+  field: { gap: Spacing.sm, marginBottom: Spacing.lg },
   label: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.medium,
     color: Colors.text,
   },
   input: {
-    height: 50,
     borderWidth: 1.5,
     borderColor: Colors.border,
     borderRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
     fontSize: Typography.fontSize.base,
     color: Colors.text,
   },
-  genderRow: { flexDirection: 'row', gap: Spacing.sm },
-  genderBtn: { flex: 1 },
 });

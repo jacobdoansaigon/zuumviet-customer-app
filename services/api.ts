@@ -282,9 +282,6 @@ export const customerApi = {
     request<CustomerProfile>(`/site/customeraccounts/${id}`, { auth: true }),
 };
 
-/** @deprecated alias — UI đang migrate */
-export const driverApi = customerApi;
-
 export const orderApi = {
   getOrders: (status?: number) =>
     request<{ total: number; items: DeliveryOrder[] }>('/site/deliveryorders', {
@@ -309,29 +306,7 @@ export const orderApi = {
   getOrderDetail: (id: number | string) =>
     request<DeliveryOrder>(`/site/deliveryorders/${id}`, { auth: true }),
 
-  /** Accept=1, Reject=3 */
-  respondOrder: (body: {
-    doid: number;
-    dopid: number;
-    docid: number;
-    status: 1 | 3;
-    lat?: number;
-    long?: number;
-  }) =>
-    request('/site/deliveryorderresponses', {
-      method: 'POST',
-      auth: true,
-      body,
-    }),
-
-  addProcess: (orderId: number | string, body: Record<string, unknown>) =>
-    request(`/site/deliveryorderprocesses/${orderId}`, {
-      method: 'POST',
-      auth: true,
-      body,
-    }),
-
-  cancelByDriver: (id: number | string, body: Record<string, unknown> = {}) =>
+  cancelOrder: (id: number | string, body: Record<string, unknown> = {}) =>
     request(`/site/deliveryorders/customercancel/${id}`, {
       method: 'PUT',
       auth: true,
@@ -352,8 +327,3 @@ export const ORDER_STATUS = {
   CUSTOMER_CANCELLED: 19,
   DRIVER_CANCELLED: 21,
 } as const;
-
-export const RESPONSE_STATUS = {
-  ACCEPT: 1 as const,
-  REJECT: 3 as const,
-};
