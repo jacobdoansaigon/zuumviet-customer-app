@@ -1,4 +1,4 @@
-// Đăng ký khách — họ tên + mật khẩu (OTP đã verify, đọc từ AsyncStorage)
+// Đăng ký khách — form + xử lý autofill web + SĐT đã tồn tại
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -10,6 +10,8 @@ import {
   Platform,
   ScrollView,
   Alert,
+  type NativeSyntheticEvent,
+  type TextInputFocusEventData,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
@@ -30,11 +32,30 @@ function paramStr(v: string | string[] | undefined): string {
   return v != null ? String(v) : '';
 }
 
+function notify(title: string, message: string) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+  Alert.alert(title, message);
+}
+
+function readAutofillValue(
+  e: NativeSyntheticEvent<TextInputFocusEventData>
+): string {
+  const ne = e.nativeEvent as TextInputFocusEventData & { text?: string };
+  if (ne?.text != null && String(ne.text).length > 0) return String(ne.text);
+  const target = (e as unknown as { target?: { value?: string } }).target;
+  if (target?.value != null) return String(target.value);
+  return '';
+}
+
 export default function RegisterScreen() {
   const raw = useLocalSearchParams<{ phone?: string }>();
   const [phone, setPhone] = useState(normalizePhoneVn(paramStr(raw.phone)));
   const [sessionReady, setSessionReady] = useState(false);
   const [session, setSession] = useState<OtpSessionData | null>(null);
+  const [formError, setFormError] = useState('');
 
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
@@ -44,37 +65,70 @@ export default function RegisterScreen() {
   useEffect(() => {
     (async () => {
       const s = await getOtpSession<OtpSessionData>();
+      const phoneNorm = normalizePhoneVn(s?.phone || paramStr(raw.phone));
+      setPhone(phoneNorm);
+
+      // SĐT đã có tài khoản → không cần đăng ký lại
+      if (phoneNorm) {
+        try {
+          const exists = await authApi.checkExists(phoneNorm, '84');
+          if (exists?.id > 0) {
+            setFormError(
+              'Số này đã có tài khoản. Hãy đăng nhập bằng OTP hoặc mật khẩu.'
+            );
+            notify(
+              'Đã có tài khoản',
+              'SĐT này đã đăng ký. Chuyển sang đăng nhập.'
+            );
+            router.replace({
+              pathname: '/(auth)/login',
+              params: { intent: 'login' },
+            });
+            return;
+          }
+        } catch {
+          // check API fail — vẫn cho thử đăng ký
+        }
+      }
+
       if (!s?.otp_id || !s?.otp_auth_code) {
-        Alert.alert(
-          'Thiếu OTP',
-          'Vui lòng xác thực OTP trước khi đăng ký.',
-          [
-            {
-              text: 'OK',
-              onPress: () =>
-                router.replace({
-                  pathname: '/(auth)/login',
-                  params: { intent: 'register' },
-                }),
-            },
-          ]
+        setFormError(
+          'Thiếu phiên OTP. Vui lòng bấm Đăng ký lại và xác thực OTP.'
         );
+        setSessionReady(false);
         return;
       }
       setSession(s);
-      setPhone(normalizePhoneVn(s.phone || phone));
       setSessionReady(true);
     })();
   }, []);
 
-  const canSubmit =
-    sessionReady &&
-    fullName.trim().length >= 2 &&
-    password.length >= 6 &&
-    password === passwordConfirm;
-
   const handleRegister = async () => {
-    if (!canSubmit || loading || !session) return;
+    setFormError('');
+    const name = fullName.trim();
+    const pass = password;
+    const pass2 = passwordConfirm;
+
+    if (!sessionReady || !session) {
+      setFormError('Thiếu phiên OTP. Quay lại Đăng ký và xác thực OTP.');
+      notify('Thiếu OTP', 'Quay lại bước Đăng ký khách hàng và nhận OTP mới.');
+      return;
+    }
+    if (name.length < 2) {
+      setFormError('Nhập họ tên (ít nhất 2 ký tự).');
+      return;
+    }
+    if (pass.length < 6) {
+      setFormError(
+        'Mật khẩu chưa đủ 6 ký tự — nếu trình duyệt tự điền, hãy gõ lại mật khẩu trong ô.'
+      );
+      return;
+    }
+    if (pass !== pass2) {
+      setFormError('Hai mật khẩu không khớp — gõ lại cả hai ô (tránh autofill lệch).');
+      return;
+    }
+
     setLoading(true);
     try {
       const otpId = Number(session.otp_id);
@@ -82,15 +136,11 @@ export default function RegisterScreen() {
       const otpGroup = session.otp_group || 'otp_register';
       const phoneNorm = normalizePhoneVn(session.phone || phone);
 
-      if (!phoneNorm || !otpId || !otpAuthCode) {
-        throw new ApiError(422, 'Thiếu thông tin OTP — làm lại từ Đăng ký');
-      }
-
       await authApi.register({
-        full_name: fullName.trim(),
+        full_name: name,
         phone: phoneNorm,
         country_code: '84',
-        password,
+        password: pass,
         email: '',
         type: CUSTOMER_TYPE_NORMAL,
         otp_id: otpId,
@@ -105,32 +155,35 @@ export default function RegisterScreen() {
       });
 
       try {
-        const byPass = await authApi.loginPassword(phoneNorm, password, '84');
+        const byPass = await authApi.loginPassword(phoneNorm, pass, '84');
         await saveSession(byPass.token, byPass);
         router.replace('/(tabs)');
-      } catch (loginErr) {
-        // Account đã tạo — vẫn cho vào app qua login lại
-        Alert.alert(
+      } catch {
+        notify(
           'Đăng ký thành công',
-          'Tài khoản đã tạo. Vui lòng đăng nhập bằng số điện thoại.',
-          [
-            {
-              text: 'Đăng nhập',
-              onPress: () =>
-                router.replace({
-                  pathname: '/(auth)/login',
-                  params: { intent: 'login' },
-                }),
-            },
-          ]
+          'Tài khoản đã tạo. Hãy đăng nhập bằng số điện thoại.'
         );
+        router.replace({
+          pathname: '/(auth)/login',
+          params: { intent: 'login' },
+        });
       }
     } catch (e) {
       const msg =
         e instanceof ApiError
           ? e.message
           : 'Không đăng ký được. Thử lại hoặc gửi OTP mới.';
-      Alert.alert('Đăng ký thất bại', msg);
+      if (msg.includes('phone_existed') || msg.includes('existed')) {
+        setFormError('SĐT đã có tài khoản — hãy Đăng nhập.');
+        notify('Đã có tài khoản', 'Chuyển sang đăng nhập.');
+        router.replace({
+          pathname: '/(auth)/login',
+          params: { intent: 'login' },
+        });
+        return;
+      }
+      setFormError(msg);
+      notify('Đăng ký thất bại', msg);
     } finally {
       setLoading(false);
     }
@@ -147,8 +200,11 @@ export default function RegisterScreen() {
       >
         <Text style={styles.title}>Đăng ký khách hàng</Text>
         <Text style={styles.sub}>
-          SĐT +84 {phone || '…'} đã xác thực OTP. Nhập họ tên và mật khẩu.
+          SĐT +84 {phone || '…'} — nhập họ tên và mật khẩu (gõ tay, tránh autofill
+          lệch).
         </Text>
+
+        {formError ? <Text style={styles.errorBanner}>{formError}</Text> : null}
 
         <View style={styles.field}>
           <Text style={styles.label}>Họ và tên</Text>
@@ -159,6 +215,7 @@ export default function RegisterScreen() {
             placeholder="Nguyễn Văn A"
             placeholderTextColor={Colors.placeholder}
             autoCapitalize="words"
+            autoComplete="name"
           />
         </View>
 
@@ -168,9 +225,15 @@ export default function RegisterScreen() {
             style={styles.input}
             value={password}
             onChangeText={setPassword}
+            onBlur={(e) => {
+              const v = readAutofillValue(e);
+              if (v) setPassword(v);
+            }}
             secureTextEntry
-            placeholder="••••••"
+            placeholder="Gõ mật khẩu (không dùng Strong Password)"
             placeholderTextColor={Colors.placeholder}
+            autoComplete="new-password"
+            textContentType="newPassword"
           />
         </View>
 
@@ -180,19 +243,37 @@ export default function RegisterScreen() {
             style={styles.input}
             value={passwordConfirm}
             onChangeText={setPasswordConfirm}
+            onBlur={(e) => {
+              const v = readAutofillValue(e);
+              if (v) setPasswordConfirm(v);
+            }}
             secureTextEntry
-            placeholder="••••••"
+            placeholder="Gõ lại mật khẩu"
             placeholderTextColor={Colors.placeholder}
+            autoComplete="new-password"
+            textContentType="newPassword"
           />
         </View>
 
         <Button
           title={loading ? 'Đang tạo...' : 'Đăng ký khách hàng'}
           onPress={handleRegister}
-          disabled={!canSubmit || loading}
+          disabled={loading}
           loading={loading}
-          variant={canSubmit ? 'primary' : 'secondary'}
+          variant="primary"
         />
+
+        <Text
+          style={styles.loginLink}
+          onPress={() =>
+            router.replace({
+              pathname: '/(auth)/login',
+              params: { intent: 'login' },
+            })
+          }
+        >
+          Đã có tài khoản? Đăng nhập →
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -205,7 +286,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing['2xl'],
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.xl,
-    gap: 0,
   },
   title: {
     fontSize: Typography.fontSize['2xl'],
@@ -214,9 +294,17 @@ const styles = StyleSheet.create({
   },
   sub: {
     marginTop: Spacing.sm,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
     color: Colors.textSecondary,
     lineHeight: 22,
+  },
+  errorBanner: {
+    backgroundColor: '#FFEBEE',
+    color: Colors.error,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.lg,
+    lineHeight: 20,
   },
   field: { gap: Spacing.sm, marginBottom: Spacing.lg },
   label: {
@@ -232,5 +320,12 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     fontSize: Typography.fontSize.base,
     color: Colors.text,
+    backgroundColor: Colors.white,
+  },
+  loginLink: {
+    marginTop: Spacing.lg,
+    textAlign: 'center',
+    color: Colors.primary,
+    fontWeight: Typography.fontWeight.semiBold,
   },
 });
