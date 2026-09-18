@@ -7,15 +7,17 @@ import { Platform, Alert } from 'react-native';
 import { router } from 'expo-router';
 
 // Configure how notifications are displayed while app is foregrounded
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 export type PushToken = string;
 
@@ -28,6 +30,10 @@ export function useNotifications({ onTokenReady }: UseNotificationsOptions = {})
   const responseListener = useRef<Notifications.EventSubscription>();
 
   useEffect(() => {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
     registerForPushNotifications().then((token) => {
       if (token && onTokenReady) onTokenReady(token);
     });
@@ -36,11 +42,9 @@ export function useNotifications({ onTokenReady }: UseNotificationsOptions = {})
     notificationListener.current = Notifications.addNotificationReceivedListener(
       (notification) => {
         console.log('[Notification received]', notification);
-        // Pusher handles real-time orders; this is for other push types
       }
     );
 
-    // User tapped a notification (background/killed)
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         const data = response.notification.request.content.data as Record<string, string>;
@@ -69,7 +73,7 @@ function handleNotificationNavigation(data: Record<string, string>) {
       router.push('/(tabs)/wallet');
       break;
     case 'system':
-      router.push('/(tabs)/community');
+      router.push('/(tabs)/account');
       break;
     default:
       router.push('/(tabs)');

@@ -4,16 +4,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useNotifications } from '@/hooks/useNotifications';
 
 function AppWithNotifications() {
+  // Push chỉ cần trên native; web bỏ qua để tránh treo flow auth
   useNotifications({
-    onTokenReady: async (token) => {
-      // Register FCM token to backend
-      try {
-        // Push token wiring optional until notify service is on Railway
-        // await customerApi.registerPushToken(token);
-      } catch {
-        // silent — token will be retried on next open
-      }
-    },
+    onTokenReady: async () => {},
   });
 
   return (

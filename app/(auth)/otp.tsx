@@ -1,4 +1,4 @@
-// OTP → login hoặc form đăng ký khách
+// OTP → login hoặc form đăng ký khách (web-safe errors)
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
@@ -7,6 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
+  Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
@@ -16,7 +17,9 @@ import {
   ApiError,
   saveSession,
   saveOtpSession,
+  getOtpSession,
   normalizePhoneVn,
+  type OtpSessionData,
 } from '@/services/api';
 
 const OTP_LENGTH = 6;
@@ -25,6 +28,14 @@ const RESEND_TIMEOUT = 60;
 function paramStr(v: string | string[] | undefined, fallback = ''): string {
   if (Array.isArray(v)) return String(v[0] ?? fallback);
   return v != null && v !== '' ? String(v) : fallback;
+}
+
+function notify(title: string, message: string) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+  Alert.alert(title, message);
 }
 
 export default function OtpScreen() {
@@ -36,16 +47,32 @@ export default function OtpScreen() {
     otpGroup?: string;
   }>();
 
-  const phone = normalizePhoneVn(paramStr(raw.phone));
-  const isRegister = paramStr(raw.intent) === 'register';
-  const otpGroup =
-    paramStr(raw.otpGroup) || (isRegister ? 'otp_register' : 'otp_general');
+  const [phone, setPhone] = useState(normalizePhoneVn(paramStr(raw.phone)));
+  const [isRegister, setIsRegister] = useState(paramStr(raw.intent) === 'register');
+  const [otpGroup, setOtpGroup] = useState(
+    paramStr(raw.otpGroup) ||
+      (paramStr(raw.intent) === 'register' ? 'otp_register' : 'otp_general')
+  );
 
   const [otpId, setOtpId] = useState(Number(paramStr(raw.otpId)) || 0);
   const [otp, setOtp] = useState(paramStr(raw.otpDebug));
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(RESEND_TIMEOUT);
+  const [error, setError] = useState('');
   const inputRef = useRef<TextInput>(null);
+
+  // Khôi phục otp_id / group từ AsyncStorage nếu URL mất param (hay gặp trên web)
+  useEffect(() => {
+    (async () => {
+      const s = await getOtpSession<OtpSessionData>();
+      if (!s) return;
+      if (!phone && s.phone) setPhone(normalizePhoneVn(s.phone));
+      if (!otpId && s.otp_id) setOtpId(Number(s.otp_id));
+      if (s.otp_group) setOtpGroup(s.otp_group);
+      if (s.intent === 'register') setIsRegister(true);
+      if (!otp && s.otp_debug) setOtp(String(s.otp_debug));
+    })();
+  }, []);
 
   const formattedPhone = useMemo(() => {
     if (!phone) return '';
@@ -61,6 +88,7 @@ export default function OtpScreen() {
 
   const handleResend = async () => {
     if (countdown > 0) return;
+    setError('');
     try {
       const res = await authApi.sendOtp(phone, otpGroup, '84');
       setOtpId(res.id);
@@ -75,15 +103,13 @@ export default function OtpScreen() {
         intent: isRegister ? 'register' : 'login',
       });
     } catch (e) {
-      Alert.alert('Lỗi', e instanceof ApiError ? e.message : 'Gửi lại OTP thất bại');
+      const msg = e instanceof ApiError ? e.message : 'Gửi lại OTP thất bại';
+      setError(msg);
+      notify('Lỗi', msg);
     }
   };
 
   const goRegister = async (otpIdVal: number, authCode: string, group: string) => {
-    if (!authCode) {
-      Alert.alert('Lỗi OTP', 'Thiếu auth_code sau xác thực. Gửi lại OTP.');
-      return;
-    }
     await saveOtpSession({
       phone,
       country_code: '84',
@@ -92,7 +118,6 @@ export default function OtpScreen() {
       otp_group: group,
       intent: 'register',
     });
-    // Không đưa auth_code lên URL (dễ mất / cắt). Chỉ phone để hiển thị.
     router.replace({
       pathname: '/(auth)/register',
       params: { phone },
@@ -100,7 +125,21 @@ export default function OtpScreen() {
   };
 
   const handleVerify = async () => {
-    if (otp.length !== OTP_LENGTH || !otpId) return;
+    setError('');
+    if (otp.length !== OTP_LENGTH) {
+      setError('Nhập đủ 6 số OTP.');
+      return;
+    }
+    if (!otpId) {
+      setError('Thiếu mã phiên OTP. Quay lại bước nhập SĐT và gửi OTP mới.');
+      notify('Thiếu OTP', 'Quay lại và nhấn nhận mã OTP lại.');
+      return;
+    }
+    if (!phone) {
+      setError('Thiếu số điện thoại.');
+      return;
+    }
+
     setLoading(true);
     try {
       const verified = await authApi.verifyOtp({
@@ -113,12 +152,19 @@ export default function OtpScreen() {
 
       const group = verified.group || otpGroup;
       const authCode = verified.auth_code;
-
       if (!authCode) {
         throw new ApiError(422, 'OTP verify không trả auth_code');
       }
 
-      // Đăng ký: sau verify → form (không phụ thuộc loginotp)
+      await saveOtpSession({
+        phone,
+        country_code: '84',
+        otp_id: verified.id,
+        otp_auth_code: authCode,
+        otp_group: group,
+        intent: isRegister ? 'register' : 'login',
+      });
+
       if (isRegister) {
         await goRegister(verified.id, authCode, group);
         return;
@@ -139,13 +185,18 @@ export default function OtpScreen() {
       }
 
       const token = (login as { token: string }).token;
+      if (!token) {
+        throw new ApiError(500, 'Login OTP không trả token');
+      }
       await saveSession(token, login as typeof login & { token: string });
-      router.replace('/(tabs)');
+      router.replace('/(tabs)/');
     } catch (e) {
-      Alert.alert(
-        'Xác thực thất bại',
-        e instanceof ApiError ? e.message : 'OTP không đúng hoặc hết hạn'
-      );
+      const msg =
+        e instanceof ApiError
+          ? e.message
+          : 'OTP không đúng, hết hạn, hoặc lỗi mạng.';
+      setError(msg);
+      notify('Xác thực thất bại', msg);
     } finally {
       setLoading(false);
     }
@@ -163,12 +214,17 @@ export default function OtpScreen() {
           Mã OTP đã được gửi đến số{'\n'}
           <Text style={styles.phoneHighlight}>+84 {formattedPhone}</Text>
         </Text>
-        {paramStr(raw.otpDebug) || otp ? (
-          <Text style={styles.debugHint}>
-            OTP_DEBUG: {paramStr(raw.otpDebug) || otp}
+        {otp ? <Text style={styles.debugHint}>OTP_DEBUG: {otp}</Text> : null}
+        {otpId ? (
+          <Text style={styles.metaHint}>otp_id: {otpId} · group: {otpGroup}</Text>
+        ) : (
+          <Text style={styles.errorBanner}>
+            Thiếu otp_id — hãy quay lại và gửi OTP mới.
           </Text>
-        ) : null}
+        )}
       </View>
+
+      {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
 
       <TouchableOpacity
         style={styles.otpRow}
@@ -212,11 +268,11 @@ export default function OtpScreen() {
 
       <View style={styles.ctaContainer}>
         <Button
-          title="Xác nhận"
+          title={loading ? 'Đang xác thực...' : 'Xác nhận'}
           onPress={handleVerify}
           loading={loading}
-          disabled={otp.length !== OTP_LENGTH}
-          variant={otp.length === OTP_LENGTH ? 'primary' : 'secondary'}
+          disabled={loading}
+          variant="primary"
         />
       </View>
     </View>
@@ -230,7 +286,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing['2xl'],
     paddingTop: Spacing.xl,
   },
-  header: { gap: Spacing.sm, marginBottom: Spacing['3xl'] },
+  header: { gap: Spacing.sm, marginBottom: Spacing.xl },
   title: {
     fontSize: Typography.fontSize['2xl'],
     fontWeight: Typography.fontWeight.bold,
@@ -249,6 +305,18 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     fontSize: Typography.fontSize.sm,
     color: Colors.warning,
+  },
+  metaHint: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.gray500,
+  },
+  errorBanner: {
+    backgroundColor: '#FFEBEE',
+    color: Colors.error,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.md,
+    lineHeight: 20,
   },
   otpRow: {
     flexDirection: 'row',
