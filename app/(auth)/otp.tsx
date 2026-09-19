@@ -124,18 +124,55 @@ export default function OtpScreen() {
     });
   };
 
+  const goHomeAfterLogin = () => {
+    // /home — không dùng /(tabs) hay / vì conflict với welcome app/index
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.location.assign('/home');
+      return;
+    }
+    router.replace('/home');
+  };
+
   const handleVerify = async () => {
     setError('');
     if (otp.length !== OTP_LENGTH) {
       setError('Nhập đủ 6 số OTP.');
       return;
     }
-    if (!otpId) {
+
+    // Khôi phục session nếu state mất otp_id (race / mất query trên web)
+    let activeOtpId = otpId;
+    let activePhone = phone;
+    let activeGroup = otpGroup;
+    let activeRegister = isRegister;
+    if (!activeOtpId || !activePhone) {
+      const s = await getOtpSession<OtpSessionData>();
+      if (s) {
+        if (!activeOtpId && s.otp_id) {
+          activeOtpId = Number(s.otp_id);
+          setOtpId(activeOtpId);
+        }
+        if (!activePhone && s.phone) {
+          activePhone = normalizePhoneVn(s.phone);
+          setPhone(activePhone);
+        }
+        if (s.otp_group) {
+          activeGroup = s.otp_group;
+          setOtpGroup(activeGroup);
+        }
+        if (s.intent === 'register') {
+          activeRegister = true;
+          setIsRegister(true);
+        }
+      }
+    }
+
+    if (!activeOtpId) {
       setError('Thiếu mã phiên OTP. Quay lại bước nhập SĐT và gửi OTP mới.');
       notify('Thiếu OTP', 'Quay lại và nhấn nhận mã OTP lại.');
       return;
     }
-    if (!phone) {
+    if (!activePhone) {
       setError('Thiếu số điện thoại.');
       return;
     }
@@ -143,35 +180,35 @@ export default function OtpScreen() {
     setLoading(true);
     try {
       const verified = await authApi.verifyOtp({
-        phone,
-        otpId,
+        phone: activePhone,
+        otpId: activeOtpId,
         otpCode: otp,
-        otpGroup,
+        otpGroup: activeGroup,
         countryCode: '84',
       });
 
-      const group = verified.group || otpGroup;
+      const group = verified.group || activeGroup;
       const authCode = verified.auth_code;
       if (!authCode) {
         throw new ApiError(422, 'OTP verify không trả auth_code');
       }
 
       await saveOtpSession({
-        phone,
+        phone: activePhone,
         country_code: '84',
         otp_id: verified.id,
         otp_auth_code: authCode,
         otp_group: group,
-        intent: isRegister ? 'register' : 'login',
+        intent: activeRegister ? 'register' : 'login',
       });
 
-      if (isRegister) {
+      if (activeRegister) {
         await goRegister(verified.id, authCode, group);
         return;
       }
 
       const login = await authApi.loginByOtp({
-        phone,
+        phone: activePhone,
         otpId: verified.id,
         otpCode: otp,
         otpAuthCode: authCode,
@@ -189,7 +226,7 @@ export default function OtpScreen() {
         throw new ApiError(500, 'Login OTP không trả token');
       }
       await saveSession(token, login as typeof login & { token: string });
-      router.replace('/(tabs)/');
+      goHomeAfterLogin();
     } catch (e) {
       const msg =
         e instanceof ApiError

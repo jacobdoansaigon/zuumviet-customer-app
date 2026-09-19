@@ -64,19 +64,19 @@ function handleNotificationNavigation(data: Record<string, string>) {
   const { type, orderId } = data;
   switch (type) {
     case 'new_order':
-      router.push('/(tabs)'); // home handles new order
+      router.push('/home');
       break;
     case 'order_status':
-      router.push('/(tabs)/orders');
+      router.push('/orders');
       break;
     case 'wallet':
-      router.push('/(tabs)/wallet');
+      router.push('/wallet');
       break;
     case 'system':
-      router.push('/(tabs)/account');
+      router.push('/account');
       break;
     default:
-      router.push('/(tabs)');
+      router.push('/home');
   }
 }
 

@@ -21,7 +21,7 @@ export default function HomeScreen() {
       const c = await getStoredCustomer();
       setCustomer(c);
       if (!c) {
-        router.replace('/(auth)/login');
+        router.replace('/');
         return;
       }
       try {
@@ -50,7 +50,7 @@ export default function HomeScreen() {
 
       <Pressable
         style={styles.secondaryCta}
-        onPress={() => router.push('/(tabs)/orders')}
+        onPress={() => router.push('/orders')}
       >
         <Text style={styles.secondaryText}>Xem đơn của tôi →</Text>
       </Pressable>

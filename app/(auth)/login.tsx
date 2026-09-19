@@ -52,12 +52,15 @@ export default function LoginScreen() {
         },
       });
     } catch (e) {
-      Alert.alert(
-        'Lỗi',
+      const msg =
         e instanceof ApiError
           ? e.message
-          : 'Không gửi được OTP. Kiểm tra mạng / API.'
-      );
+          : 'Không gửi được OTP. Kiểm tra mạng / API.';
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.alert(`Lỗi\n\n${msg}`);
+      } else {
+        Alert.alert('Lỗi', msg);
+      }
     } finally {
       setLoading(false);
     }

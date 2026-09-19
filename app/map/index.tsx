@@ -63,7 +63,7 @@ export default function CustomerMapScreen() {
       Alert.alert(
         'Đặt đơn',
         'Đã ghi nhận yêu cầu giao hàng (MVP). Chi tiết tạo đơn đầy đủ sẽ nối service/weight ở phase sau.',
-        [{ text: 'Xem đơn', onPress: () => router.replace('/(tabs)/orders') }]
+        [{ text: 'Xem đơn', onPress: () => router.replace('/orders') }]
       );
     } catch (e) {
       Alert.alert(
@@ -125,7 +125,7 @@ export default function CustomerMapScreen() {
                 try {
                   await orderApi.cancelOrder(Number(orderId));
                   Alert.alert('Đã huỷ', 'Đơn đã được huỷ.');
-                  router.replace('/(tabs)/orders');
+                  router.replace('/orders');
                 } catch (e) {
                   Alert.alert(
                     'Không huỷ được',

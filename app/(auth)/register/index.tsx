@@ -157,7 +157,11 @@ export default function RegisterScreen() {
       try {
         const byPass = await authApi.loginPassword(phoneNorm, pass, '84');
         await saveSession(byPass.token, byPass);
-        router.replace('/(tabs)');
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.location.assign('/home');
+        } else {
+          router.replace('/home');
+        }
       } catch {
         notify(
           'Đăng ký thành công',

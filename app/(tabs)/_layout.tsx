@@ -31,7 +31,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="home"
         options={{
           title: 'Trang chủ',
           tabBarIcon: ({ focused }) => <TabIcon focused={focused} emoji="🏠" />,
