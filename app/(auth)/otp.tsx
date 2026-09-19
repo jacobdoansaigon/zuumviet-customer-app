@@ -126,9 +126,13 @@ export default function OtpScreen() {
 
   const goHomeAfterLogin = () => {
     // /home — không dùng /(tabs) hay / vì conflict với welcome app/index
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.location.assign('/home');
-      return;
+    try {
+      if (typeof window !== 'undefined') {
+        window.location.assign('/home');
+        return;
+      }
+    } catch {
+      /* fall through */
     }
     router.replace('/home');
   };
@@ -216,12 +220,21 @@ export default function OtpScreen() {
         countryCode: '84',
       });
 
-      if ('need_register' in login && login.need_register) {
-        await goRegister(login.otp_id, login.otp_auth_code, login.otp_group);
+      if (login == null || typeof login !== 'object') {
+        throw new ApiError(500, 'Login OTP không trả JSON hợp lệ');
+      }
+
+      if ('need_register' in login && (login as { need_register?: boolean }).need_register) {
+        const nr = login as {
+          otp_id: number;
+          otp_auth_code: string;
+          otp_group: string;
+        };
+        await goRegister(nr.otp_id, nr.otp_auth_code, nr.otp_group);
         return;
       }
 
-      const token = (login as { token: string }).token;
+      const token = (login as { token?: string }).token;
       if (!token) {
         throw new ApiError(500, 'Login OTP không trả token');
       }
@@ -231,7 +244,9 @@ export default function OtpScreen() {
       const msg =
         e instanceof ApiError
           ? e.message
-          : 'OTP không đúng, hết hạn, hoặc lỗi mạng.';
+          : e instanceof Error
+            ? e.message
+            : 'OTP không đúng, hết hạn, hoặc lỗi mạng.';
       setError(msg);
       notify('Xác thực thất bại', msg);
     } finally {

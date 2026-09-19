@@ -107,14 +107,28 @@ function ensureBaseUrl() {
 }
 
 async function getToken(): Promise<string | null> {
-  return AsyncStorage.getItem(STORAGE_KEYS.token);
+  let t = await AsyncStorage.getItem(STORAGE_KEYS.token);
+  if (!t && typeof localStorage !== 'undefined') {
+    t = localStorage.getItem(STORAGE_KEYS.token);
+  }
+  return t;
 }
 
 export async function saveSession(token: string, customer: CustomerProfile) {
+  const profile = JSON.stringify(customer);
   await AsyncStorage.multiSet([
     [STORAGE_KEYS.token, token],
-    [STORAGE_KEYS.customer, JSON.stringify(customer)],
+    [STORAGE_KEYS.customer, profile],
   ]);
+  // Web: mirror to localStorage so hard navigation (/home) vẫn đọc được session
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEYS.token, token);
+      localStorage.setItem(STORAGE_KEYS.customer, profile);
+    } catch {
+      /* ignore quota */
+    }
+  }
 }
 
 export async function clearSession() {
@@ -123,10 +137,22 @@ export async function clearSession() {
     STORAGE_KEYS.customer,
     STORAGE_KEYS.otpSession,
   ]);
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.token);
+      localStorage.removeItem(STORAGE_KEYS.customer);
+      localStorage.removeItem(STORAGE_KEYS.otpSession);
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 export async function getStoredCustomer(): Promise<CustomerProfile | null> {
-  const raw = await AsyncStorage.getItem(STORAGE_KEYS.customer);
+  let raw = await AsyncStorage.getItem(STORAGE_KEYS.customer);
+  if (!raw && typeof localStorage !== 'undefined') {
+    raw = localStorage.getItem(STORAGE_KEYS.customer);
+  }
   if (!raw) return null;
   try {
     return JSON.parse(raw) as CustomerProfile;
