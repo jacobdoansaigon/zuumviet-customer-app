@@ -116,11 +116,8 @@ async function getToken(): Promise<string | null> {
 
 export async function saveSession(token: string, customer: CustomerProfile) {
   const profile = JSON.stringify(customer);
-  await AsyncStorage.multiSet([
-    [STORAGE_KEYS.token, token],
-    [STORAGE_KEYS.customer, profile],
-  ]);
-  // Web: mirror to localStorage so hard navigation (/home) vẫn đọc được session
+  await AsyncStorage.setItem(STORAGE_KEYS.token, token);
+  await AsyncStorage.setItem(STORAGE_KEYS.customer, profile);
   if (typeof localStorage !== 'undefined') {
     try {
       localStorage.setItem(STORAGE_KEYS.token, token);
@@ -132,11 +129,9 @@ export async function saveSession(token: string, customer: CustomerProfile) {
 }
 
 export async function clearSession() {
-  await AsyncStorage.multiRemove([
-    STORAGE_KEYS.token,
-    STORAGE_KEYS.customer,
-    STORAGE_KEYS.otpSession,
-  ]);
+  await AsyncStorage.removeItem(STORAGE_KEYS.token);
+  await AsyncStorage.removeItem(STORAGE_KEYS.customer);
+  await AsyncStorage.removeItem(STORAGE_KEYS.otpSession);
   if (typeof localStorage !== 'undefined') {
     try {
       localStorage.removeItem(STORAGE_KEYS.token);
