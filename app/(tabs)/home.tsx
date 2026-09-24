@@ -1,5 +1,5 @@
-// Trang chủ — Figma HOME 1.2 (3385-663): header tím chào theo giờ + avatar, card dịch vụ đè header,
-// thẻ ví gradient, 2 stat card, "Tin tức / Tất cả", banner chuyến đang đi nổi trên tab bar.
+// Trang chủ — Figma HOME 1.2 (3385-663): header tím chào theo giờ + avatar, lưới dịch vụ đè header,
+// thẻ ví gradient, 2 stat card, "Khuyến mãi / Tất cả" (2 hàng × 2 thẻ, cuộn ngang), banner chuyến đang đi nổi trên tab bar.
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -9,7 +9,7 @@ import {
   HomeHeader,
   ServiceCard,
   WalletCard,
-  NewsCard,
+  PromoGrid,
   ActiveTripBanner,
   describeActiveOrder,
   type HomeServiceKey,
@@ -22,7 +22,7 @@ import {
   getDisplayName,
   type CustomerProfile,
 } from '@/services/api';
-import { MOCK_NEWS, MOCK_COMMUNITY, getGreeting } from '@/constants/mock';
+import { MOCK_PROMOS, MOCK_COMMUNITY, getGreeting } from '@/constants/mock';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
 import { localAvatarStore } from '@/services/profileStore';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
@@ -116,13 +116,11 @@ export default function HomeScreen() {
             <StatCard icon={Icons.chart} value={String(MOCK_COMMUNITY.homeStats.points)} label="điểm thưởng" />
           </View>
 
-          <SectionHeader title="Tin tức" actionLabel="Tất cả" onAction={() => router.push('/news/all')} style={styles.newsHeader} />
-          {MOCK_NEWS.map((n) => (
-            <NewsCard key={n.id} item={n} onPress={() => router.push(`/news/${n.id}`)} />
-          ))}
+          <SectionHeader title="Khuyến mãi" actionLabel="Tất cả" onAction={() => router.push('/promotions')} style={styles.newsHeader} />
+          <PromoGrid items={MOCK_PROMOS} onPress={(p) => router.push(`/promotions/${p.id}`)} />
 
-          <AppText size={11} color={Colors.textDisabled} align="center" style={{ marginBottom: Spacing.sm }}>
-            Tin tức & số dư ví đang là dữ liệu mẫu (demo)
+          <AppText size={11} color={Colors.textDisabled} align="center" style={{ marginTop: Spacing.lg, marginBottom: Spacing.sm }}>
+            Khuyến mãi & số dư ví đang là dữ liệu mẫu (demo)
           </AppText>
         </View>
       </ScrollView>

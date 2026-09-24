@@ -132,6 +132,127 @@ export const MOCK_NEWS: NewsItem[] = [
 ];
 
 /* ------------------------------------------------------------------ */
+/* Khuyến mãi (Home: lưới 2 hàng, cuộn ngang)                          */
+/* ------------------------------------------------------------------ */
+
+export type PromoItem = {
+  id: string;
+  /** Tiêu đề ngắn trên thẻ (tối đa 2 dòng) */
+  title: string;
+  /** Nhóm dịch vụ áp dụng, hiển thị dạng tag nhỏ */
+  tag: string;
+  /** Nhãn ưu đãi nổi bật trên ảnh: "-20%", "-30K", "0Đ"... */
+  discount: string;
+  code: string;
+  /** dd/mm/yyyy */
+  expiry: string;
+  image: string;
+  /** ServiceKey mở màn đặt khi bấm "Đặt ngay" */
+  service: string;
+  summary: string;
+  conditions: string[];
+};
+
+export const MOCK_PROMOS: PromoItem[] = [
+  {
+    id: 'p1',
+    title: 'Giảm 20% đơn giao hàng đầu tiên',
+    tag: 'Giao hàng',
+    discount: '-20%',
+    code: 'MUAXUAN2020',
+    expiry: '31/10/2026',
+    image: 'https://picsum.photos/seed/zuum-promo-1/600/380',
+    service: 'delivery',
+    summary: 'Nhập mã khi xác nhận đơn để giảm 20%, tối đa 30.000đ cho đơn Giao hàng đầu tiên.',
+    conditions: ['Áp dụng cho khách hàng chưa có đơn hoàn thành', 'Đơn tối thiểu 30.000đ, giảm tối đa 30.000đ', 'Mỗi tài khoản dùng 1 lần', 'Không áp dụng cùng ưu đãi khác'],
+  },
+  {
+    id: 'p2',
+    title: 'Xe máy đồng giá 10K nội thành',
+    tag: 'Xe máy',
+    discount: '10K',
+    code: 'XEMAY10K',
+    expiry: '15/10/2026',
+    image: 'https://picsum.photos/seed/zuum-promo-2/600/380',
+    service: 'bike',
+    summary: 'Chuyến Xe máy dưới 5km trong nội thành TP.HCM đồng giá 10.000đ, áp dụng khung 9h–16h.',
+    conditions: ['Quãng đường tối đa 5km', 'Khung giờ 9:00 – 16:00 các ngày trong tuần', 'Tối đa 2 chuyến/ngày/tài khoản'],
+  },
+  {
+    id: 'p3',
+    title: 'Giảm 30K chuyến xe hơi đầu tiên',
+    tag: 'Xe hơi',
+    discount: '-30K',
+    code: 'XEHOI30',
+    expiry: '31/10/2026',
+    image: 'https://picsum.photos/seed/zuum-promo-3/600/380',
+    service: 'car',
+    summary: 'Trải nghiệm Xe 4 chỗ với ưu đãi giảm ngay 30.000đ cho chuyến đầu tiên.',
+    conditions: ['Áp dụng cho Xe 4 chỗ và Xe 4 chỗ Plus', 'Cước chuyến tối thiểu 50.000đ', 'Mỗi tài khoản dùng 1 lần'],
+  },
+  {
+    id: 'p4',
+    title: 'Đi sân bay giảm 15% xe 6 chỗ',
+    tag: 'Xe 6 chỗ',
+    discount: '-15%',
+    code: 'SANBAY15',
+    expiry: '30/11/2026',
+    image: 'https://picsum.photos/seed/zuum-promo-4/600/380',
+    service: 'car6',
+    summary: 'Giảm 15% gói Xe 6 chỗ sân bay, tối đa 60.000đ, cả chiều đi và chiều về.',
+    conditions: ['Áp dụng gói "Xe 6 chỗ sân bay"', 'Giảm tối đa 60.000đ/chuyến', 'Đặt trước tối thiểu 2 giờ'],
+  },
+  {
+    id: 'p5',
+    title: 'Miễn phí gọi thợ khảo sát tại nhà',
+    tag: 'Gọi thợ',
+    discount: '0Đ',
+    code: 'THOKHAOSAT',
+    expiry: '31/10/2026',
+    image: 'https://picsum.photos/seed/zuum-promo-5/600/380',
+    service: 'handyman',
+    summary: 'Miễn phí gọi thợ điện, nước đến khảo sát và báo giá tại nhà trong tháng 10.',
+    conditions: ['Áp dụng Thợ điện và Thợ nước', 'Khu vực TP.HCM', 'Công sửa chữa và vật tư tính riêng theo báo giá'],
+  },
+  {
+    id: 'p6',
+    title: 'Chuyển nhà cuối tuần giảm 50K',
+    tag: 'Vận tải',
+    discount: '-50K',
+    code: 'CHUYENNHA50',
+    expiry: '31/12/2026',
+    image: 'https://picsum.photos/seed/zuum-promo-6/600/380',
+    service: 'transport',
+    summary: 'Giảm 50.000đ cho chuyến Xe tải nhỏ hoặc Xe tải trung đặt vào thứ 7, chủ nhật.',
+    conditions: ['Áp dụng Xe tải nhỏ (500kg) và Xe tải trung (1000kg)', 'Ngày lấy hàng rơi vào thứ 7 hoặc chủ nhật', 'Cước tối thiểu 250.000đ'],
+  },
+  {
+    id: 'p7',
+    title: 'Thuê tài xế 8 giờ, tặng thêm 1 giờ',
+    tag: 'Gọi tài xế',
+    discount: '+1H',
+    code: 'TAIXE8H',
+    expiry: '30/11/2026',
+    image: 'https://picsum.photos/seed/zuum-promo-7/600/380',
+    service: 'driver',
+    summary: 'Đặt gói Tài xế 8 giờ được cộng thêm 1 giờ miễn phí, không giới hạn số lần.',
+    conditions: ['Áp dụng gói "Tài xế 8 giờ"', 'Giờ tặng không quy đổi thành tiền', 'Đặt trước tối thiểu 12 giờ'],
+  },
+  {
+    id: 'p8',
+    title: 'Mời bạn bè, nhận 20K mỗi người',
+    tag: 'Cộng đồng',
+    discount: '+20K',
+    code: 'MOIBAN20',
+    expiry: '31/12/2026',
+    image: 'https://picsum.photos/seed/zuum-promo-8/600/380',
+    service: 'delivery',
+    summary: 'Mỗi người bạn đăng ký bằng mã giới thiệu của bạn và hoàn thành 1 đơn, bạn nhận 20.000đ vào Tài khoản thưởng.',
+    conditions: ['Người được mời phải là tài khoản mới', 'Thưởng ghi nhận sau khi đơn đầu tiên hoàn thành', 'Không giới hạn số người mời'],
+  },
+];
+
+/* ------------------------------------------------------------------ */
 /* Hộp thư                                                             */
 /* ------------------------------------------------------------------ */
 
