@@ -346,7 +346,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
   car: {
     key: 'car',
     title: 'Xe hơi',
-    icon: Icons.car,
+    icon: Icons.carSide,
     kind: 'ride',
     labels: RIDE_LABELS,
     maxStops: 1,
@@ -360,7 +360,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         includedKm: 2,
         perKmPrice: 11000,
         extraStopPrice: 0,
-        icon: Icons.car,
+        icon: Icons.carSide,
         infoLines: ['Giá mở cửa (2km đầu): đ30.000', 'Mỗi km tiếp theo: đ11.000', 'Phụ phí giờ cao điểm: +đ10.000', 'Miễn phí chờ 5 phút đầu', VAT_LINE],
       },
       {
@@ -372,7 +372,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         includedKm: 2,
         perKmPrice: 13500,
         extraStopPrice: 0,
-        icon: Icons.car,
+        icon: Icons.carSide,
         infoLines: ['Giá mở cửa (2km đầu): đ38.000', 'Mỗi km tiếp theo: đ13.500', 'Xe đời 2020 trở lên, có nước suối', 'Tài xế đánh giá 4.9★ trở lên', VAT_LINE],
       },
     ],

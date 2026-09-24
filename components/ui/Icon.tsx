@@ -158,6 +158,7 @@ export const Icons = {
   eyeOff: 'ion:eye-off-outline' as IconName,
   motorbike: 'mci:motorbike' as IconName,
   carSeat: 'mci:car-estate' as IconName,
+  carSide: 'mci:car-side' as IconName,
   steering: 'mci:steering' as IconName,
   tools: 'mci:tools' as IconName,
 };
