@@ -16,7 +16,7 @@ export default function PromotionsScreen() {
   const cardWidth = Math.floor((width - Spacing.screen * 2 - GAP) / 2);
 
   return (
-    <Screen header={<AppHeader title="Khuyến mãi" variant="light" left="back" />} background={Colors.white}>
+    <Screen header={<AppHeader title="Dành cho bạn" variant="light" left="back" />} background={Colors.white}>
       <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
         <AppText size={13} color={Colors.textSecondary} style={styles.intro}>
           Nhập mã ở bước xác nhận đơn để áp dụng ưu đãi.
