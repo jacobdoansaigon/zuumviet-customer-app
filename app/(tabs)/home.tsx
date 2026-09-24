@@ -1,110 +1,145 @@
-// Home — khách đặt giao hàng
-
-import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
-import { router } from 'expo-router';
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
-import { Button } from '@/components/ui/Button';
+// Trang chủ — Figma HOME 1.2 (3385-663): header tím chào theo giờ + avatar, card dịch vụ đè header,
+// thẻ ví gradient, 2 stat card, "Tin tức / Tất cả", banner chuyến đang đi nổi trên tab bar.
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { Colors, Spacing } from '@/constants/theme';
+import { AppText, SectionHeader, StatCard, Icons } from '@/components/ui';
+import {
+  HomeHeader,
+  ServiceCard,
+  WalletCard,
+  NewsCard,
+  ActiveTripBanner,
+  describeActiveOrder,
+  type HomeServiceKey,
+  type ActiveTripInfo,
+} from '@/components/home';
 import {
   getStoredCustomer,
   orderApi,
+  isActiveOrder,
+  getDisplayName,
   type CustomerProfile,
-  type DeliveryOrder,
 } from '@/services/api';
+import { MOCK_NEWS, MOCK_COMMUNITY, getGreeting } from '@/constants/mock';
+import { useWalletBalance } from '@/hooks/useWalletBalance';
+import { localAvatarStore } from '@/services/profileStore';
+import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
+
+const HEADER_OVERLAP = 40;
 
 export default function HomeScreen() {
+  useStatusBarStyle('light');
   const [customer, setCustomer] = useState<CustomerProfile | null>(null);
-  const [orders, setOrders] = useState<DeliveryOrder[]>([]);
+  const [activeTrip, setActiveTrip] = useState<ActiveTripInfo | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [greeting, setGreeting] = useState(getGreeting());
+  const localAvatar = localAvatarStore.use();
+  const walletBalance = useWalletBalance();
+
+  const loadOrders = useCallback(async () => {
+    try {
+      const res = await orderApi.getOrders();
+      const items = res?.items ?? [];
+      const active = items.find(isActiveOrder);
+      setActiveTrip(active ? describeActiveOrder(active) : null);
+    } catch {
+      // chưa cấu hình API / chưa có đơn → không hiện banner
+      setActiveTrip(null);
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
       const c = await getStoredCustomer();
-      setCustomer(c);
       if (!c) {
         router.replace('/');
         return;
       }
-      try {
-        const res = await orderApi.getOrders();
-        setOrders(res.items ?? []);
-      } catch {
-        /* empty until first order */
-      }
+      setCustomer(c);
     })();
   }, []);
 
-  const name =
-    customer?.full_name || customer?.fullname || customer?.phone || 'bạn';
+  useFocusEffect(
+    useCallback(() => {
+      setGreeting(getGreeting());
+      getStoredCustomer().then((c) => c && setCustomer(c));
+      void loadOrders();
+    }, [loadOrders])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadOrders();
+    setRefreshing(false);
+  };
+
+  const openService = (key: HomeServiceKey) => {
+    router.push({ pathname: '/booking', params: { service: key } });
+  };
+
+  const name = getDisplayName(customer, customer?.phone ? String(customer.phone) : 'bạn');
+  const avatarUri = localAvatar ?? (typeof customer?.avatar_url === 'string' ? customer.avatar_url : null);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.brand}>ZUUMCUSTOMER</Text>
-      <Text style={styles.hello}>Xin chào, {name}</Text>
-      <Text style={styles.sub}>Bạn muốn gửi hàng đi đâu hôm nay?</Text>
-
-      <Button
-        title="Đặt giao hàng"
-        onPress={() => router.push('/map')}
-        style={{ marginTop: Spacing.lg }}
-      />
-
-      <Pressable
-        style={styles.secondaryCta}
-        onPress={() => router.push('/orders')}
+    <View style={styles.root}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, activeTrip ? { paddingBottom: 120 } : null]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       >
-        <Text style={styles.secondaryText}>Xem đơn của tôi →</Text>
-      </Pressable>
+        <HomeHeader
+          greeting={greeting}
+          name={name}
+          avatarUri={avatarUri}
+          overlap={HEADER_OVERLAP}
+          onAvatarPress={() => router.push('/account')}
+        />
 
-      <Text style={styles.section}>Đơn gần đây</Text>
-      {orders.length === 0 ? (
-        <Text style={styles.empty}>Chưa có đơn. Bấm “Đặt giao hàng” để bắt đầu.</Text>
-      ) : (
-        orders.slice(0, 5).map((o) => (
-          <Pressable
-            key={String(o.id)}
-            style={styles.card}
-            onPress={() => router.push(`/map?orderId=${o.id}`)}
-          >
-            <Text style={styles.cardTitle}>Đơn #{o.id}</Text>
-            <Text style={styles.cardMeta}>Trạng thái: {String(o.status)}</Text>
-          </Pressable>
-        ))
-      )}
-    </ScrollView>
+        <View style={styles.body}>
+          <View style={{ marginTop: -HEADER_OVERLAP }}>
+            <ServiceCard onSelect={openService} />
+          </View>
+
+          <View style={styles.section}>
+            <WalletCard
+              balance={walletBalance}
+              onPress={() => router.push('/wallet')}
+              onTopUp={() => router.push('/wallet/topup')}
+            />
+          </View>
+
+          <View style={[styles.section, styles.stats]}>
+            <StatCard icon={Icons.network} value={String(MOCK_COMMUNITY.homeStats.members)} label="thành viên" />
+            <StatCard icon={Icons.chart} value={String(MOCK_COMMUNITY.homeStats.points)} label="điểm thưởng" />
+          </View>
+
+          <SectionHeader title="Tin tức" actionLabel="Tất cả" onAction={() => router.push('/news/all')} style={styles.newsHeader} />
+          {MOCK_NEWS.map((n) => (
+            <NewsCard key={n.id} item={n} onPress={() => router.push(`/news/${n.id}`)} />
+          ))}
+
+          <AppText size={11} color={Colors.textDisabled} align="center" style={{ marginBottom: Spacing.sm }}>
+            Tin tức & số dư ví đang là dữ liệu mẫu (demo)
+          </AppText>
+        </View>
+      </ScrollView>
+
+      {activeTrip ? (
+        <ActiveTripBanner trip={activeTrip} onPress={() => router.push(`/booking/tracking?orderId=${activeTrip.id}`)} bottom={Spacing.md} />
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
-  content: { padding: Spacing.lg, paddingTop: Spacing.xl * 2 },
-  brand: {
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.primary,
-  },
-  hello: {
-    marginTop: Spacing.sm,
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.gray900,
-  },
-  sub: { marginTop: Spacing.xs, color: Colors.gray500 },
-  secondaryCta: { marginTop: Spacing.md, alignItems: 'center' },
-  secondaryText: { color: Colors.primary, fontWeight: Typography.fontWeight.medium },
-  section: {
-    marginTop: Spacing.xl,
-    marginBottom: Spacing.sm,
-    fontSize: Typography.fontSize.md,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  empty: { color: Colors.gray500 },
-  card: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  cardTitle: { fontWeight: Typography.fontWeight.semibold },
-  cardMeta: { color: Colors.gray500, marginTop: 4 },
+  root: { flex: 1, backgroundColor: Colors.white },
+  scroll: { flex: 1 },
+  content: { paddingBottom: Spacing.xl },
+  body: { paddingHorizontal: Spacing.screen },
+  section: { marginTop: Spacing.base },
+  stats: { flexDirection: 'row', gap: Spacing.md },
+  newsHeader: { marginTop: Spacing.lg, marginBottom: Spacing.xs },
 });

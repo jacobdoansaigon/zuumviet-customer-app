@@ -1,29 +1,24 @@
-// Login / bắt đầu đăng ký — SĐT → OTP
-
+// Đăng nhập — Figma "Login1/Login2" (0-6812 / 0-6887): header lavender "Đăng nhập", logo, label
+// "Số điện thoại của tôi là" (*), PhoneInput, link "Đăng nhập bằng mật khẩu", nút flat "Tiếp tục".
+// Giữ nguyên luồng: gửi OTP (otp_general | otp_register) → lưu OTP session → /(auth)/otp.
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
+import { View, StyleSheet, Pressable } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
-import { Button } from '@/components/ui/Button';
-import { PhoneInput } from '@/components/ui/PhoneInput';
+import { Colors, Spacing } from '@/constants/theme';
+import { AppText, AppHeader, Button, PhoneInput, Logo, Screen, ErrorSheet } from '@/components/ui';
 import { authApi, ApiError, saveOtpSession, normalizePhoneVn } from '@/services/api';
+import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
 export default function LoginScreen() {
+  useStatusBarStyle('dark');
   const { intent } = useLocalSearchParams<{ intent?: string }>();
   const isRegister = intent === 'register';
   const otpGroup = isRegister ? 'otp_register' : 'otp_general';
 
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hint, setHint] = useState('');
 
   const phoneNorm = normalizePhoneVn(phone);
   const isValid = phoneNorm.length >= 9 && phoneNorm.length <= 10;
@@ -52,159 +47,80 @@ export default function LoginScreen() {
         },
       });
     } catch (e) {
-      const msg =
-        e instanceof ApiError
-          ? e.message
-          : 'Không gửi được OTP. Kiểm tra mạng / API.';
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.alert(`Lỗi\n\n${msg}`);
-      } else {
-        Alert.alert('Lỗi', msg);
-      }
+      const msg = e instanceof ApiError ? e.message : 'Không gửi được OTP. Kiểm tra mạng / API.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
+  const goPasscode = () => {
+    if (!isValid) {
+      setHint('Nhập số điện thoại để đăng nhập bằng mật khẩu');
+      return;
+    }
+    setHint('');
+    router.push({ pathname: '/(auth)/passcode', params: { phone: phoneNorm } });
+  };
+
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.logoContainer}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoText}>Z</Text>
-          </View>
-          <Text style={styles.appName}>ZUUMCUSTOMER</Text>
-          <Text style={styles.hint}>
-            {isRegister
-              ? 'Đăng ký tài khoản khách hàng'
-              : 'Đăng nhập bằng số điện thoại'}
-          </Text>
-        </View>
-
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Số điện thoại</Text>
-          <PhoneInput
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="09xx xxx xxx"
-          />
-        </View>
-
-        <View style={{ flex: 1 }} />
-
+    <Screen
+      header={<AppHeader title={isRegister ? 'Đăng ký' : 'Đăng nhập'} variant="light" left="back" />}
+      footer={
         <Button
-          title={
-            loading
-              ? 'Đang gửi OTP...'
-              : isRegister
-                ? 'Đăng ký — nhận mã OTP'
-                : 'Đăng nhập — nhận mã OTP'
-          }
+          title="Tiếp tục"
+          flat
           onPress={handleContinue}
-          variant={isValid ? 'primary' : 'secondary'}
           disabled={!isValid || loading}
           loading={loading}
         />
-
-        <View style={styles.switchRow}>
-          {isRegister ? (
-            <>
-              <Text style={styles.switchText}>Đã có tài khoản? </Text>
-              <TouchableOpacity
-                onPress={() =>
-                  router.replace({
-                    pathname: '/(auth)/login',
-                    params: { intent: 'login' },
-                  })
-                }
-              >
-                <Text style={styles.switchLink}>Đăng nhập</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <Text style={styles.switchText}>Chưa có tài khoản? </Text>
-              <TouchableOpacity
-                onPress={() =>
-                  router.replace({
-                    pathname: '/(auth)/login',
-                    params: { intent: 'register' },
-                  })
-                }
-              >
-                <Text style={styles.switchLink}>Đăng ký khách hàng</Text>
-              </TouchableOpacity>
-            </>
-          )}
+      }
+      footerPadded={false}
+    >
+      <View style={styles.body}>
+        <View style={styles.logo}>
+          <Logo size={56} />
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+        <View style={styles.labelRow}>
+          <AppText size={14} weight="medium" color={Colors.text}>
+            Số điện thoại của tôi là
+          </AppText>
+          <AppText size={13} color={Colors.error}>
+            (*)
+          </AppText>
+        </View>
+        <PhoneInput value={phone} onChangeText={(t) => { setPhone(t); if (hint) setHint(''); }} autoFocus />
+        {hint ? (
+          <AppText size={12} color={Colors.error} style={{ marginTop: Spacing.sm }}>
+            {hint}
+          </AppText>
+        ) : null}
+
+        {!isRegister ? (
+          <Pressable onPress={goPasscode} hitSlop={8} style={styles.link}>
+            <AppText weight="bold" size={15} color={Colors.primary} align="center">
+              Đăng nhập bằng mật khẩu
+            </AppText>
+          </Pressable>
+        ) : null}
+      </View>
+
+      <ErrorSheet
+        visible={!!error}
+        title="Lỗi đăng nhập"
+        message={error ?? ''}
+        actionLabel="Thử lại"
+        onClose={() => setError(null)}
+        onAction={() => setError(null)}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: Colors.white,
-    paddingHorizontal: Spacing['2xl'],
-    paddingBottom: Spacing.xl,
-    paddingTop: Spacing.lg,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing['3xl'],
-  },
-  logoBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoText: {
-    fontSize: Typography.fontSize['2xl'],
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.white,
-  },
-  appName: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.primary,
-    letterSpacing: 2,
-  },
-  hint: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
-  fieldGroup: { gap: Spacing.sm },
-  label: {
-    fontSize: Typography.fontSize.base,
-    color: Colors.text,
-    fontWeight: Typography.fontWeight.medium,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: Spacing.md,
-    flexWrap: 'wrap',
-  },
-  switchText: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.textSecondary,
-  },
-  switchLink: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.primary,
-    fontWeight: Typography.fontWeight.semiBold,
-  },
+  body: { flex: 1, paddingHorizontal: Spacing.screen },
+  logo: { alignItems: 'center', marginTop: Spacing['2xl'], marginBottom: Spacing['2xl'] },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
+  link: { marginTop: Spacing.xl, alignSelf: 'center', paddingVertical: Spacing.xs },
 });

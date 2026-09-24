@@ -26,8 +26,8 @@ type UseNotificationsOptions = {
 };
 
 export function useNotifications({ onTokenReady }: UseNotificationsOptions = {}) {
-  const notificationListener = useRef<Notifications.EventSubscription>();
-  const responseListener = useRef<Notifications.EventSubscription>();
+  const notificationListener = useRef<Notifications.EventSubscription | undefined>(undefined);
+  const responseListener = useRef<Notifications.EventSubscription | undefined>(undefined);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -110,7 +110,7 @@ async function registerForPushNotifications(): Promise<PushToken | null> {
       name: 'Đơn hàng mới',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#6B35D4',
+      lightColor: '#59267C',
       sound: 'default',
     });
 

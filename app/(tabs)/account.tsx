@@ -1,193 +1,145 @@
-// Account — tài khoản khách hàng
+// Hồ sơ — Figma HỒ SƠ tab (0-16311): header tím "Hồ sơ" + "..." ; dòng hồ sơ avatar 48 + tên bold 17
+// + "Chỉnh sửa hồ sơ"; menu: Tài khoản (badge đ24.000) / Tài xế yêu thích (24) / Vị trí đã lưu (2) /
+// Chính sách ZuumViet / Đổi mật khẩu / Đăng xuất. Toast teal "Cập nhật mật khẩu mới thành công".
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, StyleSheet, ScrollView } from 'react-native';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Colors, Spacing } from '@/constants/theme';
+import { AppText, AppHeader, Screen, ListRow, Dialog, BottomSheet, Toast, Icons } from '@/components/ui';
+import { ProfileRow } from '@/components/profile';
+import { authApi, getStoredCustomer, getDisplayName, formatPhoneDisplay, type CustomerProfile } from '@/services/api';
+import { formatMoney } from '@/constants/mock';
+import { useWalletBalance } from '@/hooks/useWalletBalance';
+import { useSavedLocations, useFavoriteDrivers, countFavoriteDrivers, localAvatarStore } from '@/services/profileStore';
+import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
-import { authApi, getStoredCustomer, type CustomerProfile } from '@/services/api';
-
-type MenuItem = {
-  icon: string;
-  label: string;
-  badge?: string;
-  onPress: () => void;
+const TOAST_MESSAGES: Record<string, string> = {
+  passcode: 'Cập nhật mật khẩu mới thành công',
+  profile: 'Cập nhật hồ sơ thành công',
 };
 
 export default function AccountScreen() {
+  useStatusBarStyle('light');
+  const params = useLocalSearchParams<{ toast?: string }>();
   const [customer, setCustomer] = useState<CustomerProfile | null>(null);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const hideToast = useCallback(() => setToast(null), []);
+
+  const savedLocations = useSavedLocations();
+  const favoriteDrivers = useFavoriteDrivers();
+  const localAvatar = localAvatarStore.use();
+  const walletBalance = useWalletBalance();
+
+  useFocusEffect(
+    useCallback(() => {
+      getStoredCustomer().then(setCustomer);
+    }, [])
+  );
 
   useEffect(() => {
-    getStoredCustomer().then(setCustomer);
-  }, []);
+    const key = Array.isArray(params.toast) ? params.toast[0] : params.toast;
+    if (key && TOAST_MESSAGES[key]) {
+      setToast(TOAST_MESSAGES[key]);
+      router.setParams({ toast: '' });
+    }
+  }, [params.toast]);
 
-  const handleLogout = () => {
-    Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất?', [
-      { text: 'Huỷ', style: 'cancel' },
-      {
-        text: 'Đăng xuất',
-        style: 'destructive',
-        onPress: async () => {
-          await authApi.logout();
-          router.replace('/');
-        },
-      },
-    ]);
+  const handleLogout = async () => {
+    setConfirmLogout(false);
+    await authApi.logout();
+    router.replace('/');
   };
 
-  const menuGroups: { title: string; items: MenuItem[] }[] = [
-    {
-      title: 'Tài khoản',
-      items: [
-        { icon: '👤', label: 'Thông tin cá nhân', onPress: () => {} },
-        { icon: '📍', label: 'Địa chỉ đã lưu', onPress: () => {} },
-        { icon: '⭐', label: 'Tài xế yêu thích', onPress: () => {} },
-      ],
-    },
-    {
-      title: 'Cài đặt',
-      items: [
-        { icon: '🔔', label: 'Thông báo', onPress: () => {} },
-        { icon: '🌐', label: 'Ngôn ngữ', badge: 'Tiếng Việt', onPress: () => {} },
-      ],
-    },
-    {
-      title: 'Hỗ trợ',
-      items: [
-        { icon: '🎧', label: 'Liên hệ hỗ trợ', onPress: () => {} },
-        { icon: '📋', label: 'Điều khoản dịch vụ', onPress: () => {} },
-        { icon: 'ℹ️', label: 'Về ứng dụng', badge: 'v1.0.0', onPress: () => {} },
-      ],
-    },
-  ];
-
-  const displayName =
-    customer?.full_name || customer?.fullname || 'Khách hàng';
-  const phone = customer?.phone
-    ? `+${customer.country_code || '84'} ${customer.phone}`
-    : '';
+  const name = getDisplayName(customer);
+  const phone = formatPhoneDisplay(customer?.phone, customer?.country_code || '84');
+  const avatarUri = localAvatar ?? (typeof customer?.avatar_url === 'string' ? customer.avatar_url : null);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Tài khoản</Text>
-      </View>
+    <Screen
+      header={
+        <AppHeader
+          title="Hồ sơ"
+          variant="dark"
+          left="none"
+          right={{ icon: Icons.more, onPress: () => setMoreOpen(true), label: 'Thêm' }}
+        />
+      }
+    >
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ProfileRow name={name} phone={phone} avatarUri={avatarUri} onEdit={() => router.push('/profile/edit')} />
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {displayName.slice(0, 1).toUpperCase()}
-            </Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{displayName}</Text>
-            {phone ? <Text style={styles.phone}>{phone}</Text> : null}
-          </View>
+        <View style={styles.menu}>
+          <ListRow icon={Icons.wallet} label="Tài khoản" badgeLabel={formatMoney(walletBalance)} onPress={() => router.push('/wallet')} />
+          <ListRow
+            icon={Icons.heartOutline}
+            label="Tài xế yêu thích"
+            badgeCount={countFavoriteDrivers(favoriteDrivers)}
+            onPress={() => router.push('/profile/favorite-drivers')}
+          />
+          <ListRow icon={Icons.bookmark} label="Vị trí đã lưu" badgeCount={savedLocations.length} onPress={() => router.push('/profile/saved-locations')} />
+          <ListRow icon={Icons.shield} label="Chính sách ZuumViet" onPress={() => router.push('/profile/policies')} />
+          <ListRow icon={Icons.lock} label="Đổi mật khẩu" onPress={() => router.push('/profile/change-passcode')} />
+          <ListRow icon={Icons.logout} iconColor={Colors.error} label="Đăng xuất" chevron={false} onPress={() => setConfirmLogout(true)} divider={false} />
         </View>
 
-        {menuGroups.map((group) => (
-          <View key={group.title} style={styles.group}>
-            <Text style={styles.groupTitle}>{group.title}</Text>
-            {group.items.map((item) => (
-              <TouchableOpacity
-                key={item.label}
-                style={styles.row}
-                onPress={item.onPress}
-              >
-                <Text style={styles.rowIcon}>{item.icon}</Text>
-                <Text style={styles.rowLabel}>{item.label}</Text>
-                {item.badge ? (
-                  <Text style={styles.badge}>{item.badge}</Text>
-                ) : (
-                  <Text style={styles.chevron}>›</Text>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        ))}
-
-        <TouchableOpacity style={styles.logout} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Đăng xuất</Text>
-        </TouchableOpacity>
+        <AppText size={12} color={Colors.textDisabled} align="center" style={styles.version}>
+          ZuumViet Customer · v1.0.0
+        </AppText>
       </ScrollView>
-    </SafeAreaView>
+
+      <BottomSheet visible={moreOpen} onClose={() => setMoreOpen(false)} title="Tuỳ chọn" showClose>
+        <ListRow
+          icon={Icons.edit}
+          label="Chỉnh sửa hồ sơ"
+          onPress={() => {
+            setMoreOpen(false);
+            router.push('/profile/edit');
+          }}
+          style={{ paddingHorizontal: 0 }}
+        />
+        <ListRow
+          icon={Icons.lock}
+          label="Đổi mật khẩu"
+          onPress={() => {
+            setMoreOpen(false);
+            router.push('/profile/change-passcode');
+          }}
+          style={{ paddingHorizontal: 0 }}
+        />
+        <ListRow
+          icon={Icons.logout}
+          iconColor={Colors.error}
+          label="Đăng xuất"
+          chevron={false}
+          divider={false}
+          onPress={() => {
+            setMoreOpen(false);
+            setConfirmLogout(true);
+          }}
+          style={{ paddingHorizontal: 0 }}
+        />
+      </BottomSheet>
+
+      <Dialog
+        visible={confirmLogout}
+        onClose={() => setConfirmLogout(false)}
+        title="Đăng xuất"
+        message="Bạn có chắc muốn đăng xuất khỏi ZuumViet?"
+        actions={[
+          { label: 'Huỷ', variant: 'secondary', onPress: () => setConfirmLogout(false) },
+          { label: 'Đăng xuất', variant: 'danger', onPress: handleLogout },
+        ]}
+      />
+
+      <Toast visible={!!toast} message={toast ?? ''} tone="success" onHide={hideToast} />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.white },
-  header: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerTitle: {
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.text,
-  },
-  content: { padding: Spacing.lg, paddingBottom: Spacing['3xl'] },
-  profileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.primaryBg,
-    marginBottom: Spacing.xl,
-  },
-  avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: Colors.white,
-    fontWeight: Typography.fontWeight.bold,
-    fontSize: Typography.fontSize.lg,
-  },
-  name: {
-    fontSize: Typography.fontSize.md,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.text,
-  },
-  phone: { marginTop: 4, color: Colors.textSecondary },
-  group: { marginBottom: Spacing.lg },
-  groupTitle: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray200,
-  },
-  rowIcon: { fontSize: 18, marginRight: Spacing.md },
-  rowLabel: { flex: 1, fontSize: Typography.fontSize.base, color: Colors.text },
-  badge: { color: Colors.textSecondary, fontSize: Typography.fontSize.sm },
-  chevron: { color: Colors.gray400, fontSize: 22 },
-  logout: {
-    marginTop: Spacing.lg,
-    alignItems: 'center',
-    padding: Spacing.md,
-  },
-  logoutText: {
-    color: Colors.error,
-    fontWeight: Typography.fontWeight.semibold,
-  },
+  content: { paddingBottom: Spacing['2xl'] },
+  menu: { marginTop: Spacing.sm },
+  version: { marginTop: Spacing['2xl'] },
 });

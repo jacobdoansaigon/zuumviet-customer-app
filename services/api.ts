@@ -80,11 +80,39 @@ export type LoginOtpResult =
       phone: string;
     };
 
+export type LoginNeedRegister = Extract<LoginOtpResult, { need_register: true }>;
+export type LoginSuccess = CustomerProfile & { token: string };
+
+/** Kết quả loginotp yêu cầu đăng ký (SĐT chưa có tài khoản) */
+export function isNeedRegister(r: LoginOtpResult): r is LoginNeedRegister {
+  return !!r && typeof r === 'object' && 'need_register' in r && r.need_register === true;
+}
+
+/** Tên hiển thị của khách (BE trả full_name hoặc fullname) */
+export function getDisplayName(c?: CustomerProfile | null, fallback = 'Khách hàng'): string {
+  const n = (c?.full_name || c?.fullname || '').toString().trim();
+  return n || fallback;
+}
+
+/** SĐT dạng hiển thị "+84 87654321" */
+export function formatPhoneDisplay(phone?: string | null, countryCode = '84'): string {
+  const p = normalizePhoneVn(String(phone ?? ''));
+  if (!p) return '';
+  return `+${countryCode} ${p}`;
+}
+
 export type DeliveryOrder = {
   id: number;
   status: number;
   [key: string]: unknown;
 };
+
+/** Các trạng thái đơn còn "đang chạy" (hiện banner chuyến đang đi trên Home) */
+export const ACTIVE_ORDER_STATUSES: readonly number[] = [1, 3, 5, 7, 9, 11, 13];
+
+export function isActiveOrder(o: DeliveryOrder): boolean {
+  return ACTIVE_ORDER_STATUSES.includes(Number(o.status));
+}
 
 export class ApiError extends Error {
   status: number;
@@ -95,6 +123,20 @@ export class ApiError extends Error {
     this.status = status;
     this.payload = payload;
   }
+}
+
+/**
+ * true khi lỗi do chưa cấu hình API (EXPO_PUBLIC_API_URL trống) hoặc endpoint chưa có trên BE (404).
+ * Các màn chưa có backend (hồ sơ, đổi passcode) dùng để fallback sang chế độ demo/local.
+ */
+export function isDemoFallbackError(e: unknown): boolean {
+  return e instanceof ApiError && (e.status === 0 || e.status === 404);
+}
+
+export function getErrorMessage(e: unknown, fallback = 'Có lỗi xảy ra trong quá trình'): string {
+  if (e instanceof ApiError) return e.message || fallback;
+  if (e instanceof Error && e.message) return e.message;
+  return fallback;
 }
 
 function ensureBaseUrl() {
@@ -321,12 +363,41 @@ export const authApi = {
       body: { phone: normalizePhoneVn(phone), country_code: countryCode },
     }),
 
+  /**
+   * Đổi passcode (mật khẩu). TODO(BE): xác nhận path thật — hiện dùng
+   * PUT /site/customeraccounts/changepassword ; màn hình fallback demo khi 404.
+   */
+  changePassword: (body: { old_password?: string; new_password: string }) =>
+    request<{ success?: boolean }>('/site/customeraccounts/changepassword', {
+      method: 'PUT',
+      auth: true,
+      body,
+    }),
+
   logout: () => clearSession(),
 };
+
+/** Ghi đè profile đã lưu trong storage (giữ token hiện tại). */
+export async function updateStoredCustomer(patch: Partial<CustomerProfile>): Promise<CustomerProfile | null> {
+  const current = await getStoredCustomer();
+  if (!current) return null;
+  const token = await getToken();
+  const next = { ...current, ...patch } as CustomerProfile;
+  await saveSession(token ?? String(current.token ?? ''), next);
+  return next;
+}
 
 export const customerApi = {
   getProfile: (id: number) =>
     request<CustomerProfile>(`/site/customeraccounts/${id}`, { auth: true }),
+
+  /** Cập nhật hồ sơ (họ tên, email, avatar). TODO(BE): xác nhận path PUT /site/customeraccounts/{id}. */
+  updateProfile: (id: number, body: Partial<Pick<CustomerProfile, 'full_name' | 'email'>> & Record<string, unknown>) =>
+    request<CustomerProfile>(`/site/customeraccounts/${id}`, {
+      method: 'PUT',
+      auth: true,
+      body,
+    }),
 };
 
 export const orderApi = {
