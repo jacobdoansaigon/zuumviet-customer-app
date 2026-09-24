@@ -50,19 +50,21 @@ export default function BookingScreen() {
   );
 
   const group = SERVICE_GROUPS[state.service];
+  const labels = group.labels;
   const selected = group.options.find((o) => o.id === state.optionId) ?? group.options[0]!;
   const complete = state.receivers.filter(isReceiverComplete);
-  const canConfirm = complete.length > 0 && !!state.sender.place && !!state.sender.name && !!state.sender.phone;
+  const senderReady = !!state.sender.place && !!state.sender.name && !!state.sender.phone;
+  const canConfirm = senderReady && (group.maxStops === 0 || complete.length > 0);
 
   const stops = useMemo<MapStop[]>(() => {
     const list: MapStop[] = [];
     const p = state.sender.place;
-    if (p) list.push({ id: 'pickup', lat: p.lat, lng: p.lng, type: 'pickup', label: 'Điểm lấy hàng' });
+    if (p) list.push({ id: 'pickup', lat: p.lat, lng: p.lng, type: 'pickup', label: labels.mapPickupLabel });
     state.receivers.filter(isReceiverComplete).forEach((r, i) => {
-      list.push({ id: `drop-${r.id}`, lat: r.place!.lat, lng: r.place!.lng, type: 'dropoff', label: `Điểm giao ${i + 1}` });
+      list.push({ id: `drop-${r.id}`, lat: r.place!.lat, lng: r.place!.lng, type: 'dropoff', label: group.maxStops > 1 ? `${labels.mapDropLabel} ${i + 1}` : labels.mapDropLabel });
     });
     return list;
-  }, [state.sender.place, state.receivers]);
+  }, [state.sender.place, state.receivers, labels, group.maxStops]);
 
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/home'));
   const openSender = () => router.push('/booking/sender');
@@ -116,10 +118,12 @@ export default function BookingScreen() {
             onPressReceiver={openReceiver}
             onRemoveReceiver={removeReceiver}
             onAddReceiver={addStop}
+            labels={labels}
+            maxStops={group.maxStops}
           />
         </ScrollView>
 
-        <FlatFooter title={canConfirm ? 'Xác nhận' : 'Vui lòng chọn địa điểm gửi hàng'} disabled={!canConfirm} onPress={() => router.push('/booking/confirm')} />
+        <FlatFooter title={canConfirm ? 'Xác nhận' : labels.confirmHint} disabled={!canConfirm} onPress={() => router.push('/booking/confirm')} />
       </View>
 
       <ServiceInfoDialog

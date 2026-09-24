@@ -1,8 +1,10 @@
-// StopList — lộ trình trên bottom sheet đặt hàng: người gửi → các người nhận (X để xoá) → link thêm điểm (Figma GH 1.1)
+// StopList — lộ trình trên bottom sheet đặt hàng: người gửi/điểm đón → các điểm đến (X để xoá) → link thêm điểm (Figma GH 1.1)
+// Nhãn theo loại dịch vụ (labels) — giao hàng / chở khách / gọi thợ (maxStops = 0: chỉ có 1 địa điểm)
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, Icon, Icons, StopMarker } from '@/components/ui';
+import { DELIVERY_LABELS, type ServiceLabels } from '@/constants/mockBooking';
 import { isReceiverComplete, type Sender, type Receiver } from '@/services/bookingStore';
 
 interface StopRowProps {
@@ -39,7 +41,7 @@ const StopRow: React.FC<StopRowProps> = ({ type, title, placeholder, status, sub
           </AppText>
         ) : null}
         {onRemove ? (
-          <Pressable onPress={onRemove} hitSlop={10} style={{ marginLeft: 'auto', paddingLeft: Spacing.sm }} accessibilityLabel="Xoá điểm giao">
+          <Pressable onPress={onRemove} hitSlop={10} style={{ marginLeft: 'auto', paddingLeft: Spacing.sm }} accessibilityLabel="Xoá điểm">
             <Icon name={Icons.close} size={18} color={Colors.text} />
           </Pressable>
         ) : null}
@@ -60,35 +62,48 @@ interface StopListProps {
   onPressReceiver: (index: number) => void;
   onRemoveReceiver: (index: number) => void;
   onAddReceiver: () => void;
+  labels?: ServiceLabels;
+  /** số điểm đến tối đa; 0 = không có điểm đến (dịch vụ tận nơi) */
+  maxStops?: number;
 }
 
-export const StopList: React.FC<StopListProps> = ({ sender, receivers, onPressSender, onPressReceiver, onRemoveReceiver, onAddReceiver }) => {
+export const StopList: React.FC<StopListProps> = ({
+  sender,
+  receivers,
+  onPressSender,
+  onPressReceiver,
+  onRemoveReceiver,
+  onAddReceiver,
+  labels = DELIVERY_LABELS,
+  maxStops = 10,
+}) => {
   const complete = receivers.map((r, index) => ({ r, index })).filter((x) => isReceiverComplete(x.r));
   const senderTitle = sender.name && sender.phone ? `${sender.name} - ${sender.phone}` : undefined;
+  const canAdd = maxStops > 0 && complete.length < maxStops;
   return (
     <View style={styles.wrap}>
       <StopRow
         type="pickup"
         title={senderTitle}
-        placeholder="Nhập thông tin người gửi"
-        status="Đang lấy hàng"
+        placeholder={labels.senderPlaceholder}
+        status={labels.senderStatus}
         subtitle={sender.place?.address}
-        connector
+        connector={maxStops > 0}
         onPress={onPressSender}
       />
-      {complete.map(({ r, index }) => (
+      {complete.map(({ r, index }, i) => (
         <StopRow
           key={r.id}
           type="dropoff"
-          title={`${r.name} - ${r.phone}`}
-          status="Đang lấy hàng"
+          title={r.name && r.phone ? `${r.name} - ${r.phone}` : r.place?.title || labels.receiverStatus}
+          status={labels.receiverStatus}
           subtitle={r.place?.address}
-          connector
+          connector={canAdd || i < complete.length - 1}
           onPress={() => onPressReceiver(index)}
           onRemove={() => onRemoveReceiver(index)}
         />
       ))}
-      <StopRow type="dropoff" placeholder={complete.length ? '+ Thêm địa điểm gửi hàng' : 'Nhập điểm gửi hàng'} onPress={onAddReceiver} />
+      {canAdd ? <StopRow type="dropoff" placeholder={complete.length ? labels.receiverAddPlaceholder : labels.receiverPlaceholder} onPress={onAddReceiver} /> : null}
     </View>
   );
 };

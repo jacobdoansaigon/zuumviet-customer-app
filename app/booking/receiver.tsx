@@ -5,7 +5,7 @@ import { View, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader, Icons, Radio, Screen, SwitchRow, TextField } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
-import { VIEW_OPTIONS, type PackageSizeId, type ViewOptionId } from '@/constants/mockBooking';
+import { SERVICE_GROUPS, VIEW_OPTIONS, type PackageSizeId, type ViewOptionId } from '@/constants/mockBooking';
 import { useBooking, ensureReceiver, updateReceiver, isValidPhoneVn, formatThousands } from '@/services/bookingStore';
 import { AddressBlock, ContactPickerSheet, FlatFooter, PackageSizePicker } from '@/components/booking';
 
@@ -14,6 +14,10 @@ export default function ReceiverScreen() {
   const index = Math.max(0, Number(indexParam ?? 0) || 0);
   const state = useBooking();
   const receiver = state.receivers[index];
+  const group = SERVICE_GROUPS[state.service];
+  const labels = group.labels;
+  // Chở khách: chỉ cần điểm đến; tên/SĐT không bắt buộc (mặc định lấy của người đi)
+  const isDelivery = group.kind === 'delivery';
 
   useEffect(() => {
     ensureReceiver(index);
@@ -29,12 +33,12 @@ export default function ReceiverScreen() {
   const [contacts, setContacts] = useState(false);
 
   const place = receiver?.place ?? null;
-  const valid = name.trim().length >= 2 && isValidPhoneVn(phone) && !!place;
+  const valid = !!place && (!isDelivery || (name.trim().length >= 2 && isValidPhoneVn(phone)));
 
   const confirm = () => {
     updateReceiver(index, {
-      name: name.trim(),
-      phone: phone.trim(),
+      name: name.trim() || (isDelivery ? '' : state.sender.name),
+      phone: phone.trim() || (isDelivery ? '' : state.sender.phone),
       cod: Number(cod.replace(/\D/g, '')) || 0,
       note: note.trim(),
       packageSize: size,
@@ -47,7 +51,7 @@ export default function ReceiverScreen() {
 
   return (
     <Screen
-      header={<AppHeader variant="dark" title="Thông tin người nhận" left="arrow" />}
+      header={<AppHeader variant="dark" title={labels.receiverScreenTitle} left="arrow" />}
       scroll
       edges={['left', 'right']}
       footerPadded={false}
@@ -56,19 +60,23 @@ export default function ReceiverScreen() {
       <View style={styles.body}>
         <AddressBlock
           address={place?.address}
-          placeholder="Nhập điểm gửi hàng"
+          placeholder={labels.receiverPlaceholder}
           markerType="dropoff"
           onChange={() => router.push({ pathname: '/booking/location', params: { target: 'receiver', index: String(index), back: '1' } })}
         />
-        <SwitchRow icon={Icons.handHold} label="Giao hàng tận tay" sublabel="đ10,000" value={hand} onValueChange={setHand} />
-        <View style={styles.divider} />
+        {isDelivery ? (
+          <>
+            <SwitchRow icon={Icons.handHold} label="Giao hàng tận tay" sublabel="đ10,000" value={hand} onValueChange={setHand} />
+            <View style={styles.divider} />
+          </>
+        ) : null}
 
         <TextField
-          label="Họ và tên người nhận"
-          required
+          label={isDelivery ? 'Họ và tên người nhận' : 'Người đi (nếu đặt cho người khác)'}
+          required={isDelivery}
           value={name}
           onChangeText={setName}
-          placeholder="Họ và tên người nhận"
+          placeholder={isDelivery ? 'Họ và tên người nhận' : state.sender.name || 'Họ và tên người đi'}
           autoCapitalize="words"
           iconRight={Icons.contacts}
           onIconRightPress={() => setContacts(true)}
@@ -76,34 +84,46 @@ export default function ReceiverScreen() {
         />
         <TextField
           label="Số điện thoại"
-          required
+          required={isDelivery}
           value={phone}
           onChangeText={setPhone}
-          placeholder="Số điện thoại người nhận"
+          placeholder={isDelivery ? 'Số điện thoại người nhận' : state.sender.phone || 'Số điện thoại người đi'}
           keyboardType="phone-pad"
           containerStyle={styles.field}
         />
+        {isDelivery ? (
+          <TextField
+            label="COD"
+            value={formatThousands(cod)}
+            onChangeText={(t) => setCod(t.replace(/\D/g, ''))}
+            placeholder="Nhập số tiền"
+            suffix="đ"
+            keyboardType="number-pad"
+            helper="Tài xế sẽ trả tiền hàng trước và thu lại số tiền đó từ người nhận"
+            containerStyle={styles.field}
+          />
+        ) : null}
         <TextField
-          label="COD"
-          value={formatThousands(cod)}
-          onChangeText={(t) => setCod(t.replace(/\D/g, ''))}
-          placeholder="Nhập số tiền"
-          suffix="đ"
-          keyboardType="number-pad"
-          helper="Tài xế sẽ trả tiền hàng trước và thu lại số tiền đó từ người nhận"
+          label={isDelivery ? 'Ghi chú sản phẩm' : `Ghi chú cho ${labels.provider.toLowerCase()}`}
+          value={note}
+          onChangeText={setNote}
+          placeholder={isDelivery ? 'Ghi chú sản phẩm' : 'Ví dụ: đón trước cổng, có hành lý...'}
           containerStyle={styles.field}
         />
-        <TextField label="Ghi chú sản phẩm" value={note} onChangeText={setNote} placeholder="Ghi chú sản phẩm" containerStyle={styles.field} />
 
-        <View style={{ marginTop: Spacing.lg }}>
-          <PackageSizePicker value={size} onChange={setSize} />
-        </View>
+        {isDelivery ? (
+          <>
+            <View style={{ marginTop: Spacing.lg }}>
+              <PackageSizePicker value={size} onChange={setSize} />
+            </View>
 
-        <View style={styles.radios}>
-          {VIEW_OPTIONS.map((o) => (
-            <Radio key={o.id} selected={view === o.id} onPress={() => setView(o.id)} label={o.label} style={styles.radio} />
-          ))}
-        </View>
+            <View style={styles.radios}>
+              {VIEW_OPTIONS.map((o) => (
+                <Radio key={o.id} selected={view === o.id} onPress={() => setView(o.id)} label={o.label} style={styles.radio} />
+              ))}
+            </View>
+          </>
+        ) : null}
       </View>
 
       <ContactPickerSheet

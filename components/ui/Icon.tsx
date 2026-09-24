@@ -113,6 +113,10 @@ export const Icons = {
   moon: 'ion:moon' as IconName,
   eye: 'ion:eye-outline' as IconName,
   eyeOff: 'ion:eye-off-outline' as IconName,
+  motorbike: 'mci:motorbike' as IconName,
+  carSeat: 'mci:car-estate' as IconName,
+  steering: 'mci:steering' as IconName,
+  tools: 'mci:tools' as IconName,
 };
 
 export default Icon;

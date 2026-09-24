@@ -9,6 +9,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { AppText, BottomSheet, Icons, ListRow, Toast } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { orderApi, ORDER_STATUS } from '@/services/api';
+import { SERVICE_GROUPS } from '@/constants/mockBooking';
 import {
   useBooking,
   getStoredOrder,
@@ -109,9 +110,11 @@ export default function TrackingScreen() {
 
   const stops = useMemo<MapStop[]>(() => {
     if (!order) return [];
+    const group = SERVICE_GROUPS[order.service];
+    const L = group.labels;
     const list: MapStop[] = [
-      { id: 'pickup', lat: order.pickup.lat, lng: order.pickup.lng, type: 'pickup', label: 'Điểm lấy hàng' },
-      ...order.stops.map<MapStop>((s, i) => ({ id: `drop-${i}`, lat: s.lat, lng: s.lng, type: 'dropoff', label: `Điểm giao ${i + 1}` })),
+      { id: 'pickup', lat: order.pickup.lat, lng: order.pickup.lng, type: 'pickup', label: L.mapPickupLabel },
+      ...order.stops.map<MapStop>((s, i) => ({ id: `drop-${i}`, lat: s.lat, lng: s.lng, type: 'dropoff', label: group.maxStops > 1 ? `${L.mapDropLabel} ${i + 1}` : L.mapDropLabel })),
     ];
     const phase = getTrackingPhase(order);
     if (order.driver && (phase === 'accepted' || phase === 'delivering')) {

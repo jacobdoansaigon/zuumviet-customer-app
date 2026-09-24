@@ -3,11 +3,128 @@
 // mã ưu đãi, tài xế yêu thích, danh bạ → toàn bộ mock nằm ở đây (đánh dấu rõ ràng để thay sau).
 import { Icons, type IconName } from '@/components/ui/Icon';
 
-export type ServiceKey = 'delivery' | 'transport' | 'rental';
+export type ServiceKey = 'delivery' | 'transport' | 'rental' | 'bike' | 'car' | 'car6' | 'driver' | 'handyman';
+
+export const SERVICE_KEYS: ServiceKey[] = ['delivery', 'transport', 'rental', 'bike', 'car', 'car6', 'driver', 'handyman'];
 
 export function toServiceKey(v: unknown): ServiceKey {
-  return v === 'transport' || v === 'rental' ? v : 'delivery';
+  return typeof v === 'string' && (SERVICE_KEYS as string[]).includes(v) ? (v as ServiceKey) : 'delivery';
 }
+
+/** Loại luồng đặt: giao hàng (nhiều điểm giao) / chở khách (1 điểm đến) / tận nơi (không có điểm đến) */
+export type ServiceKind = 'delivery' | 'ride' | 'onsite';
+
+/** Nhãn hiển thị theo loại luồng — dùng chung cho màn đặt / người gửi / điểm đến / xác nhận / theo dõi */
+export interface ServiceLabels {
+  /** "Tài xế" | "Thợ" */
+  provider: string;
+  feeLabel: string;
+  senderPlaceholder: string;
+  senderStatus: string;
+  senderScreenTitle: string;
+  senderNameLabel: string;
+  senderPhonePlaceholder: string;
+  senderLocationTitle: string;
+  senderLocationPlaceholder: string;
+  receiverPlaceholder: string;
+  receiverAddPlaceholder: string;
+  receiverStatus: string;
+  receiverScreenTitle: string;
+  receiverLocationTitle: string;
+  receiverLocationPlaceholder: string;
+  confirmTitle: string;
+  confirmHint: string;
+  /** đơn vị đếm điểm ở footer xác nhận: "2 điểm giao" */
+  stopUnit: string;
+  mapPickupLabel: string;
+  mapDropLabel: string;
+  trackingAccepted: string;
+  /** có chỗ trống {eta} = số phút */
+  trackingEta: string;
+  trackingDelivering: string;
+  trackingDone: string;
+}
+
+export const DELIVERY_LABELS: ServiceLabels = {
+  provider: 'Tài xế',
+  feeLabel: 'Cước dịch vụ',
+  senderPlaceholder: 'Nhập thông tin người gửi',
+  senderStatus: 'Đang lấy hàng',
+  senderScreenTitle: 'Thông tin người gửi',
+  senderNameLabel: 'Họ và tên người gửi',
+  senderPhonePlaceholder: 'Số điện thoại người gửi',
+  senderLocationTitle: 'Lựa chọn địa điểm',
+  senderLocationPlaceholder: 'Nhập địa chỉ lấy hàng',
+  receiverPlaceholder: 'Nhập điểm gửi hàng',
+  receiverAddPlaceholder: '+ Thêm địa điểm gửi hàng',
+  receiverStatus: 'Đang lấy hàng',
+  receiverScreenTitle: 'Thông tin người nhận',
+  receiverLocationTitle: 'Thêm điểm gửi hàng',
+  receiverLocationPlaceholder: 'Nhập địa chỉ người nhận',
+  confirmTitle: 'Xác nhận giao hàng',
+  confirmHint: 'Vui lòng chọn địa điểm gửi hàng',
+  stopUnit: 'điểm giao',
+  mapPickupLabel: 'Điểm lấy hàng',
+  mapDropLabel: 'Điểm giao',
+  trackingAccepted: 'Đang lấy hàng',
+  trackingEta: '{eta} phút nữa Tài xế đến lấy hàng',
+  trackingDelivering: 'Đang giao',
+  trackingDone: 'Giao hàng thành công',
+};
+
+export const RIDE_LABELS: ServiceLabels = {
+  provider: 'Tài xế',
+  feeLabel: 'Cước chuyến đi',
+  senderPlaceholder: 'Nhập thông tin người đi',
+  senderStatus: 'Điểm đón',
+  senderScreenTitle: 'Thông tin người đi',
+  senderNameLabel: 'Họ và tên người đi',
+  senderPhonePlaceholder: 'Số điện thoại người đi',
+  senderLocationTitle: 'Chọn điểm đón',
+  senderLocationPlaceholder: 'Nhập điểm đón',
+  receiverPlaceholder: 'Nhập điểm đến',
+  receiverAddPlaceholder: '+ Thêm điểm đến',
+  receiverStatus: 'Điểm đến',
+  receiverScreenTitle: 'Điểm đến',
+  receiverLocationTitle: 'Chọn điểm đến',
+  receiverLocationPlaceholder: 'Nhập điểm đến',
+  confirmTitle: 'Xác nhận đặt xe',
+  confirmHint: 'Vui lòng chọn điểm đón và điểm đến',
+  stopUnit: 'điểm đến',
+  mapPickupLabel: 'Điểm đón',
+  mapDropLabel: 'Điểm đến',
+  trackingAccepted: 'Đang đến đón',
+  trackingEta: '{eta} phút nữa Tài xế đến đón bạn',
+  trackingDelivering: 'Đang di chuyển',
+  trackingDone: 'Chuyến đi hoàn thành',
+};
+
+export const ONSITE_LABELS: ServiceLabels = {
+  provider: 'Thợ',
+  feeLabel: 'Phí gọi thợ',
+  senderPlaceholder: 'Nhập thông tin liên hệ',
+  senderStatus: 'Địa điểm',
+  senderScreenTitle: 'Thông tin liên hệ',
+  senderNameLabel: 'Họ và tên người liên hệ',
+  senderPhonePlaceholder: 'Số điện thoại liên hệ',
+  senderLocationTitle: 'Địa điểm cần thợ',
+  senderLocationPlaceholder: 'Nhập địa điểm cần thợ',
+  receiverPlaceholder: '',
+  receiverAddPlaceholder: '',
+  receiverStatus: '',
+  receiverScreenTitle: '',
+  receiverLocationTitle: '',
+  receiverLocationPlaceholder: '',
+  confirmTitle: 'Xác nhận gọi thợ',
+  confirmHint: 'Vui lòng nhập địa điểm cần thợ',
+  stopUnit: 'địa điểm',
+  mapPickupLabel: 'Địa điểm',
+  mapDropLabel: '',
+  trackingAccepted: 'Thợ đang đến',
+  trackingEta: '{eta} phút nữa Thợ đến nơi',
+  trackingDelivering: 'Đang thực hiện',
+  trackingDone: 'Hoàn thành công việc',
+};
 
 export interface ServiceOptionDef {
   id: string;
@@ -31,6 +148,10 @@ export interface ServiceGroupDef {
   key: ServiceKey;
   title: string;
   icon: IconName;
+  kind: ServiceKind;
+  labels: ServiceLabels;
+  /** số điểm đến tối đa (0 = dịch vụ tận nơi, không có điểm đến) */
+  maxStops: number;
   options: ServiceOptionDef[];
 }
 
@@ -41,6 +162,9 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
     key: 'delivery',
     title: 'Giao hàng',
     icon: Icons.scooter,
+    kind: 'delivery',
+    labels: DELIVERY_LABELS,
+    maxStops: 10,
     options: [
       {
         id: 'sieu-toc',
@@ -96,6 +220,9 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
     key: 'transport',
     title: 'Vận tải',
     icon: Icons.truck,
+    kind: 'delivery',
+    labels: DELIVERY_LABELS,
+    maxStops: 10,
     options: [
       {
         id: 'ban-tai',
@@ -139,6 +266,9 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
     key: 'rental',
     title: 'Thuê xe tải',
     icon: Icons.van,
+    kind: 'delivery',
+    labels: DELIVERY_LABELS,
+    maxStops: 10,
     options: [
       {
         id: 'thue-2h',
@@ -175,6 +305,226 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         extraStopPrice: 0,
         icon: Icons.van,
         infoLines: ['Giá thuê 1 ngày (8 giờ): đ1.500.000', '120km đầu miễn phí, vượt: đ7.000/km', 'Vượt giờ: đ150.000/giờ', VAT_LINE],
+      },
+    ],
+  },
+  // ---------------------------------------------------------------- Chở khách
+  bike: {
+    key: 'bike',
+    title: 'Xe máy',
+    icon: Icons.motorbike,
+    kind: 'ride',
+    labels: RIDE_LABELS,
+    maxStops: 1,
+    options: [
+      {
+        id: 'xe-may',
+        serviceId: 31,
+        name: 'Xe máy',
+        description: 'Đón tận nơi, 1 hành khách',
+        basePrice: 12000,
+        includedKm: 2,
+        perKmPrice: 4500,
+        extraStopPrice: 0,
+        icon: Icons.motorbike,
+        infoLines: ['Giá mở cửa (2km đầu): đ12.000', 'Mỗi km tiếp theo: đ4.500', 'Phụ phí giờ cao điểm / mưa: +đ5.000', 'Miễn phí chờ 5 phút đầu', VAT_LINE],
+      },
+      {
+        id: 'xe-may-plus',
+        serviceId: 33,
+        name: 'Xe máy Plus',
+        description: 'Tài xế 4.8★ trở lên, xe đời mới',
+        basePrice: 16000,
+        includedKm: 2,
+        perKmPrice: 5500,
+        extraStopPrice: 0,
+        icon: Icons.motorbike,
+        infoLines: ['Giá mở cửa (2km đầu): đ16.000', 'Mỗi km tiếp theo: đ5.500', 'Tài xế đánh giá 4.8★ trở lên', 'Tặng nón bảo hiểm sạch & áo mưa', VAT_LINE],
+      },
+    ],
+  },
+  car: {
+    key: 'car',
+    title: 'Xe hơi',
+    icon: Icons.car,
+    kind: 'ride',
+    labels: RIDE_LABELS,
+    maxStops: 1,
+    options: [
+      {
+        id: 'xe-4-cho',
+        serviceId: 41,
+        name: 'Xe 4 chỗ',
+        description: 'Sedan / hatchback, tối đa 4 khách',
+        basePrice: 30000,
+        includedKm: 2,
+        perKmPrice: 11000,
+        extraStopPrice: 0,
+        icon: Icons.car,
+        infoLines: ['Giá mở cửa (2km đầu): đ30.000', 'Mỗi km tiếp theo: đ11.000', 'Phụ phí giờ cao điểm: +đ10.000', 'Miễn phí chờ 5 phút đầu', VAT_LINE],
+      },
+      {
+        id: 'xe-4-cho-plus',
+        serviceId: 43,
+        name: 'Xe 4 chỗ Plus',
+        description: 'Xe đời mới, tài xế 4.9★',
+        basePrice: 38000,
+        includedKm: 2,
+        perKmPrice: 13500,
+        extraStopPrice: 0,
+        icon: Icons.car,
+        infoLines: ['Giá mở cửa (2km đầu): đ38.000', 'Mỗi km tiếp theo: đ13.500', 'Xe đời 2020 trở lên, có nước suối', 'Tài xế đánh giá 4.9★ trở lên', VAT_LINE],
+      },
+    ],
+  },
+  car6: {
+    key: 'car6',
+    title: 'Xe 6 chỗ',
+    icon: Icons.carSeat,
+    kind: 'ride',
+    labels: RIDE_LABELS,
+    maxStops: 1,
+    options: [
+      {
+        id: 'xe-6-cho',
+        serviceId: 51,
+        name: 'Xe 6 chỗ',
+        description: 'SUV / MPV, tối đa 6 khách',
+        basePrice: 38000,
+        includedKm: 2,
+        perKmPrice: 13000,
+        extraStopPrice: 0,
+        icon: Icons.carSeat,
+        infoLines: ['Giá mở cửa (2km đầu): đ38.000', 'Mỗi km tiếp theo: đ13.000', 'Phụ phí giờ cao điểm: +đ10.000', 'Khoang hành lý rộng', VAT_LINE],
+      },
+      {
+        id: 'xe-7-cho',
+        serviceId: 53,
+        name: 'Xe 7 chỗ',
+        description: 'Fortuner, Innova… tối đa 7 khách',
+        basePrice: 42000,
+        includedKm: 2,
+        perKmPrice: 14500,
+        extraStopPrice: 0,
+        icon: Icons.carSeat,
+        infoLines: ['Giá mở cửa (2km đầu): đ42.000', 'Mỗi km tiếp theo: đ14.500', 'Phụ phí giờ cao điểm: +đ10.000', 'Phù hợp gia đình, nhóm bạn', VAT_LINE],
+      },
+      {
+        id: 'xe-6-cho-san-bay',
+        serviceId: 55,
+        name: 'Xe 6 chỗ sân bay',
+        description: 'Đưa đón sân bay, giá trọn gói',
+        basePrice: 250000,
+        includedKm: 15,
+        perKmPrice: 10000,
+        extraStopPrice: 0,
+        icon: Icons.carSeat,
+        infoLines: ['Trọn gói 15km đầu: đ250.000', 'Vượt km: đ10.000/km', 'Đã gồm phí ra vào sân bay', 'Chờ tối đa 30 phút sau giờ hạ cánh', VAT_LINE],
+      },
+    ],
+  },
+  driver: {
+    key: 'driver',
+    title: 'Gọi tài xế',
+    icon: Icons.steering,
+    kind: 'ride',
+    labels: RIDE_LABELS,
+    maxStops: 1,
+    options: [
+      {
+        id: 'tai-xe-chuyen',
+        serviceId: 61,
+        name: 'Tài xế theo chuyến',
+        description: 'Lái xe của bạn, tính theo km',
+        basePrice: 150000,
+        includedKm: 10,
+        perKmPrice: 8000,
+        extraStopPrice: 0,
+        icon: Icons.steering,
+        infoLines: ['Phí tối thiểu (10km đầu): đ150.000', 'Mỗi km tiếp theo: đ8.000', 'Tài xế có bằng B2 trở lên, tối thiểu 3 năm kinh nghiệm', 'Xăng, phí cầu đường do chủ xe chi trả', VAT_LINE],
+      },
+      {
+        id: 'tai-xe-4h',
+        serviceId: 63,
+        name: 'Tài xế 4 giờ',
+        description: 'Thuê tài xế nửa ngày, tối đa 60km',
+        basePrice: 450000,
+        includedKm: 60,
+        perKmPrice: 5000,
+        extraStopPrice: 0,
+        icon: Icons.steering,
+        infoLines: ['Giá thuê 4 giờ: đ450.000 (60km đầu)', 'Vượt km: đ5.000/km', 'Vượt giờ: đ100.000/giờ', 'Xăng, phí cầu đường do chủ xe chi trả', VAT_LINE],
+      },
+      {
+        id: 'tai-xe-8h',
+        serviceId: 65,
+        name: 'Tài xế 8 giờ',
+        description: 'Thuê tài xế cả ngày, tối đa 120km',
+        basePrice: 800000,
+        includedKm: 120,
+        perKmPrice: 5000,
+        extraStopPrice: 0,
+        icon: Icons.steering,
+        infoLines: ['Giá thuê 8 giờ: đ800.000 (120km đầu)', 'Vượt km: đ5.000/km', 'Vượt giờ: đ100.000/giờ', 'Xăng, phí cầu đường do chủ xe chi trả', VAT_LINE],
+      },
+    ],
+  },
+  // ---------------------------------------------------------------- Dịch vụ tận nơi
+  handyman: {
+    key: 'handyman',
+    title: 'Gọi thợ',
+    icon: Icons.tools,
+    kind: 'onsite',
+    labels: ONSITE_LABELS,
+    maxStops: 0,
+    options: [
+      {
+        id: 'tho-dien',
+        serviceId: 71,
+        name: 'Thợ điện',
+        description: 'Chập điện, ổ cắm, đèn, quạt, CB',
+        basePrice: 100000,
+        includedKm: 0,
+        perKmPrice: 0,
+        extraStopPrice: 0,
+        icon: Icons.flash,
+        infoLines: ['Phí gọi thợ (khảo sát): đ100.000', 'Công sửa chữa: báo giá tại chỗ trước khi làm', 'Vật tư thay thế tính riêng', 'Bảo hành công 7 ngày', VAT_LINE],
+      },
+      {
+        id: 'tho-nuoc',
+        serviceId: 73,
+        name: 'Thợ nước',
+        description: 'Rò rỉ, tắc nghẽn, vòi sen, bồn cầu',
+        basePrice: 100000,
+        includedKm: 0,
+        perKmPrice: 0,
+        extraStopPrice: 0,
+        icon: 'mci:water-pump',
+        infoLines: ['Phí gọi thợ (khảo sát): đ100.000', 'Công sửa chữa: báo giá tại chỗ trước khi làm', 'Vật tư thay thế tính riêng', 'Bảo hành công 7 ngày', VAT_LINE],
+      },
+      {
+        id: 'tho-dien-lanh',
+        serviceId: 75,
+        name: 'Thợ điện lạnh',
+        description: 'Vệ sinh, bơm gas, sửa máy lạnh / tủ lạnh',
+        basePrice: 150000,
+        includedKm: 0,
+        perKmPrice: 0,
+        extraStopPrice: 0,
+        icon: 'mci:snowflake',
+        infoLines: ['Phí gọi thợ (khảo sát): đ150.000', 'Vệ sinh máy lạnh treo tường: đ150.000/máy', 'Bơm gas: đ150.000 - đ350.000 tuỳ loại', 'Bảo hành công 15 ngày', VAT_LINE],
+      },
+      {
+        id: 'tho-khoa',
+        serviceId: 77,
+        name: 'Thợ khoá',
+        description: 'Mở khoá, thay ổ, làm chìa, khoá cửa cuốn',
+        basePrice: 120000,
+        includedKm: 0,
+        perKmPrice: 0,
+        extraStopPrice: 0,
+        icon: Icons.lock,
+        infoLines: ['Phí gọi thợ: đ120.000', 'Mở khoá cửa / xe: từ đ150.000', 'Thay ổ khoá: báo giá theo loại', 'Yêu cầu xuất trình giấy tờ chứng minh sở hữu', VAT_LINE],
       },
     ],
   },

@@ -5,7 +5,7 @@ import { View, TextInput, Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { AppHeader, AppText, BottomSheet, Checkbox, ErrorSheet, Icon, Icons, Screen, Stepper, fontStyle } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
-import { EXTRA_PRICES } from '@/constants/mockBooking';
+import { EXTRA_PRICES, SERVICE_GROUPS } from '@/constants/mockBooking';
 import { useBooking, setOptions, computePrice, formatVnd, formatScheduleLabel, submitBooking, promoLabel } from '@/services/bookingStore';
 import { DriverPickerSheet, FlatFooter, OptionRow, PaymentSheet } from '@/components/booking';
 
@@ -26,7 +26,11 @@ export default function ConfirmScreen() {
   const [paySheet, setPaySheet] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const stopsCount = Math.max(1, state.receivers.length);
+  const group = SERVICE_GROUPS[state.service];
+  const labels = group.labels;
+  const isDelivery = group.kind === 'delivery';
+  const stopsCount = group.maxStops === 0 ? 0 : Math.max(1, state.receivers.length);
+  const providerLower = labels.provider.toLowerCase();
 
   const pickTime = (c: (typeof SCHEDULE_CHOICES)[number]) => {
     let ts: number | null = null;
@@ -84,7 +88,7 @@ export default function ConfirmScreen() {
         </View>
         <AppText size={12} color={Colors.textSecondary}>
           {price.distanceKm ? `${price.distanceKm.toFixed(1)}km · ` : ''}
-          {stopsCount} điểm giao
+          {stopsCount === 0 ? `${labels.provider} đến tận nơi` : `${stopsCount} ${labels.stopUnit}`}
         </AppText>
       </View>
       <FlatFooter title="Xác nhận" loading={submitting} onPress={onConfirm} />
@@ -92,25 +96,29 @@ export default function ConfirmScreen() {
   );
 
   return (
-    <Screen header={<AppHeader variant="dark" title="Xác nhận giao hàng" left="arrow" />} scroll edges={['left', 'right']} footer={footer} footerPadded={false}>
-      <OptionRow
-        icon={Icons.refresh}
-        label="Quay lại điểm giao hàng"
-        sub={formatVnd(EXTRA_PRICES.returnToPickup)}
-        right={<Checkbox checked={opt.returnToPickup} onPress={() => setOptions({ returnToPickup: !opt.returnToPickup })} />}
-      />
-      <OptionRow
-        icon={Icons.handHold}
-        label="Gửi tận tay khách hàng"
-        sub="đ35.000 / lần"
-        right={<Stepper value={opt.handToCustomer} onChange={(v) => setOptions({ handToCustomer: v })} max={stopsCount} />}
-      />
+    <Screen header={<AppHeader variant="dark" title={labels.confirmTitle} left="arrow" />} scroll edges={['left', 'right']} footer={footer} footerPadded={false}>
+      {isDelivery ? (
+        <>
+          <OptionRow
+            icon={Icons.refresh}
+            label="Quay lại điểm giao hàng"
+            sub={formatVnd(EXTRA_PRICES.returnToPickup)}
+            right={<Checkbox checked={opt.returnToPickup} onPress={() => setOptions({ returnToPickup: !opt.returnToPickup })} />}
+          />
+          <OptionRow
+            icon={Icons.handHold}
+            label="Gửi tận tay khách hàng"
+            sub="đ35.000 / lần"
+            right={<Stepper value={opt.handToCustomer} onChange={(v) => setOptions({ handToCustomer: v })} max={stopsCount} />}
+          />
+        </>
+      ) : null}
       <OptionRow icon={Icons.cash} label="Tiền tip" sub="đ 5,000 / lần" right={<Stepper value={opt.tip} onChange={(v) => setOptions({ tip: v })} max={20} />} />
       <OptionRow icon={Icons.calendar} label="Thời gian lựa chọn" value={formatScheduleLabel(opt.scheduledAt)} chevron onPress={() => setTimeSheet(true)} />
       <OptionRow
         icon="mci:account-outline"
-        label="Tài xế chỉ định"
-        sub={opt.assignedDrivers.length ? `${opt.assignedDrivers.length} tài xế` : undefined}
+        label={`${labels.provider} chỉ định`}
+        sub={opt.assignedDrivers.length ? `${opt.assignedDrivers.length} ${providerLower}` : undefined}
         value="Lựa chọn"
         chevron
         onPress={() => setDriverSheet(true)}

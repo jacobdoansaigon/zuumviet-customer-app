@@ -3,7 +3,7 @@ import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppText, Avatar, Button, Icon, Icons, RouteStops, ServiceOption, type RouteStop } from '@/components/ui';
-import { STOP_STATUS_TEXT, SERVICE_GROUPS } from '@/constants/mockBooking';
+import { STOP_STATUS_TEXT, SERVICE_GROUPS, type ServiceLabels } from '@/constants/mockBooking';
 import { formatVnd, formatScheduleLabel, getTrackingPhase, type TrackedOrder, type TrackingPhase, type StopStatus } from '@/services/bookingStore';
 
 const STOP_TONE: Record<StopStatus, RouteStop['statusTone']> = {
@@ -16,14 +16,24 @@ const STOP_TONE: Record<StopStatus, RouteStop['statusTone']> = {
   returned: 'primary',
 };
 
-const PHASE_STATUS: Record<TrackingPhase, string> = {
-  scheduled: 'Đã lên lịch',
-  searching: 'Tìm tài xế',
-  notfound: 'Không tìm thấy tài xế',
-  accepted: 'Đang lấy hàng',
-  delivering: 'Đang giao',
-  completed: 'Hoàn thành',
-  cancelled: 'Đã huỷ',
+const phaseStatus = (phase: TrackingPhase, L: ServiceLabels): string => {
+  const p = L.provider.toLowerCase();
+  switch (phase) {
+    case 'scheduled':
+      return 'Đã lên lịch';
+    case 'searching':
+      return `Tìm ${p}`;
+    case 'notfound':
+      return `Không tìm thấy ${p}`;
+    case 'accepted':
+      return L.trackingAccepted;
+    case 'delivering':
+      return L.trackingDelivering;
+    case 'completed':
+      return 'Hoàn thành';
+    default:
+      return 'Đã huỷ';
+  }
 };
 
 interface Props {
@@ -40,7 +50,10 @@ interface Props {
 
 export const TrackingSheet: React.FC<Props> = ({ order, expanded, onToggle, onMore, onRetry, onCall, onChat, onRate, onHome }) => {
   const phase = getTrackingPhase(order);
-  const option = SERVICE_GROUPS[order.service].options.find((o) => o.id === order.optionId);
+  const group = SERVICE_GROUPS[order.service];
+  const L = group.labels;
+  const providerLower = L.provider.toLowerCase();
+  const option = group.options.find((o) => o.id === order.optionId);
   const showDriver = !!order.driver && (phase === 'accepted' || phase === 'delivering' || phase === 'completed');
 
   const stops: RouteStop[] = [
@@ -77,7 +90,7 @@ export const TrackingSheet: React.FC<Props> = ({ order, expanded, onToggle, onMo
           <>
             <Icon name={Icons.moon} size={26} color={Colors.secondary} style={styles.headIcon} />
             <AppText weight="bold" size={15} style={{ flex: 1 }}>
-              Đang tìm tài xế gần bạn ....
+              Đang tìm {providerLower} gần bạn ....
             </AppText>
             {more}
           </>
@@ -92,7 +105,7 @@ export const TrackingSheet: React.FC<Props> = ({ order, expanded, onToggle, onMo
         ) : phase === 'notfound' ? (
           <View style={{ flex: 1 }}>
             <AppText weight="bold" size={16}>
-              Không tìm thấy tài xế
+              Không tìm thấy {providerLower}
             </AppText>
             <Pressable onPress={onRetry} hitSlop={8} style={{ marginTop: 4 }}>
               <AppText weight="semiBold" size={14} color={Colors.primary}>
@@ -104,7 +117,7 @@ export const TrackingSheet: React.FC<Props> = ({ order, expanded, onToggle, onMo
           <>
             <Icon name={Icons.checkCircle} size={26} color={Colors.success} style={styles.headIcon} />
             <AppText weight="bold" size={15} style={{ flex: 1 }}>
-              Giao hàng thành công
+              {L.trackingDone}
             </AppText>
           </>
         ) : phase === 'cancelled' ? (
@@ -117,7 +130,7 @@ export const TrackingSheet: React.FC<Props> = ({ order, expanded, onToggle, onMo
         ) : (
           <>
             <AppText weight="bold" size={15} style={{ flex: 1 }}>
-              {phase === 'accepted' ? `${order.etaMinutes} phút nữa Tài xế đến lấy hàng` : 'Đang giao'}
+              {phase === 'accepted' ? L.trackingEta.replace('{eta}', String(order.etaMinutes)) : L.trackingDelivering}
             </AppText>
             {more}
           </>
@@ -170,16 +183,18 @@ export const TrackingSheet: React.FC<Props> = ({ order, expanded, onToggle, onMo
           Mã {order.code}
         </AppText>
         <AppText size={14} color={Colors.textSecondary}>
-          {PHASE_STATUS[phase]}
+          {phaseStatus(phase, L)}
         </AppText>
         <Icon name={expanded ? Icons.chevronDown : Icons.chevronRight} size={18} color={Colors.textSecondary} style={{ marginLeft: 4 }} />
       </Pressable>
 
       {expanded ? (
         <View style={styles.expanded}>
-          <AppText weight="bold" size={13} style={{ marginBottom: Spacing.sm }}>
-            Đoạn đường {order.distanceKm.toFixed(1)}km
-          </AppText>
+          {order.distanceKm > 0 ? (
+            <AppText weight="bold" size={13} style={{ marginBottom: Spacing.sm }}>
+              Đoạn đường {order.distanceKm.toFixed(1)}km
+            </AppText>
+          ) : null}
           <RouteStops stops={stops} titleSize={14} />
           <AppText weight="bold" size={14} style={{ marginTop: Spacing.md }}>
             Ghi chú
@@ -192,7 +207,7 @@ export const TrackingSheet: React.FC<Props> = ({ order, expanded, onToggle, onMo
 
       {phase === 'completed' ? (
         <View style={styles.cta}>
-          <Button title="Đánh giá tài xế" onPress={onRate} />
+          <Button title={`Đánh giá ${providerLower}`} onPress={onRate} />
         </View>
       ) : phase === 'cancelled' ? (
         <View style={styles.cta}>

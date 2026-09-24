@@ -4,11 +4,13 @@ import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { AppHeader, Icons, Screen, TextField } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
+import { SERVICE_GROUPS } from '@/constants/mockBooking';
 import { useBooking, setSenderInfo, isValidPhoneVn } from '@/services/bookingStore';
 import { AddressBlock, ContactPickerSheet, FlatFooter } from '@/components/booking';
 
 export default function SenderScreen() {
   const state = useBooking();
+  const labels = SERVICE_GROUPS[state.service].labels;
   const [name, setName] = useState(state.sender.name);
   const [phone, setPhone] = useState(state.sender.phone);
   const [contacts, setContacts] = useState(false);
@@ -23,7 +25,7 @@ export default function SenderScreen() {
 
   return (
     <Screen
-      header={<AppHeader variant="dark" title="Thông tin người gửi" left="arrow" />}
+      header={<AppHeader variant="dark" title={labels.senderScreenTitle} left="arrow" />}
       scroll
       edges={['left', 'right']}
       footerPadded={false}
@@ -32,11 +34,11 @@ export default function SenderScreen() {
       <View style={styles.body}>
         <AddressBlock
           address={place?.address}
-          placeholder="Nhập điểm gửi hàng"
+          placeholder={labels.senderLocationPlaceholder}
           onChange={() => router.push({ pathname: '/booking/location', params: { target: 'sender' } })}
         />
         <TextField
-          label="Họ và tên người nhận"
+          label={labels.senderNameLabel}
           required
           value={name}
           onChangeText={setName}
@@ -51,7 +53,7 @@ export default function SenderScreen() {
           required
           value={phone}
           onChangeText={setPhone}
-          placeholder="Số điện thoại người gửi"
+          placeholder={labels.senderPhonePlaceholder}
           keyboardType="phone-pad"
           containerStyle={{ marginTop: Spacing.base }}
         />

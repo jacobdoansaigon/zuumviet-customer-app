@@ -264,7 +264,10 @@ export function removeReceiver(index: number) {
 }
 
 export function isReceiverComplete(r: Receiver): boolean {
-  return !!r.place && r.name.trim().length > 0 && r.phone.replace(/\D/g, '').length >= 9;
+  if (!r.place) return false;
+  // Chở khách / gọi thợ: điểm đến chỉ cần địa chỉ (tên & SĐT mặc định lấy của người đặt)
+  if (SERVICE_GROUPS[state.service].kind !== 'delivery') return true;
+  return r.name.trim().length > 0 && r.phone.replace(/\D/g, '').length >= 9;
 }
 
 /** Bỏ các người nhận bỏ dở (quay lại màn đặt mà chưa điền xong) */
@@ -321,7 +324,7 @@ export function computePrice(s: BookingState = state, optionId?: string): PriceS
   const extraStops = Math.max(0, stops.length - 1);
   const base = opt.basePrice + extraKm * opt.perKmPrice + extraStops * opt.extraStopPrice;
 
-  const lines: PriceLine[] = [{ label: 'Cước dịch vụ', amount: base }];
+  const lines: PriceLine[] = [{ label: SERVICE_GROUPS[s.service].labels.feeLabel, amount: base }];
   const handDelivery = stops.filter((r) => r.handDelivery).length * EXTRA_PRICES.handDelivery;
   if (handDelivery) lines.push({ label: 'Giao hàng tận tay', amount: handDelivery });
   if (s.options.returnToPickup) lines.push({ label: 'Quay lại điểm giao hàng', amount: EXTRA_PRICES.returnToPickup });
@@ -351,8 +354,13 @@ export function promoLabel(promo: PromoDef | null): string | null {
 /** Body cho POST /site/deliveryorders & /drymode (theo DeliveryOrders::add / addValidate) */
 export function buildOrderPayload(s: BookingState = state): Record<string, unknown> {
   const opt = getOption(s);
+  const group = SERVICE_GROUPS[s.service];
   const pickup = s.sender.place;
-  const stops = s.receivers.filter(isReceiverComplete);
+  let stops = s.receivers.filter(isReceiverComplete);
+  // Dịch vụ tận nơi (gọi thợ): BE bắt buộc có details → dùng chính địa điểm của khách làm điểm đến duy nhất
+  if (group.kind === 'onsite' && stops.length === 0 && pickup) {
+    stops = [{ ...emptyReceiver(), name: s.sender.name, phone: s.sender.phone, place: pickup, viewOption: 'no_view' }];
+  }
   return {
     service_id: opt.serviceId,
     need_return_pickup: s.options.returnToPickup ? 1 : 0,
@@ -385,7 +393,7 @@ export function buildOrderPayload(s: BookingState = state): Record<string, unkno
       wayout_long: r.place?.lng ?? 0,
       wayout_map_place_id: r.place?.placeId ?? '',
       cod: r.cod,
-      note: [r.note, VIEW_NOTE[r.viewOption]].filter(Boolean).join(' · '),
+      note: group.kind === 'delivery' ? [r.note, VIEW_NOTE[r.viewOption]].filter(Boolean).join(' · ') : r.note,
       // TODO: id ServiceAddon "Giao hàng tận tay" chưa rõ → chưa gửi addon, chỉ tính giá phía app
       addons: [] as number[],
       hand_delivery: r.handDelivery ? 1 : 0,

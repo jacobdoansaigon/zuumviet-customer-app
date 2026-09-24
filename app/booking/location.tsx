@@ -5,7 +5,7 @@ import { View, TextInput, Pressable, FlatList, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Chip, Icon, Icons, Screen, StopMarker, fontStyle } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Sizes } from '@/constants/theme';
-import { SAMPLE_PLACES, SAVED_LOCATIONS, HCM_CENTER, type SamplePlace } from '@/constants/mockBooking';
+import { SAMPLE_PLACES, SAVED_LOCATIONS, HCM_CENTER, SERVICE_GROUPS, type SamplePlace } from '@/constants/mockBooking';
 import { useBooking, setSenderPlace, setReceiverPlace, placeFromSample, haversineKm, type Place } from '@/services/bookingStore';
 
 type Result = SamplePlace & { km: number };
@@ -15,6 +15,8 @@ export default function LocationScreen() {
   const isReceiver = target === 'receiver';
   const index = Math.max(0, Number(indexParam ?? 0) || 0);
   const state = useBooking();
+  const group = SERVICE_GROUPS[state.service];
+  const labels = group.labels;
   const current = isReceiver ? state.receivers[index]?.place : state.sender.place;
   const [query, setQuery] = useState(current && current.source !== 'default' ? current.address : '');
   const [dirty, setDirty] = useState(false);
@@ -30,7 +32,8 @@ export default function LocationScreen() {
   const finish = (place: Place) => {
     if (isReceiver) {
       setReceiverPlace(index, place);
-      if (back === '1') router.back();
+      // Chở khách: điểm đến không cần tên/SĐT → quay thẳng về màn đặt
+      if (back === '1' || group.kind !== 'delivery') router.back();
       else router.replace({ pathname: '/booking/receiver', params: { index: String(index) } });
     } else {
       setSenderPlace(place);
@@ -50,17 +53,17 @@ export default function LocationScreen() {
   const showTyped = dirty && query.trim().length > 3 && !results.some((r) => r.address.toLowerCase() === query.trim().toLowerCase());
 
   return (
-    <Screen header={<AppHeader variant="dark" title={isReceiver ? 'Thêm điểm gửi hàng' : 'Lựa chọn địa điểm'} left="close" />} keyboardAvoiding={false}>
+    <Screen header={<AppHeader variant="dark" title={isReceiver ? labels.receiverLocationTitle : labels.senderLocationTitle} left="close" />} keyboardAvoiding={false}>
       <View style={styles.searchWrap}>
         <View style={styles.searchBox}>
-          <StopMarker type="pickup" size={16} />
+          <StopMarker type={isReceiver ? 'dropoff' : 'pickup'} size={16} />
           <TextInput
             value={query}
             onChangeText={(t) => {
               setQuery(t);
               setDirty(true);
             }}
-            placeholder={isReceiver ? 'Nhập địa chỉ người nhận' : 'Nhập địa chỉ lấy hàng'}
+            placeholder={isReceiver ? labels.receiverLocationPlaceholder : labels.senderLocationPlaceholder}
             placeholderTextColor={Colors.placeholder}
             style={[styles.input, fontStyle('bold')]}
             autoFocus
