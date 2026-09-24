@@ -1,5 +1,6 @@
 // Trang chủ — Figma HOME 1.2 (3385-663): header tím chào theo giờ + avatar, lưới dịch vụ đè header,
-// thẻ ví gradient, 2 stat card, "Dành cho bạn / Tất cả" (2 hàng × 2 thẻ, cuộn ngang), banner chuyến đang đi nổi trên tab bar.
+// thẻ ví gradient, 2 stat card, "Tại sao chọn ZuumViet?" (1 thẻ / màn, cuộn ngang 4 khác biệt),
+// "Dành cho bạn / Tất cả" (2 hàng × 2 thẻ, cuộn ngang), banner chuyến đang đi nổi trên tab bar.
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -10,6 +11,7 @@ import {
   ServiceCard,
   WalletCard,
   PromoGrid,
+  WhyZuumCarousel,
   ActiveTripBanner,
   describeActiveOrder,
   type HomeServiceKey,
@@ -115,6 +117,9 @@ export default function HomeScreen() {
             <StatCard icon={Icons.network} value={String(MOCK_COMMUNITY.homeStats.members)} label="thành viên" />
             <StatCard icon={Icons.chart} value={String(MOCK_COMMUNITY.homeStats.points)} label="điểm thưởng" />
           </View>
+
+          <SectionHeader title="Tại sao chọn ZuumViet?" style={styles.newsHeader} />
+          <WhyZuumCarousel />
 
           <SectionHeader title="Dành cho bạn" actionLabel="Tất cả" onAction={() => router.push('/promotions')} style={styles.newsHeader} />
           <PromoGrid items={MOCK_PROMOS} onPress={(p) => router.push(`/promotions/${p.id}`)} />

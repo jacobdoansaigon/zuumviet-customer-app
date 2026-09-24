@@ -132,6 +132,45 @@ export const MOCK_NEWS: NewsItem[] = [
 ];
 
 /* ------------------------------------------------------------------ */
+/* Tại sao chọn ZuumViet? (Home: 1 thẻ / màn, cuộn ngang 4 khác biệt)  */
+/* ------------------------------------------------------------------ */
+
+export type WhyZuumItem = {
+  id: string;
+  /** IconName dạng chuỗi (ion:/mci:) */
+  icon: string;
+  title: string;
+  description: string;
+};
+
+export const WHY_ZUUM: WhyZuumItem[] = [
+  {
+    id: 'w1',
+    icon: 'mci:graph-outline',
+    title: 'Cộng đồng chia sẻ thu nhập',
+    description: 'Mỗi chuyến của thành viên bạn giới thiệu đều mang điểm thưởng về cho bạn. Càng mời nhiều, càng nhận nhiều.',
+  },
+  {
+    id: 'w2',
+    icon: 'mci:cash-check',
+    title: 'Giá rõ ràng, không phụ phí ẩn',
+    description: 'Báo giá trước khi đặt, đã gồm VAT. Bạn thấy đúng số tiền phải trả trước khi bấm Xác nhận.',
+  },
+  {
+    id: 'w3',
+    icon: 'ion:shield-checkmark-outline',
+    title: 'Tài xế được xác minh',
+    description: 'Tài xế và thợ đều được kiểm tra CMND, bằng lái, phương tiện. Đánh giá sau mỗi chuyến hiển thị công khai.',
+  },
+  {
+    id: 'w4',
+    icon: 'mci:view-grid-outline',
+    title: 'Một ứng dụng, mọi nhu cầu',
+    description: 'Xe máy, xe hơi, đường dài, giao hàng, vận tải, tài xế riêng. Một tài khoản, một ví, đặt trong 30 giây.',
+  },
+];
+
+/* ------------------------------------------------------------------ */
 /* Khuyến mãi (Home: lưới 2 hàng, cuộn ngang)                          */
 /* ------------------------------------------------------------------ */
 
