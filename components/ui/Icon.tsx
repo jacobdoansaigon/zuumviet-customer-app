@@ -159,6 +159,7 @@ export const Icons = {
   motorbike: 'mci:motorbike' as IconName,
   carSeat: 'mci:car-estate' as IconName,
   carSide: 'mci:car-side' as IconName,
+  vanPassenger: 'mci:van-passenger' as IconName,
   steering: 'mci:steering' as IconName,
   tools: 'mci:tools' as IconName,
 };

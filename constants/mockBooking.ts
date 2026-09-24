@@ -3,9 +3,9 @@
 // mã ưu đãi, tài xế yêu thích, danh bạ → toàn bộ mock nằm ở đây (đánh dấu rõ ràng để thay sau).
 import { Icons, type IconName } from '@/components/ui/Icon';
 
-export type ServiceKey = 'delivery' | 'transport' | 'rental' | 'bike' | 'car' | 'car6' | 'driver' | 'handyman';
+export type ServiceKey = 'delivery' | 'transport' | 'rental' | 'bike' | 'car' | 'car6' | 'intercity' | 'driver' | 'handyman';
 
-export const SERVICE_KEYS: ServiceKey[] = ['delivery', 'transport', 'rental', 'bike', 'car', 'car6', 'driver', 'handyman'];
+export const SERVICE_KEYS: ServiceKey[] = ['delivery', 'transport', 'rental', 'bike', 'car', 'car6', 'intercity', 'driver', 'handyman'];
 
 export function toServiceKey(v: unknown): ServiceKey {
   return typeof v === 'string' && (SERVICE_KEYS as string[]).includes(v) ? (v as ServiceKey) : 'delivery';
@@ -264,7 +264,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
   },
   rental: {
     key: 'rental',
-    title: 'Thuê xe tải',
+    title: 'Gọi xe tải',
     icon: Icons.van,
     kind: 'delivery',
     labels: DELIVERY_LABELS,
@@ -466,6 +466,52 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         extraStopPrice: 0,
         icon: Icons.steering,
         infoLines: ['Giá thuê 8 giờ: đ800.000 (120km đầu)', 'Vượt km: đ5.000/km', 'Vượt giờ: đ100.000/giờ', 'Xăng, phí cầu đường do chủ xe chi trả', VAT_LINE],
+      },
+    ],
+  },
+  intercity: {
+    key: 'intercity',
+    title: 'Xe đường dài',
+    icon: Icons.vanPassenger,
+    kind: 'ride',
+    labels: RIDE_LABELS,
+    maxStops: 1,
+    options: [
+      {
+        id: 'duong-dai-4-cho',
+        serviceId: 57,
+        name: 'Xe 4 chỗ đường dài',
+        description: 'Liên tỉnh, sedan 4 chỗ, đón tận nơi',
+        basePrice: 350000,
+        includedKm: 30,
+        perKmPrice: 9000,
+        extraStopPrice: 0,
+        icon: Icons.carSide,
+        infoLines: ['Trọn gói 30km đầu: đ350.000', 'Mỗi km tiếp theo: đ9.000', 'Đã gồm phí cầu đường, xăng xe', 'Chờ miễn phí 15 phút, sau đó đ50.000/30 phút', VAT_LINE],
+      },
+      {
+        id: 'duong-dai-7-cho',
+        serviceId: 58,
+        name: 'Xe 7 chỗ đường dài',
+        description: 'SUV / MPV 7 chỗ, khoang hành lý rộng',
+        basePrice: 450000,
+        includedKm: 30,
+        perKmPrice: 11000,
+        extraStopPrice: 0,
+        icon: Icons.carSeat,
+        infoLines: ['Trọn gói 30km đầu: đ450.000', 'Mỗi km tiếp theo: đ11.000', 'Đã gồm phí cầu đường, xăng xe', 'Chờ miễn phí 15 phút, sau đó đ50.000/30 phút', VAT_LINE],
+      },
+      {
+        id: 'limousine-9-cho',
+        serviceId: 59,
+        name: 'Limousine 9 chỗ',
+        description: 'Ghế thương gia, wifi, nước suối',
+        basePrice: 650000,
+        includedKm: 30,
+        perKmPrice: 14000,
+        extraStopPrice: 0,
+        icon: Icons.vanPassenger,
+        infoLines: ['Trọn gói 30km đầu: đ650.000', 'Mỗi km tiếp theo: đ14.000', 'Đã gồm phí cầu đường, xăng xe', 'Đặt trước tối thiểu 4 giờ', VAT_LINE],
       },
     ],
   },

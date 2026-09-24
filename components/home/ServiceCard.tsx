@@ -1,5 +1,5 @@
 // ServiceCard — card trắng bo 12 đè lên header: lưới dịch vụ 4 cột (icon tím + label)
-// Giao hàng / Xe máy / Xe hơi / Xe 6 chỗ / Vận tải / Thuê xe tải / Gọi tài xế / Gọi thợ
+// Hàng 1: Xe máy / Xe hơi / Xe 6 chỗ / Xe đường dài — Hàng 2: Giao hàng / Vận tải / Gọi xe tải / Gọi tài xế
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
@@ -10,7 +10,7 @@ export type HomeServiceKey = ServiceKey;
 
 export type HomeService = { key: HomeServiceKey; label: string; icon: IconName };
 
-const HOME_ORDER: HomeServiceKey[] = ['delivery', 'bike', 'car', 'car6', 'transport', 'rental', 'driver', 'handyman'];
+const HOME_ORDER: HomeServiceKey[] = ['bike', 'car', 'car6', 'intercity', 'delivery', 'transport', 'rental', 'driver'];
 
 export const HOME_SERVICES: HomeService[] = HOME_ORDER.map((key) => ({
   key,
