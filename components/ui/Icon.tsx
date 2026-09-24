@@ -1,5 +1,6 @@
 // Icon — wrapper thống nhất cho bộ icon (Ionicons / MaterialCommunityIcons / Feather)
 import React from 'react';
+import { View, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 
@@ -7,10 +8,14 @@ type IonName = React.ComponentProps<typeof Ionicons>['name'];
 type MciName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 type FeatherName = React.ComponentProps<typeof Feather>['name'];
 
+/** Glyph tự vẽ của ZuumViet (không có trong bộ icon chuẩn) */
+type ZvName = 'delivery-bike';
+
 export type IconName =
   | `ion:${IonName}`
   | `mci:${MciName}`
-  | `feather:${FeatherName}`;
+  | `feather:${FeatherName}`
+  | `zv:${ZvName}`;
 
 export interface IconProps {
   name: IconName;
@@ -19,10 +24,47 @@ export interface IconProps {
   style?: React.ComponentProps<typeof Ionicons>['style'];
 }
 
+/** Xe máy giao hàng: moped + thùng hàng gắn phía sau (trên yên sau) */
+const DeliveryBike: React.FC<{ size: number; color: string; style?: IconProps['style'] }> = ({ size, color, style }) => {
+  const border = Math.max(1, Math.round(size * 0.045));
+  const lid = Math.max(1, Math.round(size * 0.04));
+  const boxH = size * 0.34;
+  return (
+    <View style={[{ width: size, height: size }, style as unknown as StyleProp<ViewStyle>]}>
+      <MaterialCommunityIcons name="moped" size={size} color={color} />
+      {/* thùng hàng đặt trên yên sau (phía trái glyph moped) */}
+      <View
+        style={[
+          zvStyles.box,
+          {
+            left: size * 0.01,
+            top: size * 0.12,
+            width: size * 0.42,
+            height: boxH,
+            borderRadius: size * 0.06,
+            borderWidth: border,
+            backgroundColor: color,
+          },
+        ]}
+      >
+        <View style={[zvStyles.lid, { top: boxH * 0.3, height: lid }]} />
+      </View>
+    </View>
+  );
+};
+
+const zvStyles = StyleSheet.create({
+  box: { position: 'absolute', borderColor: Colors.white, overflow: 'hidden' },
+  lid: { position: 'absolute', left: 0, right: 0, backgroundColor: Colors.white, opacity: 0.9 },
+});
+
 export const Icon: React.FC<IconProps> = ({ name, size = 22, color = Colors.text, style }) => {
   const idx = name.indexOf(':');
   const set = name.slice(0, idx);
   const glyph = name.slice(idx + 1);
+  if (set === 'zv') {
+    return <DeliveryBike size={size} color={color} style={style} />;
+  }
   if (set === 'mci') {
     return <MaterialCommunityIcons name={glyph as MciName} size={size} color={color} style={style} />;
   }
@@ -88,6 +130,7 @@ export const Icons = {
   doc: 'ion:document-outline' as IconName,
   car: 'ion:car-outline' as IconName,
   scooter: 'mci:moped' as IconName,
+  deliveryBike: 'zv:delivery-bike' as IconName,
   truck: 'mci:truck-outline' as IconName,
   van: 'mci:van-utility' as IconName,
   box: 'mci:package-variant-closed' as IconName,

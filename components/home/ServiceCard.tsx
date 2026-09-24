@@ -3,7 +3,7 @@
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { AppText, Icon, Icons, type IconName } from '@/components/ui';
+import { AppText, Icon, type IconName } from '@/components/ui';
 import { SERVICE_GROUPS, type ServiceKey } from '@/constants/mockBooking';
 
 export type HomeServiceKey = ServiceKey;
@@ -37,11 +37,6 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ onSelect, services = H
       >
         <View style={styles.iconWrap}>
           <Icon name={s.icon} size={34} color={Colors.primary} />
-          {s.key === 'delivery' ? (
-            <View style={styles.box}>
-              <Icon name={Icons.box} size={14} color={Colors.primary} />
-            </View>
-          ) : null}
         </View>
         <AppText size={13} weight="semiBold" color={Colors.text} align="center" numberOfLines={1}>
           {s.label}
@@ -64,14 +59,6 @@ const styles = StyleSheet.create({
   item: { alignItems: 'center', paddingVertical: Spacing.sm, paddingHorizontal: 2, borderRadius: BorderRadius.md },
   pressed: { backgroundColor: Colors.primaryBg },
   iconWrap: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
-  box: {
-    position: 'absolute',
-    right: -2,
-    top: 0,
-    backgroundColor: Colors.white,
-    borderRadius: 8,
-    padding: 1,
-  },
 });
 
 export default ServiceCard;

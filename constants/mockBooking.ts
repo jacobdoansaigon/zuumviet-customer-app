@@ -161,7 +161,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
   delivery: {
     key: 'delivery',
     title: 'Giao hàng',
-    icon: Icons.scooter,
+    icon: Icons.deliveryBike,
     kind: 'delivery',
     labels: DELIVERY_LABELS,
     maxStops: 10,
@@ -175,7 +175,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         includedKm: 4,
         perKmPrice: 2000,
         extraStopPrice: 12000,
-        icon: Icons.scooter,
+        icon: Icons.deliveryBike,
         infoLines: [
           'Phí tối thiểu (dưới 4km): đ245.000',
           '4km - 10km: đ26.000/km',
@@ -193,7 +193,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         includedKm: 4,
         perKmPrice: 1500,
         extraStopPrice: 8000,
-        icon: Icons.scooter,
+        icon: Icons.deliveryBike,
         infoLines: [
           'Phí tối thiểu (dưới 4km): đ30.000',
           '4km - 10km: đ18.000/km',
@@ -211,7 +211,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         includedKm: 0,
         perKmPrice: 0,
         extraStopPrice: 25000,
-        icon: Icons.scooter,
+        icon: Icons.deliveryBike,
         infoLines: ['Đồng giá nội thành: đ25.000/điểm giao', 'Không phụ thu theo km', 'Giao trong ngày (trước 21h)', VAT_LINE],
       },
     ],
@@ -312,7 +312,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
   bike: {
     key: 'bike',
     title: 'Xe máy',
-    icon: Icons.motorbike,
+    icon: Icons.scooter,
     kind: 'ride',
     labels: RIDE_LABELS,
     maxStops: 1,
@@ -326,7 +326,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         includedKm: 2,
         perKmPrice: 4500,
         extraStopPrice: 0,
-        icon: Icons.motorbike,
+        icon: Icons.scooter,
         infoLines: ['Giá mở cửa (2km đầu): đ12.000', 'Mỗi km tiếp theo: đ4.500', 'Phụ phí giờ cao điểm / mưa: +đ5.000', 'Miễn phí chờ 5 phút đầu', VAT_LINE],
       },
       {
@@ -338,7 +338,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         includedKm: 2,
         perKmPrice: 5500,
         extraStopPrice: 0,
-        icon: Icons.motorbike,
+        icon: Icons.scooter,
         infoLines: ['Giá mở cửa (2km đầu): đ16.000', 'Mỗi km tiếp theo: đ5.500', 'Tài xế đánh giá 4.8★ trở lên', 'Tặng nón bảo hiểm sạch & áo mưa', VAT_LINE],
       },
     ],
