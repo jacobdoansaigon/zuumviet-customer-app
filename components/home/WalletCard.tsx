@@ -1,5 +1,5 @@
-// WalletCard — thẻ ví gradient tím → vệt cam/vàng bên phải (Figma Home 3385-663):
-// icon ví trắng, "đ 10.000" bold 18 trắng, "Ví của bạn" 13, pill trắng "Nạp tiền" + icon plus xanh
+// WalletCard — thẻ ví thưởng gradient tím → vệt cam/vàng bên phải (Figma Home 3385-663):
+// icon ví trắng, "đ 10.000" bold 18 trắng, "Ví thưởng của bạn" 13, pill trắng bên phải = số thành viên cộng đồng của bạn
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,13 +9,16 @@ import { formatMoney } from '@/constants/mock';
 
 interface WalletCardProps {
   balance: number;
+  /** số thành viên trong cộng đồng của bạn (hiện ở pill bên phải) */
+  members?: number;
   onPress?: () => void;
-  onTopUp?: () => void;
+  onMembersPress?: () => void;
   label?: string;
+  membersLabel?: string;
 }
 
-export const WalletCard: React.FC<WalletCardProps> = ({ balance, onPress, onTopUp, label = 'Ví của bạn' }) => (
-  <Pressable onPress={onPress} style={({ pressed }) => [styles.wrap, pressed && { opacity: 0.94 }]}>
+export const WalletCard: React.FC<WalletCardProps> = ({ balance, members, onPress, onMembersPress, label = 'Ví thưởng của bạn', membersLabel = 'thành viên' }) => (
+  <Pressable onPress={onPress} style={({ pressed }) => [styles.wrap, pressed && { opacity: 0.94 }]} accessibilityRole="button" accessibilityLabel={label}>
     <LinearGradient colors={[Colors.primary, '#6E2F98', '#7E37AF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
       {/* vệt cam/vàng góc phải */}
       <LinearGradient colors={['#F26B4A', Colors.secondary]} start={{ x: 0, y: 1 }} end={{ x: 1, y: 0 }} style={styles.swooshBig} />
@@ -33,14 +36,27 @@ export const WalletCard: React.FC<WalletCardProps> = ({ balance, onPress, onTopU
             {label}
           </AppText>
         </View>
-        <Pressable onPress={onTopUp ?? onPress} hitSlop={6} style={({ pressed }) => [styles.pill, pressed && { opacity: 0.85 }]}>
-          <AppText weight="bold" size={13} color={Colors.primary}>
-            Nạp tiền
-          </AppText>
-          <View style={styles.plus}>
-            <Icon name={Icons.plusCircle} size={20} color={Colors.green} />
-          </View>
-        </Pressable>
+        {typeof members === 'number' ? (
+          <Pressable
+            onPress={onMembersPress ?? onPress}
+            hitSlop={6}
+            style={({ pressed }) => [styles.pill, pressed && { opacity: 0.85 }]}
+            accessibilityRole="button"
+            accessibilityLabel={`${members} ${membersLabel}`}
+          >
+            <View style={styles.pillIcon}>
+              <Icon name={Icons.network} size={16} color={Colors.primary} />
+            </View>
+            <View>
+              <AppText weight="extraBold" size={15} color={Colors.primary} style={{ lineHeight: 18 }}>
+                {members}
+              </AppText>
+              <AppText size={10} weight="semiBold" color={Colors.textSecondary} style={{ lineHeight: 12 }}>
+                {membersLabel}
+              </AppText>
+            </View>
+          </Pressable>
+        ) : null}
       </View>
     </LinearGradient>
   </Pressable>
@@ -82,11 +98,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.full,
-    paddingLeft: Spacing.md,
-    paddingRight: 6,
-    height: 34,
+    paddingLeft: 6,
+    paddingRight: Spacing.md,
+    height: 40,
   },
-  plus: { marginLeft: 6 },
+  pillIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.primaryBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
 });
 
 export default WalletCard;

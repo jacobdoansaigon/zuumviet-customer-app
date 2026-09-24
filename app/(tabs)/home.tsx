@@ -1,12 +1,12 @@
 // Trang chủ — Figma HOME 1.2 (3385-663): header tím chào theo giờ + avatar, lưới dịch vụ đè header,
-// thẻ ví gradient, 2 stat card, "Tại sao chọn ZuumViet?" (1 thẻ / màn, cuộn ngang 4 khác biệt),
+// thẻ ví thưởng gradient (pill số thành viên bên phải), "Tại sao chọn ZuumViet?" (1 thẻ / màn, cuộn ngang 4 khác biệt),
 // "Dành cho bạn / Tất cả" (2 hàng × 2 thẻ, cuộn ngang), "Đối tác của ZuumViet" (banner quảng cáo cuộn ngang),
 // footer app (logo, liên kết, công ty, phiên bản), banner chuyến đang đi nổi trên tab bar.
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
-import { AppText, SectionHeader, StatCard, Icons } from '@/components/ui';
+import { SectionHeader } from '@/components/ui';
 import {
   HomeHeader,
   ServiceCard,
@@ -111,14 +111,10 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <WalletCard
               balance={walletBalance}
+              members={MOCK_COMMUNITY.homeStats.members}
               onPress={() => router.push('/wallet')}
-              onTopUp={() => router.push('/wallet/topup')}
+              onMembersPress={() => router.push('/community')}
             />
-          </View>
-
-          <View style={[styles.section, styles.stats]}>
-            <StatCard icon={Icons.network} value={String(MOCK_COMMUNITY.homeStats.members)} label="thành viên" />
-            <StatCard icon={Icons.chart} value={String(MOCK_COMMUNITY.homeStats.points)} label="điểm thưởng" />
           </View>
 
           <SectionHeader title="Tại sao chọn ZuumViet?" style={styles.newsHeader} />
@@ -147,6 +143,5 @@ const styles = StyleSheet.create({
   content: { paddingBottom: Spacing.xl },
   body: { paddingHorizontal: Spacing.screen },
   section: { marginTop: Spacing.base },
-  stats: { flexDirection: 'row', gap: Spacing.md },
   newsHeader: { marginTop: Spacing.lg, marginBottom: Spacing.xs },
 });
