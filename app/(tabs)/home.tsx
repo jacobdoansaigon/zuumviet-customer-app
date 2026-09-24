@@ -1,6 +1,7 @@
 // Trang chủ — Figma HOME 1.2 (3385-663): header tím chào theo giờ + avatar, lưới dịch vụ đè header,
 // thẻ ví gradient, 2 stat card, "Tại sao chọn ZuumViet?" (1 thẻ / màn, cuộn ngang 4 khác biệt),
-// "Dành cho bạn / Tất cả" (2 hàng × 2 thẻ, cuộn ngang), banner chuyến đang đi nổi trên tab bar.
+// "Dành cho bạn / Tất cả" (2 hàng × 2 thẻ, cuộn ngang), "Đối tác của ZuumViet" (banner quảng cáo cuộn ngang),
+// footer app (logo, liên kết, công ty, phiên bản), banner chuyến đang đi nổi trên tab bar.
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -12,6 +13,8 @@ import {
   WalletCard,
   PromoGrid,
   WhyZuumCarousel,
+  PartnerBanner,
+  AppFooter,
   ActiveTripBanner,
   describeActiveOrder,
   type HomeServiceKey,
@@ -124,9 +127,10 @@ export default function HomeScreen() {
           <SectionHeader title="Dành cho bạn" actionLabel="Tất cả" onAction={() => router.push('/promotions')} style={styles.newsHeader} />
           <PromoGrid items={MOCK_PROMOS} onPress={(p) => router.push(`/promotions/${p.id}`)} />
 
-          <AppText size={11} color={Colors.textDisabled} align="center" style={{ marginTop: Spacing.lg, marginBottom: Spacing.sm }}>
-            Ưu đãi & số dư ví đang là dữ liệu mẫu (demo)
-          </AppText>
+          <SectionHeader title="Đối tác của ZuumViet" style={styles.newsHeader} />
+          <PartnerBanner />
+
+          <AppFooter note="Ưu đãi, đối tác & số dư ví đang là dữ liệu mẫu (demo)" />
         </View>
       </ScrollView>
 

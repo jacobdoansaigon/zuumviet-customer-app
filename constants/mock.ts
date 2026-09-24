@@ -171,6 +171,66 @@ export const WHY_ZUUM: WhyZuumItem[] = [
 ];
 
 /* ------------------------------------------------------------------ */
+/* Banner đối tác (Home, dưới cùng): quảng cáo của đối tác ZuumViet     */
+/* ------------------------------------------------------------------ */
+
+export type PartnerAd = {
+  id: string;
+  partner: string;
+  headline: string;
+  description: string;
+  cta: string;
+  url: string;
+  /** 2 màu gradient nền banner (đến khi có ảnh banner thật) */
+  colors: [string, string];
+  /** ảnh banner (tuỳ chọn) — có thì đè lên nền gradient */
+  image?: string;
+};
+
+export const PARTNER_ADS: PartnerAd[] = [
+  {
+    id: 'ad1',
+    partner: 'MoMo',
+    headline: 'Nạp ví ZuumViet qua MoMo, hoàn 10%',
+    description: 'Áp dụng lần nạp đầu tiên, tối đa 20.000đ.',
+    cta: 'Nạp ngay',
+    url: 'https://momo.vn',
+    colors: ['#A50064', '#D82D8B'],
+  },
+  {
+    id: 'ad2',
+    partner: 'Bảo hiểm PVI',
+    headline: 'Bảo hiểm chuyến đi chỉ 2.000đ',
+    description: 'Bảo vệ hành khách và hàng hoá trên mọi chuyến ZuumViet.',
+    cta: 'Tìm hiểu',
+    url: 'https://www.pvi.com.vn',
+    colors: ['#0B4F9C', '#1E88E5'],
+  },
+  {
+    id: 'ad3',
+    partner: 'Petrolimex',
+    headline: 'Tài xế ZuumViet giảm 500đ/lít',
+    description: 'Xuất trình mã tài xế tại hơn 2.000 cây xăng toàn quốc.',
+    cta: 'Xem điểm đổ',
+    url: 'https://www.petrolimex.com.vn',
+    colors: ['#0F6E3E', '#2EBD59'],
+  },
+];
+
+/** Thông tin hiển thị ở footer app (mock, thay bằng dữ liệu thật khi có) */
+export const APP_FOOTER = {
+  tagline: 'Đi lại, giao hàng, vận tải. Một ứng dụng cho mọi nhu cầu.',
+  company: 'Công ty TNHH ZuumViet',
+  address: 'Tầng 5, 182 Lê Đại Hành, Phường 15, Quận 11, TP. Hồ Chí Minh',
+  hotline: '1900 1234',
+  hotlineTel: '19001234',
+  email: 'support@zuumviet.vn',
+  termsUrl: 'https://zuumviet.vn/terms',
+  privacyUrl: 'https://zuumviet.vn/privacy',
+  website: 'https://zuumviet.vn',
+} as const;
+
+/* ------------------------------------------------------------------ */
 /* Khuyến mãi (Home: lưới 2 hàng, cuộn ngang)                          */
 /* ------------------------------------------------------------------ */
 
