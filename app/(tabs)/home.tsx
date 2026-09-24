@@ -1,4 +1,5 @@
 // Trang chủ — Figma HOME 1.2 (3385-663): header tím chào theo giờ + avatar, lưới dịch vụ đè header,
+// "Gợi ý cho bạn" (hoạt động gần đây / gợi ý theo giờ, 3 hàng cuộn dọc, bấm → mở đặt với lộ trình điền sẵn),
 // thẻ ví thưởng gradient (pill số thành viên bên phải), "Tại sao chọn ZuumViet?" (1 thẻ / màn, cuộn ngang 4 khác biệt),
 // "Dành cho bạn / Tất cả" (2 hàng × 2 thẻ, cuộn ngang), "Đối tác của ZuumViet" (banner quảng cáo cuộn ngang),
 // footer app (logo, liên kết, công ty, phiên bản), banner chuyến đang đi nổi trên tab bar.
@@ -15,6 +16,7 @@ import {
   WhyZuumCarousel,
   PartnerBanner,
   AppFooter,
+  ActivitySuggestions,
   ActiveTripBanner,
   describeActiveOrder,
   type HomeServiceKey,
@@ -106,6 +108,17 @@ export default function HomeScreen() {
         <View style={styles.body}>
           <View style={{ marginTop: -HEADER_OVERLAP }}>
             <ServiceCard onSelect={openService} />
+          </View>
+
+          <View style={styles.section}>
+            <ActivitySuggestions
+              onPress={(s) =>
+                router.push({
+                  pathname: '/booking',
+                  params: { service: s.service, ...(s.fromPlaceId ? { from: s.fromPlaceId } : {}), ...(s.toPlaceId ? { to: s.toPlaceId } : {}) },
+                })
+              }
+            />
           </View>
 
           <View style={styles.section}>

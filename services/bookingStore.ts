@@ -228,6 +228,23 @@ export function setSenderPlace(place: Place) {
   update((s) => ({ sender: { ...s.sender, place } }));
 }
 
+/**
+ * Điền sẵn lộ trình từ gợi ý / hoạt động gần đây (id SamplePlace).
+ * Chở khách: điểm đến lấy tên/SĐT của người đặt; giao hàng: người dùng bổ sung thông tin người nhận.
+ */
+export function prefillRoute(fromId?: string, toId?: string) {
+  const from = fromId ? SAMPLE_PLACES.find((p) => p.id === fromId) : undefined;
+  const to = toId ? SAMPLE_PLACES.find((p) => p.id === toId) : undefined;
+  if (!from && !to) return;
+  const isRide = SERVICE_GROUPS[state.service].kind !== 'delivery';
+  update((s) => ({
+    sender: from ? { ...s.sender, place: placeFromSample(from, 'saved') } : s.sender,
+    receivers: to
+      ? [{ ...emptyReceiver(), place: placeFromSample(to, 'saved'), name: isRide ? s.sender.name : '', phone: isRide ? s.sender.phone : '' }]
+      : s.receivers,
+  }));
+}
+
 /** GPS thật về → thay toạ độ cho địa chỉ mẫu mặc định */
 export function applyGpsToDefaultPlace(lat: number, lng: number) {
   const p = state.sender.place;

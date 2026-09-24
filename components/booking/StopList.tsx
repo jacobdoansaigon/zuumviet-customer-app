@@ -95,7 +95,8 @@ export const StopList: React.FC<StopListProps> = ({
         <StopRow
           key={r.id}
           type="dropoff"
-          title={r.name && r.phone ? `${r.name} - ${r.phone}` : r.place?.title || labels.receiverStatus}
+          // Chở khách (1 điểm đến): hiện tên địa điểm; giao hàng: tên - SĐT người nhận
+          title={maxStops === 1 ? r.place?.title || r.place?.address || labels.receiverStatus : r.name && r.phone ? `${r.name} - ${r.phone}` : r.place?.title || labels.receiverStatus}
           status={labels.receiverStatus}
           subtitle={r.place?.address}
           connector={canAdd || i < complete.length - 1}

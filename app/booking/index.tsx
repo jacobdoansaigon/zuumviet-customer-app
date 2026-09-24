@@ -11,6 +11,7 @@ import {
   useBooking,
   startBooking,
   hydrateSender,
+  prefillRoute,
   selectOption,
   addReceiver,
   removeReceiver,
@@ -23,7 +24,7 @@ import {
 import { BookingMap, RoundIconButton, StopList, ServiceInfoDialog, FlatFooter, useCurrentLocation, type MapStop } from '@/components/booking';
 
 export default function BookingScreen() {
-  const { service } = useLocalSearchParams<{ service?: string }>();
+  const { service, from, to } = useLocalSearchParams<{ service?: string; from?: string; to?: string }>();
   const serviceKey = toServiceKey(service);
   const state = useBooking();
   const insets = useSafeAreaInsets();
@@ -35,8 +36,13 @@ export default function BookingScreen() {
 
   useEffect(() => {
     startBooking(serviceKey);
-    void hydrateSender();
-  }, [serviceKey]);
+    // Từ gợi ý / hoạt động gần đây trên Home: điền sẵn điểm đón & điểm đến
+    if (from || to) prefillRoute(from, to);
+    void hydrateSender().then(() => {
+      // tên/SĐT người đi vừa được điền → đồng bộ sang điểm đến đã điền sẵn (chở khách)
+      if (to) prefillRoute(undefined, to);
+    });
+  }, [serviceKey, from, to]);
 
   useEffect(() => {
     if (location) applyGpsToDefaultPlace(location.latitude, location.longitude);

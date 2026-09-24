@@ -7,4 +7,5 @@ export * from './PromoGrid';
 export * from './WhyZuumCarousel';
 export * from './PartnerBanner';
 export * from './AppFooter';
+export * from './ActivitySuggestions';
 export * from './ActiveTripBanner';

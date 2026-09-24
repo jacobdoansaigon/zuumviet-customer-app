@@ -132,6 +132,125 @@ export const MOCK_NEWS: NewsItem[] = [
 ];
 
 /* ------------------------------------------------------------------ */
+/* Gợi ý hành động / hoạt động gần đây (Home, trên thẻ ví thưởng)      */
+/* ------------------------------------------------------------------ */
+
+export type SuggestionWhen = 'morning' | 'noon' | 'evening' | 'any';
+
+export type ActionSuggestion = {
+  id: string;
+  /** ServiceKey mở màn đặt */
+  service: string;
+  /** id SamplePlace (constants/mockBooking) cho điểm đón / điểm đến */
+  fromPlaceId?: string;
+  toPlaceId?: string;
+  title: string;
+  subtitle: string;
+  /** nhãn nhỏ: "Sáng nay", "Vừa đặt", "Gợi ý", "Lịch sắp tới" */
+  badge: string;
+  badgeTone: 'primary' | 'success' | 'warning';
+  /** khung giờ ưu tiên hiển thị lên đầu */
+  when: SuggestionWhen;
+  /** icon override (mặc định lấy icon nhóm dịch vụ) */
+  icon?: string;
+};
+
+/** Dữ liệu mẫu — sau này sinh từ lịch sử đơn (orderApi.getOrders) + vị trí đã lưu */
+export const SUGGESTED_ACTIONS: ActionSuggestion[] = [
+  {
+    id: 's-commute',
+    service: 'car',
+    fromPlaceId: 'yen-the',
+    toPlaceId: 'le-dai-hanh',
+    title: 'Đặt Xe hơi đi làm',
+    subtitle: 'Nhà → Công ty · bạn thường đặt lúc 7:30',
+    badge: 'Sáng nay',
+    badgeTone: 'warning',
+    when: 'morning',
+  },
+  {
+    id: 's-back-home',
+    service: 'bike',
+    fromPlaceId: 'vincom-dong-khoi',
+    toPlaceId: 'yen-the',
+    title: 'Đặt Xe máy về nhà',
+    subtitle: 'Vincom Đồng Khởi → Nhà · bạn vừa đến đây 25 phút trước',
+    badge: 'Gợi ý',
+    badgeTone: 'primary',
+    when: 'any',
+  },
+  {
+    id: 'r-last-ride',
+    service: 'bike',
+    fromPlaceId: 'yen-the',
+    toPlaceId: 'vincom-dong-khoi',
+    title: 'Vừa đặt Xe máy đi chơi',
+    subtitle: 'Nhà → Vincom Đồng Khởi · 25 phút trước · đặt lại',
+    badge: 'Vừa đặt',
+    badgeTone: 'success',
+    when: 'any',
+  },
+  {
+    id: 's-evening',
+    service: 'car',
+    fromPlaceId: 'le-dai-hanh',
+    toPlaceId: 'yen-the',
+    title: 'Đặt Xe hơi về nhà',
+    subtitle: 'Công ty → Nhà · thường đặt lúc 18:00',
+    badge: 'Chiều nay',
+    badgeTone: 'warning',
+    when: 'evening',
+  },
+  {
+    id: 's-airport',
+    service: 'car6',
+    fromPlaceId: 'yen-the',
+    toPlaceId: 'tan-son-nhat',
+    title: 'Xe 6 chỗ đi sân bay',
+    subtitle: 'Nhà → Tân Sơn Nhất · chuyến bay thứ 7 tuần này',
+    badge: 'Lịch sắp tới',
+    badgeTone: 'primary',
+    when: 'any',
+  },
+  {
+    id: 'r-last-delivery',
+    service: 'delivery',
+    fromPlaceId: 'yen-the',
+    toPlaceId: 'tran-van-ky',
+    title: 'Gửi lại hàng cho Tú Quỳnh',
+    subtitle: 'Nhà → 78 Trần Văn Kỷ · giao thành công hôm qua',
+    badge: 'Gần đây',
+    badgeTone: 'success',
+    when: 'any',
+  },
+  {
+    id: 's-lunch',
+    service: 'bike',
+    fromPlaceId: 'le-dai-hanh',
+    toPlaceId: 'ben-thanh',
+    title: 'Xe máy đi ăn trưa',
+    subtitle: 'Công ty → Chợ Bến Thành · 4 lần trong 2 tuần',
+    badge: 'Trưa nay',
+    badgeTone: 'warning',
+    when: 'noon',
+  },
+];
+
+export function currentSuggestionWhen(d: Date = new Date()): SuggestionWhen {
+  const h = d.getHours();
+  if (h >= 5 && h < 10) return 'morning';
+  if (h >= 10 && h < 14) return 'noon';
+  if (h >= 16 && h < 22) return 'evening';
+  return 'any';
+}
+
+/** Sắp xếp: mục khớp khung giờ hiện tại lên đầu, các mục lệch khung giờ (sáng/trưa/chiều khác) xuống cuối */
+export function sortSuggestions(items: ActionSuggestion[], when: SuggestionWhen = currentSuggestionWhen()): ActionSuggestion[] {
+  const rank = (s: ActionSuggestion) => (s.when === when ? 0 : s.when === 'any' ? 1 : 2);
+  return [...items].sort((a, b) => rank(a) - rank(b));
+}
+
+/* ------------------------------------------------------------------ */
 /* Tại sao chọn ZuumViet? (Home: 1 thẻ / màn, cuộn ngang 4 khác biệt)  */
 /* ------------------------------------------------------------------ */
 
