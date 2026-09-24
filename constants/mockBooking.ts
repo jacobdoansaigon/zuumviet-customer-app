@@ -264,7 +264,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
   },
   rental: {
     key: 'rental',
-    title: 'Chuyển trọn gói',
+    title: 'Dọn nhà',
     icon: Icons.van,
     kind: 'delivery',
     labels: DELIVERY_LABELS,

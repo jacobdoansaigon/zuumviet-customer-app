@@ -434,8 +434,8 @@ export const MOCK_PROMOS: PromoItem[] = [
   },
   {
     id: 'p6',
-    title: 'Chuyển trọn gói cuối tuần giảm 200K',
-    tag: 'Chuyển trọn gói',
+    title: 'Dọn nhà cuối tuần giảm 200K',
+    tag: 'Dọn nhà',
     discount: '-200K',
     code: 'CHUYENNHA200',
     expiry: '31/12/2026',
