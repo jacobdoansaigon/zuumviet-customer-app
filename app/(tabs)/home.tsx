@@ -1,6 +1,7 @@
 // Trang chủ — Figma HOME 1.2 (3385-663): header tím chào theo giờ + avatar, lưới dịch vụ đè header,
+// thẻ ví thưởng gradient (pill số thành viên bên phải),
 // "Gợi ý cho bạn" (hoạt động gần đây / gợi ý theo giờ, 3 hàng cuộn dọc, bấm → mở đặt với lộ trình điền sẵn),
-// thẻ ví thưởng gradient (pill số thành viên bên phải), "Tại sao chọn ZuumViet?" (1 thẻ / màn, cuộn ngang 4 khác biệt),
+// "Tại sao chọn ZuumViet?" (1 thẻ / màn, cuộn ngang 4 khác biệt),
 // "Dành cho bạn / Tất cả" (2 hàng × 2 thẻ, cuộn ngang), "Đối tác của ZuumViet" (banner quảng cáo cuộn ngang),
 // footer app (logo, liên kết, công ty, phiên bản), banner chuyến đang đi nổi trên tab bar.
 import React, { useCallback, useEffect, useState } from 'react';
@@ -111,6 +112,15 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.section}>
+            <WalletCard
+              balance={walletBalance}
+              members={MOCK_COMMUNITY.homeStats.members}
+              onPress={() => router.push('/wallet')}
+              onMembersPress={() => router.push('/community')}
+            />
+          </View>
+
+          <View style={styles.section}>
             <ActivitySuggestions
               onPress={(s) =>
                 router.push({
@@ -118,15 +128,6 @@ export default function HomeScreen() {
                   params: { service: s.service, ...(s.fromPlaceId ? { from: s.fromPlaceId } : {}), ...(s.toPlaceId ? { to: s.toPlaceId } : {}) },
                 })
               }
-            />
-          </View>
-
-          <View style={styles.section}>
-            <WalletCard
-              balance={walletBalance}
-              members={MOCK_COMMUNITY.homeStats.members}
-              onPress={() => router.push('/wallet')}
-              onMembersPress={() => router.push('/community')}
             />
           </View>
 
