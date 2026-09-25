@@ -1,15 +1,17 @@
-// app/booking/intercity/ticket/[orderId].tsx — Vé điện tử sau khi đặt Xe ghép / Mua vé xe thành công.
+// app/booking/intercity/ticket/[orderId].tsx — Vé điện tử sau khi đặt Mua vé xe thành công.
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AppHeader, AppText, Button, EmptyState, Icon, Icons, Screen } from '@/components/ui';
+import { AppHeader, AppText, Button, EmptyState, Icon, Icons, Screen, Toast } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { INTERCITY_CITIES, findCarpool, findBusTrip, findOperator } from '@/constants/mockIntercity';
+import { INTERCITY_CITIES, findBusTrip, findOperator } from '@/constants/mockIntercity';
 import { getTicketOrder } from '@/services/intercityTicketStore';
+import { buildTrackingLink, shareTrackingLink } from '@/services/shareLink';
 
 export default function IntercityTicketScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const order = getTicketOrder(orderId ?? '');
+  const [toast, setToast] = React.useState<string | null>(null);
 
   if (!order) {
     return (
@@ -20,24 +22,39 @@ export default function IntercityTicketScreen() {
   }
 
   const city = INTERCITY_CITIES.find((c) => c.id === order.cityId)!;
-  const carpool = order.kind === 'carpool' ? findCarpool(order.tripId) : null;
-  const trip = order.kind === 'bus' ? findBusTrip(order.tripId) : null;
+  const trip = findBusTrip(order.tripId);
   const operator = trip ? findOperator(trip.operatorId) : null;
-  const providerName = order.kind === 'carpool' ? carpool?.driverName : operator?.name;
-  const vehicleLabel = order.kind === 'carpool' ? `${carpool?.vehicleModel} · ${carpool?.vehiclePlate}` : trip?.vehicleType;
 
   const done = () => {
     if (router.canDismiss()) router.dismissAll();
     router.replace('/home');
   };
 
+  const share = async () => {
+    const res = await shareTrackingLink({
+      title: 'Vé xe của tôi trên ZuumViet',
+      message: `Mình vừa đặt vé xe tuyến TP. Hồ Chí Minh → ${city.name}, khởi hành ${order.departTime}. Bạn theo dõi giúp mình nhé.`,
+      url: buildTrackingLink('ticket', order.id),
+    });
+    setToast(res === 'copied' ? 'Đã sao chép liên kết chia sẻ' : res === 'unavailable' ? 'Thiết bị không hỗ trợ chia sẻ' : 'Đã mở hộp thoại chia sẻ');
+  };
+
   return (
-    <Screen header={<AppHeader title="Đặt vé thành công" variant="dark" left="close" onLeftPress={done} />} scroll footer={<Button title="Về trang chủ" onPress={done} />}>
+    <Screen
+      header={<AppHeader title="Đặt vé thành công" variant="dark" left="close" onLeftPress={done} />}
+      scroll
+      footer={
+        <View style={{ gap: Spacing.sm }}>
+          <Button title="Chia sẻ với người thân" variant="outline" iconLeft={Icons.share} onPress={() => void share()} />
+          <Button title="Về trang chủ" onPress={done} />
+        </View>
+      }
+    >
       <View style={styles.body}>
         <View style={styles.successBanner}>
           <Icon name={Icons.checkCircle} size={40} color={Colors.success} />
           <AppText size={17} weight="bold" style={{ marginTop: Spacing.sm }}>
-            {order.kind === 'carpool' ? 'Đã đặt chỗ xe ghép' : 'Đã đặt vé xe'}
+            Đã đặt vé xe
           </AppText>
           <AppText size={13} color={Colors.textSecondary} align="center" style={{ marginTop: 2 }}>
             Mã vé #{order.id.slice(-6).toUpperCase()} · Liên hệ {order.contactPhone || 'của bạn'} để nhận xác nhận
@@ -47,22 +64,18 @@ export default function IntercityTicketScreen() {
         <View style={styles.card}>
           <Row label="Tuyến" value={`TP. Hồ Chí Minh → ${city.name}`} />
           <Row label="Ngày giờ đi" value={`${order.dateLabel || 'Hôm nay'} · ${order.departTime}`} />
-          <Row label={order.kind === 'carpool' ? 'Tài xế / xe' : 'Nhà xe / loại xe'} value={`${providerName ?? ''} · ${vehicleLabel ?? ''}`} />
+          <Row label="Nhà xe / loại xe" value={`${operator?.name ?? ''} · ${trip?.vehicleType ?? ''}`} />
           <Row label="Ghế đã chọn" value={order.seatIds.join(', ') || '—'} />
-          {order.kind === 'bus' ? (
-            <>
-              <Row label="Điểm đón" value={order.pickup?.label ?? '—'} />
-              <Row label="Điểm trả" value={order.dropoff?.label ?? '—'} />
-            </>
-          ) : null}
+          <Row label="Điểm đón" value={order.pickup?.label ?? '—'} />
+          <Row label="Điểm trả" value={order.dropoff?.label ?? '—'} />
           <Row label="Hàng hoá đi kèm" value={order.hasCargo ? order.cargoNote || 'Có' : 'Không'} />
         </View>
 
         <View style={styles.card}>
           <Row label={`Vé × ${order.seatIds.length || 1}`} value={`đ${(order.unitPrice * Math.max(1, order.seatIds.length)).toLocaleString('vi-VN')}`} />
-          {order.kind === 'bus' && order.hasCargo && trip ? <Row label="Phụ thu hàng hoá" value={`đ${trip.cargoFee.toLocaleString('vi-VN')}`} /> : null}
-          {order.kind === 'bus' && order.pickup?.fee ? <Row label="Phụ thu đón tận nơi" value={`đ${order.pickup.fee.toLocaleString('vi-VN')}`} /> : null}
-          {order.kind === 'bus' && order.dropoff?.fee ? <Row label="Phụ thu trả tận nơi" value={`đ${order.dropoff.fee.toLocaleString('vi-VN')}`} /> : null}
+          {order.hasCargo && trip ? <Row label="Phụ thu hàng hoá" value={`đ${trip.cargoFee.toLocaleString('vi-VN')}`} /> : null}
+          {order.pickup?.fee ? <Row label="Phụ thu đón tận nơi" value={`đ${order.pickup.fee.toLocaleString('vi-VN')}`} /> : null}
+          {order.dropoff?.fee ? <Row label="Phụ thu trả tận nơi" value={`đ${order.dropoff.fee.toLocaleString('vi-VN')}`} /> : null}
           <View style={styles.totalRow}>
             <AppText size={15} weight="bold">
               Tổng cộng
@@ -77,6 +90,7 @@ export default function IntercityTicketScreen() {
           Vé & thông tin nhà xe đang là dữ liệu mẫu (demo)
         </AppText>
       </View>
+      <Toast visible={!!toast} message={toast ?? ''} tone="info" onHide={() => setToast(null)} />
     </Screen>
   );
 }

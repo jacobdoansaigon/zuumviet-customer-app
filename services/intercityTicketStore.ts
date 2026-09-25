@@ -1,11 +1,12 @@
-// services/intercityTicketStore.ts — trạng thái đặt Xe ghép / Mua vé xe đường dài: ngày đi, ghế đã chọn,
-// hàng hoá, đón/trả tại nhà hay bến xe. Tách riêng khỏi services/bookingStore.ts vì đây là sản phẩm bán
-// theo GHẾ trên 1 chuyến cụ thể (không phải thuê nguyên xe tính theo khoảng cách như Xe máy/Xe hơi/Gọi tài xế).
+// services/intercityTicketStore.ts — trạng thái đặt Mua vé xe đường dài: ngày đi, ghế đã chọn, hàng hoá,
+// đón/trả tại nhà hay bến xe. Tách riêng khỏi services/bookingStore.ts vì đây là sản phẩm bán theo GHẾ trên
+// 1 chuyến cố định của nhà xe (không phải thuê nguyên xe tính theo khoảng cách như Xe máy/Xe hơi/Gọi tài xế).
+// Xe ghép (đặt yêu cầu → tài xế nhận cuốc) dùng store riêng: services/carpoolRequestStore.ts.
 import { useSyncExternalStore } from 'react';
 import { getStoredCustomer } from '@/services/api';
-import { buildDateOptions, type CarpoolListing, type BusTrip, type PickupOption } from '@/constants/mockIntercity';
+import { buildDateOptions, type BusTrip, type PickupOption } from '@/constants/mockIntercity';
 
-export type TicketKind = 'carpool' | 'bus';
+export type TicketKind = 'bus';
 
 export interface TicketOrder {
   id: string;
@@ -100,34 +101,6 @@ export async function getContact(): Promise<{ name: string; phone: string }> {
 }
 
 const uid = () => `tk-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
-
-export async function bookCarpool(listing: CarpoolListing, dateLabel: string): Promise<TicketOrder> {
-  const contact = await getContact();
-  const seatCount = Math.max(1, draft.seatIds.length);
-  const total = listing.pricePerSeat * seatCount;
-  const order: TicketOrder = {
-    id: uid(),
-    kind: 'carpool',
-    cityId: listing.cityId,
-    tripId: listing.id,
-    dateKey: draft.dateKey,
-    dateLabel,
-    departTime: listing.departTime,
-    seatIds: draft.seatIds,
-    hasCargo: draft.hasCargo,
-    cargoNote: draft.cargoNote,
-    pickup: null,
-    dropoff: null,
-    contactName: contact.name,
-    contactPhone: contact.phone,
-    unitPrice: listing.pricePerSeat,
-    total,
-    createdAt: Date.now(),
-  };
-  orders.set(order.id, order);
-  emit();
-  return order;
-}
 
 export async function bookBusTrip(trip: BusTrip, dateLabel: string): Promise<TicketOrder> {
   const contact = await getContact();

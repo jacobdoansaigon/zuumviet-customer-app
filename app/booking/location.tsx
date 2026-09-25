@@ -58,11 +58,20 @@ export default function LocationScreen() {
   const chooseCity = (c: IntercityCity) =>
     finish({ title: c.name, address: `${c.station.name}, ${c.station.address}`, lat: c.station.lat, lng: c.station.lng, placeId: c.id, source: 'search' });
 
-  // Tỉnh/thành khách gõ chưa có tuyến xe ghép → vẫn cho chọn (đặt xe riêng), màn đặt sẽ gợi ý bến xe gần nhất
-  const chooseUnlistedCity = () => {
+  // Địa chỉ tự nhập cho Xe đường dài: khách gõ địa chỉ cụ thể (không chỉ tên tỉnh/thành) — luôn dùng được
+  // ngay, dù có khớp tỉnh/thành đang phục vụ hay không (màn đặt sẽ tự gợi ý bến xe/tuyến gần nhất).
+  const chooseTypedIntercity = () => {
     const q = query.trim();
     if (!q) return;
-    finish({ title: q, address: q, lat: HCM_CENTER.lat + 1.4, lng: HCM_CENTER.lng + 1.1, source: 'search' });
+    const match = matchedCityForQuery;
+    finish({
+      title: q,
+      address: q,
+      lat: match ? match.station.lat : HCM_CENTER.lat + 1.4,
+      lng: match ? match.station.lng : HCM_CENTER.lng + 1.1,
+      placeId: match?.id,
+      source: 'search',
+    });
   };
 
   // Địa chỉ tự nhập (chưa có geocoding): toạ độ lệch nhẹ quanh điểm gửi để vẫn vẽ được lộ trình
@@ -73,21 +82,25 @@ export default function LocationScreen() {
   };
 
   const showTyped = !isIntercityDest && dirty && query.trim().length > 3 && !results.some((r) => r.address.toLowerCase() === query.trim().toLowerCase());
+  // Gõ đúng/gần tên 1 tỉnh có tuyến sẵn → dùng ngay bến xe của tỉnh đó làm toạ độ cho địa chỉ tự nhập
+  const matchedCityForQuery = cityResults.length === 1 ? cityResults[0] : null;
+  const showTypedIntercity = isIntercityDest && query.trim().length > 1;
 
   if (isIntercityDest) {
     return (
-      <Screen header={<AppHeader variant="dark" title="Chọn tỉnh/thành muốn đến" left="close" />} keyboardAvoiding={false}>
+      <Screen header={<AppHeader variant="dark" title="Nhập địa chỉ đến" left="close" />} keyboardAvoiding={false}>
         <View style={styles.searchWrap}>
           <View style={styles.searchBox}>
             <StopMarker type="dropoff" size={16} />
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Tìm tỉnh/thành (Đà Lạt, Vũng Tàu...)"
+              placeholder="Nhập địa chỉ, tên nơi đến hoặc tỉnh/thành..."
               placeholderTextColor={Colors.placeholder}
               style={[styles.input, fontStyle('bold')]}
               autoFocus
               returnKeyType="search"
+              onSubmitEditing={chooseTypedIntercity}
             />
             {query ? (
               <Pressable onPress={() => setQuery('')} hitSlop={8}>
@@ -102,20 +115,36 @@ export default function LocationScreen() {
           keyExtractor={(c) => c.id}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: Spacing.xl }}
-          ListEmptyComponent={
-            query.trim().length > 1 ? (
-              <Pressable onPress={chooseUnlistedCity} style={styles.row}>
-                <Icon name={Icons.location} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
-                <View style={{ flex: 1 }}>
-                  <AppText weight="bold" size={16} numberOfLines={1}>
-                    {query.trim()}
-                  </AppText>
-                  <AppText size={13} color={Colors.textSecondary}>
-                    Chưa có xe ghép tới đây — vẫn đặt được xe riêng
+          ListHeaderComponent={
+            <>
+              {showTypedIntercity ? (
+                <Pressable onPress={chooseTypedIntercity} style={styles.row}>
+                  <Icon name={Icons.location} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
+                  <View style={{ flex: 1 }}>
+                    <AppText weight="bold" size={16} numberOfLines={2}>
+                      {query.trim()}
+                    </AppText>
+                    <AppText size={13} color={Colors.textSecondary}>
+                      {matchedCityForQuery ? `Dùng địa chỉ này · gần tuyến đi ${matchedCityForQuery.name}` : 'Dùng địa chỉ này làm điểm đến'}
+                    </AppText>
+                  </View>
+                  <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
+                </Pressable>
+              ) : null}
+              {cityResults.length ? (
+                <View style={styles.sectionLabelWrap}>
+                  <AppText size={12} weight="semiBold" color={Colors.textSecondary}>
+                    {showTypedIntercity ? 'Hoặc chọn tỉnh/thành đang có tuyến' : 'Tỉnh/thành đang có tuyến xe ghép & vé xe'}
                   </AppText>
                 </View>
-                <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
-              </Pressable>
+              ) : null}
+            </>
+          }
+          ListEmptyComponent={
+            !showTypedIntercity ? (
+              <AppText size={15} color={Colors.textSecondary} align="center" style={{ marginTop: Spacing['2xl'] }}>
+                Nhập địa chỉ cụ thể hoặc tên tỉnh/thành bạn muốn đến
+              </AppText>
             ) : null
           }
           renderItem={({ item }) => (
@@ -235,6 +264,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 16, color: Colors.text, marginLeft: Spacing.sm, paddingVertical: 0, height: Sizes.input - 3 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', marginTop: Spacing.md },
   chip: { marginRight: Spacing.sm, marginBottom: Spacing.sm },
+  sectionLabelWrap: { paddingHorizontal: Spacing.screen, paddingTop: Spacing.sm, paddingBottom: 2 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

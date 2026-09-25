@@ -1,34 +1,27 @@
-// app/booking/intercity/[cityId].tsx — Xe ghép & Mua vé xe đi {city}: chọn ngày đi + khung giờ,
-// 2 tab kết quả (Xe ghép của tài xế / Vé xe theo nhà xe, mỗi nhà xe có thể có nhiều chuyến).
+// app/booking/intercity/[cityId].tsx — Mua vé xe đi {city}: chọn ngày đi + khung giờ, xem chuyến theo từng
+// nhà xe (1 nhà xe có thể chạy nhiều chuyến/ngày). Xe ghép giờ là màn riêng (carpool-request.tsx, mô hình
+// gửi yêu cầu → tài xế nhận cuốc), không còn ở màn kết quả này — xem app/booking/intercity/choose.tsx.
 import React, { useMemo, useState } from 'react';
 import { View, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AppHeader, AppText, Avatar, Chip, EmptyState, Icon, Icons, Screen } from '@/components/ui';
+import { AppHeader, AppText, Chip, EmptyState, Icon, Icons, Screen } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import {
-  INTERCITY_CITIES,
-  TIME_SLOTS,
-  buildDateOptions,
-  carpoolsForCity,
-  operatorsForCity,
-  timeInSlot,
-  type CarpoolListing,
-  type BusTrip,
-} from '@/constants/mockIntercity';
+import { INTERCITY_CITIES, TIME_SLOTS, buildDateOptions, operatorsForCity, timeInSlot, type BusTrip } from '@/constants/mockIntercity';
 
 const DATE_OPTIONS = buildDateOptions();
 
 export default function IntercityResultsScreen() {
   const { cityId } = useLocalSearchParams<{ cityId: string }>();
   const city = INTERCITY_CITIES.find((c) => c.id === cityId);
-  const [tab, setTab] = useState<'carpool' | 'bus'>('carpool');
   const [dateKey, setDateKey] = useState(DATE_OPTIONS[0]!.key);
   const [slotId, setSlotId] = useState<(typeof TIME_SLOTS)[number]['id']>('all');
   const slot = TIME_SLOTS.find((s) => s.id === slotId)!;
   const dateLabel = DATE_OPTIONS.find((d) => d.key === dateKey);
 
-  const carpools = useMemo(() => (city ? carpoolsForCity(city.id).filter((c) => timeInSlot(c.departTime, slot)) : []), [city, slot]);
-  const operatorGroups = useMemo(() => (city ? operatorsForCity(city.id).map((g) => ({ ...g, trips: g.trips.filter((t) => timeInSlot(t.departTime, slot)) })).filter((g) => g.trips.length > 0) : []), [city, slot]);
+  const operatorGroups = useMemo(
+    () => (city ? operatorsForCity(city.id).map((g) => ({ ...g, trips: g.trips.filter((t) => timeInSlot(t.departTime, slot)) })).filter((g) => g.trips.length > 0) : []),
+    [city, slot],
+  );
 
   if (!city) {
     return (
@@ -38,13 +31,11 @@ export default function IntercityResultsScreen() {
     );
   }
 
-  const openCarpool = (c: CarpoolListing) =>
-    router.push({ pathname: '/booking/intercity/carpool/[id]', params: { id: c.id, dateKey, dateLabel: dateLabel ? `${dateLabel.label} ${dateLabel.sub}` : '' } });
   const openBusTrip = (t: BusTrip) =>
     router.push({ pathname: '/booking/intercity/bus/[id]', params: { id: t.id, dateKey, dateLabel: dateLabel ? `${dateLabel.label} ${dateLabel.sub}` : '' } });
 
   return (
-    <Screen header={<AppHeader title={`Đi ${city.name}`} variant="dark" left="back" />} background={Colors.white}>
+    <Screen header={<AppHeader title={`Mua vé đi ${city.name}`} variant="dark" left="back" />} background={Colors.white}>
       <ScrollView contentContainerStyle={{ paddingBottom: Spacing['2xl'] }} showsVerticalScrollIndicator={false}>
         <View style={styles.routeRow}>
           <Icon name="mci:map-marker-distance" size={16} color={Colors.primary} />
@@ -72,82 +63,13 @@ export default function IntercityResultsScreen() {
           ))}
         </ScrollView>
 
-        <View style={styles.tabs}>
-          <Pressable onPress={() => setTab('carpool')} style={[styles.tabBtn, tab === 'carpool' && styles.tabBtnActive]}>
-            <AppText size={14} weight="bold" color={tab === 'carpool' ? Colors.primary : Colors.textSecondary}>
-              Xe ghép ({carpools.length})
-            </AppText>
-          </Pressable>
-          <Pressable onPress={() => setTab('bus')} style={[styles.tabBtn, tab === 'bus' && styles.tabBtnActive]}>
-            <AppText size={14} weight="bold" color={tab === 'bus' ? Colors.primary : Colors.textSecondary}>
-              Mua vé xe ({operatorGroups.reduce((n, g) => n + g.trips.length, 0)})
-            </AppText>
-          </Pressable>
+        <View style={styles.sectionLabelWrap}>
+          <AppText size={12} weight="semiBold" color={Colors.textSecondary}>
+            {operatorGroups.reduce((n, g) => n + g.trips.length, 0)} chuyến khả dụng
+          </AppText>
         </View>
 
-        {tab === 'carpool' ? (
-          carpools.length ? (
-            <View style={styles.list}>
-              {carpools.map((c) => {
-                const left = c.seats.filter((s) => !s.taken).length;
-                return (
-                  <Pressable key={c.id} onPress={() => openCarpool(c)} style={styles.card}>
-                    <View style={styles.cardHead}>
-                      <Avatar name={c.driverName} size={40} />
-                      <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                        <AppText size={14} weight="bold">
-                          {c.driverName}
-                        </AppText>
-                        <AppText size={12} color={Colors.textSecondary}>
-                          {c.vehicleModel} · {c.vehiclePlate}
-                        </AppText>
-                      </View>
-                      <View style={styles.ratingPill}>
-                        <Icon name={Icons.star} size={12} color={Colors.secondary} />
-                        <AppText size={12} weight="bold" color={Colors.text} style={{ marginLeft: 2 }}>
-                          {c.driverRating.toFixed(1)}
-                        </AppText>
-                      </View>
-                    </View>
-                    <View style={styles.cardBody}>
-                      <View>
-                        <AppText size={18} weight="extraBold" color={Colors.text}>
-                          {c.departTime}
-                        </AppText>
-                        <AppText size={12} color={Colors.textSecondary}>
-                          Còn {left} chỗ
-                        </AppText>
-                      </View>
-                      <AppText size={18} weight="extraBold" color={Colors.primary}>
-                        {c.priceLabel}
-                      </AppText>
-                    </View>
-                    <View style={styles.amenityRow}>
-                      {c.amenities.slice(0, 3).map((a) => (
-                        <View key={a} style={styles.amenityTag}>
-                          <AppText size={11} color={Colors.textSecondary}>
-                            {a}
-                          </AppText>
-                        </View>
-                      ))}
-                      {c.allowsCargo ? (
-                        <View style={[styles.amenityTag, styles.cargoTag]}>
-                          <AppText size={11} color={Colors.successDark}>
-                            Nhận hàng hoá
-                          </AppText>
-                        </View>
-                      ) : null}
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : (
-            <View style={{ marginTop: Spacing['2xl'] }}>
-              <EmptyState icon="mci:car-multiple" title="Không có xe ghép trong khung giờ này" />
-            </View>
-          )
-        ) : operatorGroups.length ? (
+        {operatorGroups.length ? (
           <View style={styles.list}>
             {operatorGroups.map((g) => (
               <View key={g.operator.id} style={styles.operatorGroup}>
@@ -216,17 +138,9 @@ const styles = StyleSheet.create({
   dateCellActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   slotStrip: { paddingHorizontal: Spacing.screen, paddingBottom: Spacing.sm, gap: Spacing.sm },
   slotChip: { marginRight: 0 },
-  tabs: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border, marginTop: Spacing.xs },
-  tabBtn: { flex: 1, alignItems: 'center', paddingVertical: Spacing.md },
-  tabBtnActive: { borderBottomWidth: 2, borderBottomColor: Colors.primary },
+  sectionLabelWrap: { paddingHorizontal: Spacing.screen, paddingTop: Spacing.sm, paddingBottom: 2 },
   list: { padding: Spacing.screen, gap: Spacing.md },
-  card: { borderRadius: BorderRadius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.border, padding: Spacing.md, ...Shadow.sm },
-  cardHead: { flexDirection: 'row', alignItems: 'center' },
   ratingPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surfaceAlt, borderRadius: BorderRadius.sm, paddingHorizontal: 8, paddingVertical: 3 },
-  cardBody: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: Spacing.md },
-  amenityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: Spacing.sm },
-  amenityTag: { backgroundColor: Colors.surfaceAlt, borderRadius: BorderRadius.sm, paddingHorizontal: 8, paddingVertical: 3 },
-  cargoTag: { backgroundColor: Colors.successBg },
   operatorGroup: { borderRadius: BorderRadius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.border, overflow: 'hidden', ...Shadow.sm },
   operatorHead: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, backgroundColor: Colors.primaryBg },
   operatorLogo: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },

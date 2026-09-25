@@ -23,6 +23,7 @@ import {
   getTrackingPhase,
 } from '@/services/bookingStore';
 import { BookingMap, RoundIconButton, TrackingSheet, type MapStop } from '@/components/booking';
+import { buildTrackingLink, shareTrackingLink } from '@/services/shareLink';
 
 const MOCK_STEP_MS = 6000;
 const POLL_MS = 5000;
@@ -148,6 +149,15 @@ export default function TrackingScreen() {
     if (!phone) return;
     Linking.openURL(`tel:${phone}`).catch(() => setToast('Không thể thực hiện cuộc gọi trên thiết bị này'));
   };
+  const shareTrip = async () => {
+    if (!order) return;
+    const res = await shareTrackingLink({
+      title: 'Theo dõi chuyến của tôi trên ZuumViet',
+      message: `Mình đang đi chuyến ${order.code} trên ZuumViet, bạn theo dõi giúp mình nhé.`,
+      url: buildTrackingLink('trip', orderId),
+    });
+    setToast(res === 'copied' ? 'Đã sao chép liên kết theo dõi chuyến' : res === 'unavailable' ? 'Thiết bị không hỗ trợ chia sẻ' : 'Đã mở hộp thoại chia sẻ');
+  };
 
   const phase = order ? getTrackingPhase(order) : null;
   const cancellable = phase === 'searching' || phase === 'scheduled' || phase === 'accepted';
@@ -210,7 +220,16 @@ export default function TrackingScreen() {
             call(SUPPORT_PHONE);
           }}
         />
-        <ListRow icon={Icons.share} label="Chia sẻ lộ trình" divider={false} onPress={() => { setMenu(false); setToast('Đã sao chép liên kết theo dõi đơn'); }} />
+        <ListRow
+          icon={Icons.share}
+          label="Chia sẻ chuyến cho người thân"
+          sublabel="Người thân xem được vị trí, không cần cài app"
+          divider={false}
+          onPress={() => {
+            setMenu(false);
+            void shareTrip();
+          }}
+        />
       </BottomSheet>
 
       <Toast visible={!!toast} message={toast ?? ''} tone="info" onHide={() => setToast(null)} style={{ bottom: sheetH + Spacing.md }} />

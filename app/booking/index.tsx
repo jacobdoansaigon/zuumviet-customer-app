@@ -12,16 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AppText, Chip, Icon, Icons, ServiceOption } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import {
-  SERVICE_GROUPS,
-  URBAN_RIDE_KEYS,
-  toServiceKey,
-  matchIntercityCity,
-  suggestNearestCity,
-  type IntercityCity,
-  type ServiceKey,
-  type ServiceOptionDef,
-} from '@/constants/mockBooking';
+import { SERVICE_GROUPS, URBAN_RIDE_KEYS, toServiceKey, type ServiceKey, type ServiceOptionDef } from '@/constants/mockBooking';
 import {
   useBooking,
   startBooking,
@@ -30,7 +21,6 @@ import {
   switchRideOption,
   addReceiver,
   removeReceiver,
-  setReceiverPlace,
   pruneIncompleteReceivers,
   isReceiverComplete,
   computePrice,
@@ -90,13 +80,12 @@ export default function BookingScreen() {
       ? tabKeys.flatMap((k) => SERVICE_GROUPS[k].options.map((o) => ({ ...o, groupKey: k })))
       : group.options.map((o) => ({ ...o, groupKey: state.service }));
 
-  // Xe đường dài: điểm đến khớp tỉnh/thành đang có tuyến → mở được màn Xe ghép & Mua vé xe của tỉnh đó.
+  // Xe đường dài: sau khi có điểm đến, không hiện thẳng danh sách hạng xe — dẫn sang màn "Chọn phương án đi"
+  // (Thuê cả xe / Xe ghép / Mua vé xe) ở app/booking/intercity/choose.tsx.
   const isIntercity = state.service === 'intercity';
   const destPlace = complete[0]?.place ?? null;
-  const matchedCity = isIntercity && destPlace ? matchIntercityCity(`${destPlace.title} ${destPlace.address}`) : null;
   const options: RowOption[] = baseOptions;
   const selected = options.find((o) => o.id === state.optionId) ?? options[0]!;
-  const nearestCity = isIntercity && hasDestination && !matchedCity ? suggestNearestCity() : null;
 
   const stops = useMemo<MapStop[]>(() => {
     const list: MapStop[] = [];
@@ -123,9 +112,6 @@ export default function BookingScreen() {
   const onOptionPress = (o: RowOption) => {
     switchRideOption(o.groupKey, o.id);
     setExpanded(false);
-  };
-  const useSuggestedCity = (city: IntercityCity) => {
-    setReceiverPlace(0, { title: city.name, address: `${city.station.name}, ${city.station.address}`, lat: city.station.lat, lng: city.station.lng, placeId: city.id, source: 'search' });
   };
   const renderOption = (o: RowOption) => (
     <ServiceOption
@@ -178,53 +164,24 @@ export default function BookingScreen() {
         <ScrollView style={{ maxHeight: height * 0.58 }} contentContainerStyle={{ paddingBottom: Spacing.sm }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {hasDestination ? (
             <>
-              {nearestCity ? (
-                <View style={styles.suggestCard}>
-                  <Icon name={Icons.infoOutline} size={18} color={Colors.primary} style={{ marginTop: 1 }} />
-                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                    <AppText size={13} weight="bold" color={Colors.text}>
-                      Chưa có xe ghép tới địa điểm này
-                    </AppText>
-                    <AppText size={12} color={Colors.textSecondary} style={{ marginTop: 2 }}>
-                      Gợi ý: {nearestCity.name} ({nearestCity.region}) · cách khoảng {nearestCity.distanceKm}km · {nearestCity.station.name}
-                    </AppText>
-                    <Pressable onPress={() => useSuggestedCity(nearestCity)} hitSlop={6} style={{ marginTop: 6 }}>
-                      <AppText size={13} weight="bold" color={Colors.primary}>
-                        Đổi điểm đến sang {nearestCity.name}
-                      </AppText>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : null}
-
-              {isIntercity && matchedCity ? (
-                <Pressable
-                  onPress={() => router.push({ pathname: '/booking/intercity/[cityId]', params: { cityId: matchedCity.id } })}
-                  style={styles.marketplaceCard}
-                >
+              {isIntercity ? (
+                <Pressable onPress={() => router.push('/booking/intercity/choose')} style={styles.marketplaceCard}>
                   <View style={styles.marketplaceIcon}>
                     <Icon name="mci:bus" size={22} color={Colors.white} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <AppText size={14} weight="bold" color={Colors.text}>
-                      Xe ghép & Mua vé xe đi {matchedCity.name}
+                      Chọn phương án đi {destPlace?.title ?? ''}
                     </AppText>
                     <AppText size={12} color={Colors.textSecondary} style={{ marginTop: 2 }}>
-                      Chọn ngày giờ, chọn ghế, xem chi tiết tài xế/nhà xe
+                      Thuê cả xe · Xe ghép · Mua vé xe
                     </AppText>
                   </View>
                   <Icon name={Icons.chevronRight} size={18} color={Colors.gray400} />
                 </Pressable>
-              ) : null}
-
-              {isIntercity ? (
-                <View style={styles.sectionLabel}>
-                  <AppText size={12} weight="semiBold" color={Colors.textSecondary}>
-                    Đặt xe riêng, trọn chuyến
-                  </AppText>
-                </View>
-              ) : null}
-              <View style={styles.options}>{options.map(renderOption)}</View>
+              ) : (
+                <View style={styles.options}>{options.map(renderOption)}</View>
+              )}
               <View style={styles.divider} />
             </>
           ) : null}
@@ -240,7 +197,11 @@ export default function BookingScreen() {
           />
         </ScrollView>
 
-        <FlatFooter title={canConfirm ? 'Xác nhận' : labels.confirmHint} disabled={!canConfirm} onPress={() => router.push('/booking/confirm')} />
+        <FlatFooter
+          title={isIntercity ? 'Chọn phương án đi' : canConfirm ? 'Xác nhận' : labels.confirmHint}
+          disabled={isIntercity ? !hasDestination : !canConfirm}
+          onPress={() => router.push(isIntercity ? '/booking/intercity/choose' : '/booking/confirm')}
+        />
       </View>
 
       <ServiceInfoDialog
