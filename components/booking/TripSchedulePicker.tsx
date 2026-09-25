@@ -3,6 +3,7 @@
 // thêm ngày + giờ về. Mỗi dòng (ngày đi / giờ đi / ngày về / giờ về) là 1 dải cuộn ngang riêng: ngày hiện
 // 3 ô rồi cuộn tiếp, giờ hiện ~5 mốc rồi cuộn tiếp. Trạng thái đang chọn dùng tông tím NHẠT (viền + nền
 // lavender, chữ tím) thay vì tím đặc, để tránh nặng màu khi nhiều dòng chọn cùng lúc trên 1 màn.
+// allowRoundTrip=false (Xe ghép): ẩn hẳn lựa chọn khứ hồi, chỉ còn ngày giờ đi.
 import React from 'react';
 import { View, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
@@ -17,9 +18,11 @@ interface Props {
   /** danh sách ngày cho chiều về (phạm vi có thể xa hơn chiều đi); mặc định dùng chung dateOptions nếu không truyền */
   returnDateOptions?: DateOption[];
   timeChoices?: string[];
+  /** false (Xe ghép): ẩn lựa chọn khứ hồi, chỉ còn ngày giờ đi. Mặc định true (Thuê cả xe). */
+  allowRoundTrip?: boolean;
 }
 
-export const TripSchedulePicker: React.FC<Props> = ({ value, onChange, dateOptions, returnDateOptions, timeChoices = DEPART_TIME_CHOICES }) => {
+export const TripSchedulePicker: React.FC<Props> = ({ value, onChange, dateOptions, returnDateOptions, timeChoices = DEPART_TIME_CHOICES, allowRoundTrip = true }) => {
   const returnOptions = (returnDateOptions ?? dateOptions).filter((d) => d.key >= value.departDateKey);
   // Hiện đúng 3 ô ngày/màn hình rồi cuộn ngang cho các ngày còn lại
   const { width: winWidth } = useWindowDimensions();
@@ -28,31 +31,35 @@ export const TripSchedulePicker: React.FC<Props> = ({ value, onChange, dateOptio
   return (
     <View style={styles.card}>
       <AppText size={15} weight="bold" style={styles.title}>
-        Lịch trình
+        {allowRoundTrip ? 'Lịch trình' : 'Ngày giờ đi'}
       </AppText>
 
-      <View style={styles.tripTypeRow}>
-        <Pressable
-          onPress={() => onChange({ tripType: 'oneway' })}
-          style={[styles.tripTypeBtn, value.tripType === 'oneway' && styles.tripTypeBtnActive]}
-        >
-          <AppText size={14} weight="bold" color={value.tripType === 'oneway' ? Colors.primary : Colors.textSecondary}>
-            Chỉ chiều đi
-          </AppText>
-        </Pressable>
-        <Pressable
-          onPress={() => onChange({ tripType: 'roundtrip', returnDateKey: value.returnDateKey < value.departDateKey ? value.departDateKey : value.returnDateKey })}
-          style={[styles.tripTypeBtn, value.tripType === 'roundtrip' && styles.tripTypeBtnActive]}
-        >
-          <AppText size={14} weight="bold" color={value.tripType === 'roundtrip' ? Colors.primary : Colors.textSecondary}>
-            Khứ hồi (đi &amp; về)
-          </AppText>
-        </Pressable>
-      </View>
+      {allowRoundTrip ? (
+        <>
+          <View style={styles.tripTypeRow}>
+            <Pressable
+              onPress={() => onChange({ tripType: 'oneway' })}
+              style={[styles.tripTypeBtn, value.tripType === 'oneway' && styles.tripTypeBtnActive]}
+            >
+              <AppText size={14} weight="bold" color={value.tripType === 'oneway' ? Colors.primary : Colors.textSecondary}>
+                Chỉ chiều đi
+              </AppText>
+            </Pressable>
+            <Pressable
+              onPress={() => onChange({ tripType: 'roundtrip', returnDateKey: value.returnDateKey < value.departDateKey ? value.departDateKey : value.returnDateKey })}
+              style={[styles.tripTypeBtn, value.tripType === 'roundtrip' && styles.tripTypeBtnActive]}
+            >
+              <AppText size={14} weight="bold" color={value.tripType === 'roundtrip' ? Colors.primary : Colors.textSecondary}>
+                Khứ hồi (đi &amp; về)
+              </AppText>
+            </Pressable>
+          </View>
 
-      <AppText size={13} weight="semiBold" color={Colors.textSecondary} style={styles.subLabel}>
-        Ngày giờ đi
-      </AppText>
+          <AppText size={13} weight="semiBold" color={Colors.textSecondary} style={styles.subLabel}>
+            Ngày giờ đi
+          </AppText>
+        </>
+      ) : null}
       <DateStrip
         options={dateOptions}
         value={value.departDateKey}
@@ -61,7 +68,7 @@ export const TripSchedulePicker: React.FC<Props> = ({ value, onChange, dateOptio
       />
       <TimeChips choices={timeChoices} value={value.departTime} onChange={(t) => onChange({ departTime: t })} />
 
-      {value.tripType === 'roundtrip' ? (
+      {allowRoundTrip && value.tripType === 'roundtrip' ? (
         <>
           <AppText size={13} weight="semiBold" color={Colors.textSecondary} style={styles.subLabel}>
             Ngày giờ về

@@ -83,12 +83,6 @@ export default function CarpoolTrackingScreen() {
             TP. Hồ Chí Minh → {req.destinationLabel} · {req.departLabel}
           </AppText>
         </View>
-        {req.returnLabel ? (
-          <AppText size={12} color={Colors.primary} weight="semiBold" style={{ marginBottom: Spacing.xs }}>
-            Khứ hồi · về lúc {req.returnLabel} · {req.schedule.waitForReturn ? 'xe ở lại phục vụ' : 'xe không ở lại'}
-          </AppText>
-        ) : null}
-
         {req.status === 'searching' ? (
           <View style={styles.searchingCard}>
             <ActivityIndicator color={Colors.primary} size="large" />
@@ -130,9 +124,6 @@ export default function CarpoolTrackingScreen() {
                 <Row label="Khởi hành dự kiến" value={req.matchedListing.departTime} />
                 <Row label="Giá mỗi chỗ" value={req.matchedListing.priceLabel} />
                 <Row label="Đón / trả" value={req.dropoffPref === 'home' ? 'Tận nơi' : 'Bến xe / điểm hẹn gần nhất'} />
-                {req.schedule.tripType === 'roundtrip' ? (
-                  <Row label="Phục vụ suốt hành trình" value={req.schedule.waitForReturn ? 'Có, xe ở lại' : 'Không'} />
-                ) : null}
                 <Row label="Hàng hoá đi kèm" value={req.hasCargo ? req.cargoNote || 'Có' : 'Không'} />
                 <View style={styles.amenityWrap}>
                   {req.matchedListing.amenities.map((a) => (

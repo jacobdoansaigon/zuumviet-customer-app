@@ -1,7 +1,7 @@
-// app/booking/intercity/carpool-request.tsx — "Xe ghép": khách chọn số chỗ, lịch trình (một chiều mặc định,
-// khởi hành 6:00 sáng, hoặc khứ hồi có ngày giờ về), hàng hoá, yêu cầu đón/trả tận nơi hay ra bến gần rồi GỬI
-// YÊU CẦU (chưa thấy xe/tài xế cụ thể). Tài xế xe ghép đang chạy tuyến này "nhận cuốc" (mô phỏng ở màn
-// carpool-tracking) rồi mới gửi chi tiết xe cho khách.
+// app/booking/intercity/carpool-request.tsx — "Xe ghép": khách chọn số chỗ, ngày giờ đi (mặc định 6:00
+// sáng), hàng hoá, yêu cầu đón/trả tận nơi hay ra bến gần rồi GỬI YÊU CẦU (chưa thấy xe/tài xế cụ thể). Tài
+// xế xe ghép đang chạy tuyến này "nhận cuốc" (mô phỏng ở màn carpool-tracking) rồi mới gửi chi tiết xe cho
+// khách. Không có lựa chọn khứ hồi — xe ghép chỉ chở 1 chiều theo từng cuốc.
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -11,10 +11,8 @@ import { buildDateOptions, suggestNearestCity } from '@/constants/mockIntercity'
 import { TripSchedulePicker } from '@/components/booking';
 import { useCarpoolDraft, setSeatCount, setCarpoolSchedule, setCarpoolCargo, setDropoffPref, submitCarpoolRequest } from '@/services/carpoolRequestStore';
 
-// Ngày đi: 3 ô hiện sẵn + cuộn ngang cho 10 ngày còn lại (13 ngày). Ngày về: 3 ô hiện sẵn + cuộn ngang cho
-// 20 ngày còn lại (23 ngày) — dài hơn vì chuyến về có thể chọn xa hơn chuyến đi.
+// Ngày đi: 3 ô hiện sẵn + cuộn ngang cho 10 ngày còn lại (13 ngày).
 const DATE_OPTIONS = buildDateOptions(13);
-const RETURN_DATE_OPTIONS = buildDateOptions(23);
 
 export default function CarpoolRequestScreen() {
   const { cityId, cityName, destinationLabel } = useLocalSearchParams<{ cityId?: string; cityName?: string; destinationLabel?: string }>();
@@ -74,7 +72,7 @@ export default function CarpoolRequestScreen() {
         </View>
 
         <View style={styles.scheduleWrap}>
-          <TripSchedulePicker value={draft.schedule} onChange={setCarpoolSchedule} dateOptions={DATE_OPTIONS} returnDateOptions={RETURN_DATE_OPTIONS} />
+          <TripSchedulePicker value={draft.schedule} onChange={setCarpoolSchedule} dateOptions={DATE_OPTIONS} allowRoundTrip={false} />
         </View>
 
         <AppText size={15} weight="bold" style={styles.sectionTitle}>
