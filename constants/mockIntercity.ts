@@ -274,6 +274,49 @@ export function carpoolsForCity(cityId: string): CarpoolListing[] {
 }
 
 /* ------------------------------------------------------------------ */
+/* Giá dự kiến cho Xe ghép (đặt yêu cầu — chưa có tài xế cụ thể)       */
+/* ------------------------------------------------------------------ */
+
+/** Phụ thu đón/trả tận nơi (thay vì ra bến xe/điểm hẹn chung) */
+export const CARPOOL_HOME_DROPOFF_FEE = 20000;
+/** Phụ thu gửi thêm hàng hoá */
+export const CARPOOL_CARGO_FEE = 30000;
+
+/** Giá tham khảo mỗi chỗ cho 1 thành phố — trung bình giá các tài xế đang chạy tuyến này (mock);
+ * chưa có tài xế nào thì ước lượng theo khoảng cách để vẫn có con số hiển thị. */
+export function estimatedCarpoolSeatPrice(cityId: string): number {
+  const listings = carpoolsForCity(cityId);
+  if (listings.length) {
+    const avg = listings.reduce((sum, l) => sum + l.pricePerSeat, 0) / listings.length;
+    return Math.round(avg / 5000) * 5000;
+  }
+  const city = INTERCITY_CITIES.find((c) => c.id === cityId);
+  return city ? Math.max(80000, Math.round((city.distanceKm * 900) / 5000) * 5000) : 150000;
+}
+
+interface CarpoolEstimateInput {
+  seatCount: number;
+  dropoffPref: 'home' | 'station';
+  hasCargo: boolean;
+}
+
+export interface CarpoolEstimate {
+  unitPrice: number;
+  dropoffFee: number;
+  cargoFee: number;
+  total: number;
+}
+
+/** Giá dự kiến hiển thị khi khách điền yêu cầu xe ghép — tài xế nhận cuốc sẽ báo giá chính thức. */
+export function estimateCarpoolPrice(cityId: string, input: CarpoolEstimateInput): CarpoolEstimate {
+  const unitPrice = estimatedCarpoolSeatPrice(cityId);
+  const dropoffFee = input.dropoffPref === 'home' ? CARPOOL_HOME_DROPOFF_FEE : 0;
+  const cargoFee = input.hasCargo ? CARPOOL_CARGO_FEE : 0;
+  const total = unitPrice * Math.max(1, input.seatCount) + dropoffFee + cargoFee;
+  return { unitPrice, dropoffFee, cargoFee, total };
+}
+
+/* ------------------------------------------------------------------ */
 /* 2) Mua vé xe — nhà xe chạy nhiều chuyến/ngày, mỗi chuyến 1 sơ đồ ghế */
 /* ------------------------------------------------------------------ */
 

@@ -4,7 +4,15 @@
 // chi tiết xe/tài xế cho khách — khác với Mua vé xe (duyệt sẵn từng chuyến, chọn ghế ngay). Tách riêng khỏi
 // services/intercityTicketStore.ts (bán vé theo chuyến cố định của nhà xe).
 import { useSyncExternalStore } from 'react';
-import { buildDateOptions, carpoolsForCity, defaultTripSchedule, formatDateOptionLabel, type CarpoolListing, type TripScheduleValue } from '@/constants/mockIntercity';
+import {
+  buildDateOptions,
+  carpoolsForCity,
+  defaultTripSchedule,
+  estimateCarpoolPrice,
+  formatDateOptionLabel,
+  type CarpoolListing,
+  type TripScheduleValue,
+} from '@/constants/mockIntercity';
 import { getContact } from '@/services/intercityTicketStore';
 
 export type CarpoolRequestStatus = 'searching' | 'matched' | 'cancelled';
@@ -24,6 +32,9 @@ export interface CarpoolRequest {
   hasCargo: boolean;
   cargoNote: string;
   dropoffPref: DropoffPref;
+  /** Giá dự kiến lúc gửi yêu cầu (tài xế nhận cuốc sẽ báo giá chính thức) */
+  unitPrice: number;
+  estimatedTotal: number;
   contactName: string;
   contactPhone: string;
   status: CarpoolRequestStatus;
@@ -92,6 +103,7 @@ const uid = () => `cq-${Date.now().toString(36)}${Math.random().toString(36).sli
 export async function submitCarpoolRequest(cityId: string, cityName: string, destinationLabel: string): Promise<CarpoolRequest> {
   const contact = await getContact();
   const schedule = draft.schedule;
+  const estimate = estimateCarpoolPrice(cityId, { seatCount: draft.seatCount, dropoffPref: draft.dropoffPref, hasCargo: draft.hasCargo });
   const req: CarpoolRequest = {
     id: uid(),
     cityId,
@@ -104,6 +116,8 @@ export async function submitCarpoolRequest(cityId: string, cityName: string, des
     hasCargo: draft.hasCargo,
     cargoNote: draft.cargoNote,
     dropoffPref: draft.dropoffPref,
+    unitPrice: estimate.unitPrice,
+    estimatedTotal: estimate.total,
     contactName: contact.name,
     contactPhone: contact.phone,
     status: 'searching',

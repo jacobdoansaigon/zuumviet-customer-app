@@ -7,7 +7,7 @@ import { View, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Button, Icon, Icons, Radio, Screen, Stepper, SwitchRow, TextField } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { buildDateOptions, suggestNearestCity } from '@/constants/mockIntercity';
+import { buildDateOptions, estimateCarpoolPrice, suggestNearestCity } from '@/constants/mockIntercity';
 import { TripSchedulePicker } from '@/components/booking';
 import { useCarpoolDraft, setSeatCount, setCarpoolSchedule, setCarpoolCargo, setDropoffPref, submitCarpoolRequest } from '@/services/carpoolRequestStore';
 
@@ -25,6 +25,8 @@ export default function CarpoolRequestScreen() {
   const finalCityId = cityId ?? fallback!.id;
   const finalCityName = cityName ?? fallback!.name;
   const finalDestLabel = destinationLabel || finalCityName;
+  // Giá dự kiến — cập nhật ngay khi khách đổi số chỗ / đón trả / hàng hoá, để thấy rõ chênh lệch giữa các tuỳ chọn
+  const estimate = estimateCarpoolPrice(finalCityId, { seatCount: draft.seatCount, dropoffPref: draft.dropoffPref, hasCargo: draft.hasCargo });
 
   const submit = async () => {
     if (sending) return;
@@ -42,7 +44,7 @@ export default function CarpoolRequestScreen() {
     <Screen
       header={<AppHeader title="Xe ghép" variant="dark" left="back" />}
       scroll
-      footer={<Button title="Tìm xe ghép" loading={sending} onPress={() => void submit()} />}
+      footer={<Button title={`Tìm xe ghép · đ${estimate.total.toLocaleString('vi-VN')}`} loading={sending} onPress={() => void submit()} />}
     >
       <View style={styles.body}>
         <View style={styles.routeRow}>
@@ -111,13 +113,40 @@ export default function CarpoolRequestScreen() {
           />
         ) : null}
 
-        <AppText size={11} color={Colors.textDisabled} align="center" style={{ marginTop: Spacing.lg }}>
-          Giá xe ghép sẽ được tài xế báo khi nhận cuốc (dữ liệu mẫu, demo)
+        <AppText size={15} weight="bold" style={styles.sectionTitle}>
+          Giá dự kiến
+        </AppText>
+        <View style={styles.priceCard}>
+          <PriceRow label={`Giá mỗi chỗ × ${draft.seatCount}`} value={`đ${(estimate.unitPrice * draft.seatCount).toLocaleString('vi-VN')}`} />
+          {estimate.dropoffFee > 0 ? <PriceRow label="Phụ thu đón/trả tận nơi" value={`đ${estimate.dropoffFee.toLocaleString('vi-VN')}`} /> : null}
+          {estimate.cargoFee > 0 ? <PriceRow label="Phụ thu hàng hoá" value={`đ${estimate.cargoFee.toLocaleString('vi-VN')}`} /> : null}
+          <View style={styles.totalRow}>
+            <AppText size={15} weight="bold">
+              Tổng dự kiến
+            </AppText>
+            <AppText size={20} weight="extraBold" color={Colors.primary}>
+              đ{estimate.total.toLocaleString('vi-VN')}
+            </AppText>
+          </View>
+        </View>
+        <AppText size={11} color={Colors.textDisabled} align="center" style={{ marginTop: Spacing.sm }}>
+          Giá dự kiến — tài xế nhận cuốc sẽ báo giá chính thức (dữ liệu mẫu, demo)
         </AppText>
       </View>
     </Screen>
   );
 }
+
+const PriceRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <View style={styles.priceRow}>
+    <AppText size={13} color={Colors.textSecondary}>
+      {label}
+    </AppText>
+    <AppText size={13} weight="semiBold" color={Colors.text}>
+      {value}
+    </AppText>
+  </View>
+);
 
 const styles = StyleSheet.create({
   body: { padding: Spacing.screen, gap: Spacing.xs },
@@ -137,4 +166,22 @@ const styles = StyleSheet.create({
   choiceGroup: { gap: 2 },
   choiceRow: { paddingVertical: Spacing.sm },
   choiceSub: { marginLeft: 34, marginTop: -6, marginBottom: 4 },
+  priceCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+    gap: Spacing.sm,
+    ...Shadow.sm,
+  },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.xs,
+    paddingTop: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
 });

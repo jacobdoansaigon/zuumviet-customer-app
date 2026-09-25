@@ -92,6 +92,12 @@ export default function CarpoolTrackingScreen() {
             <AppText size={13} color={Colors.textSecondary} align="center" style={{ marginTop: 4 }}>
               Yêu cầu {req.seatCount} chỗ của bạn đã được gửi tới các tài xế đang chạy tuyến này. Vui lòng chờ trong giây lát.
             </AppText>
+            <AppText size={22} weight="extraBold" color={Colors.primary} style={{ marginTop: Spacing.md }}>
+              đ{req.estimatedTotal.toLocaleString('vi-VN')}
+            </AppText>
+            <AppText size={12} color={Colors.textSecondary}>
+              Giá dự kiến — tài xế nhận cuốc sẽ báo giá chính thức
+            </AppText>
           </View>
         ) : (
           <>
@@ -119,7 +125,7 @@ export default function CarpoolTrackingScreen() {
                       </AppText>
                     </View>
                   </View>
-                  <Button title="Gọi" size="sm" variant="teal" onPress={() => call(req.matchedListing?.driverPhone)} />
+                  <Button title="Gọi" size="sm" variant="teal" fullWidth={false} onPress={() => call(req.matchedListing?.driverPhone)} />
                 </View>
                 <Row label="Khởi hành dự kiến" value={req.matchedListing.departTime} />
                 <Row label="Giá mỗi chỗ" value={req.matchedListing.priceLabel} />
