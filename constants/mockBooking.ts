@@ -2,8 +2,6 @@
 // BE hiện chưa có API cho: bảng dịch vụ + giá hiển thị, địa điểm gợi ý, vị trí đã lưu,
 // mã ưu đãi, tài xế yêu thích, danh bạ → toàn bộ mock nằm ở đây (đánh dấu rõ ràng để thay sau).
 import { Icons, type IconName } from '@/components/ui/Icon';
-import { INTERCITY_TRIPS, type IntercityTrip } from './mockIntercity';
-
 export * from './mockIntercity';
 
 export type ServiceKey = 'delivery' | 'transport' | 'rental' | 'bike' | 'car' | 'car6' | 'intercity' | 'driver' | 'handyman' | 'labor';
@@ -215,22 +213,6 @@ const SIX_SEAT_OPTIONS: ServiceOptionDef[] = [
     infoLines: ['Trọn gói 15km đầu: đ250.000', 'Vượt km: đ10.000/km', 'Đã gồm phí ra vào sân bay', 'Chờ tối đa 30 phút sau giờ hạ cánh', VAT_LINE],
   },
 ];
-
-/** Mỗi chuyến ghép (constants/mockIntercity.ts) → 1 ServiceOptionDef tĩnh để dùng chung máy tính giá/đặt đơn */
-function tripOption(t: IntercityTrip): ServiceOptionDef {
-  return {
-    id: t.id,
-    serviceId: 90,
-    name: `${t.vehicle} · ${t.departTime}`,
-    description: `${t.note} · còn ${t.seatsLeft} chỗ`,
-    basePrice: t.pricePerSeat,
-    includedKm: 9999, // giá mỗi chỗ cố định, không tính thêm theo km
-    perKmPrice: 0,
-    extraStopPrice: 0,
-    icon: t.icon,
-    infoLines: [`Giá mỗi chỗ: ${t.priceLabel}`, `Khởi hành lúc ${t.departTime}`, `Còn ${t.seatsLeft} chỗ trống`, t.note, VAT_LINE],
-  };
-}
 
 export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
   delivery: {
@@ -527,10 +509,10 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
     kind: 'ride',
     labels: RIDE_LABELS,
     maxStops: 1,
-    // Chuyến ghép theo tuyến (xem constants/mockIntercity.ts) đứng trước — màn đặt lọc theo thành phố khách
-    // chọn làm điểm đến; 3 gói xe riêng luôn có sẵn bên dưới cho khách không muốn ghép hoặc đi nơi khác.
+    // 3 gói dưới đây là "đặt xe riêng, trọn chuyến" (giữ máy tính giá theo khoảng cách sẵn có).
+    // Xe ghép & Mua vé xe (chọn ghế theo từng chuyến của tài xế/nhà xe) nằm ở màn riêng
+    // app/booking/intercity/[cityId].tsx (xem constants/mockIntercity.ts) — không đi qua danh sách này.
     options: [
-      ...INTERCITY_TRIPS.map(tripOption),
       {
         id: 'duong-dai-4-cho',
         serviceId: 57,
