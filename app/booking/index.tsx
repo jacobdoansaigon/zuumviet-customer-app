@@ -1,12 +1,14 @@
 // app/booking/index.tsx — GH 1.1 / VT 1.1: bản đồ toàn màn + bottom sheet chọn dịch vụ (Siêu tốc / Siêu rẻ / Đồng giá 25k)
 // + lộ trình (người gửi → các điểm giao) → "Xác nhận". Param: service=delivery|transport|rental
+// Xe máy / Xe hơi: có thêm tab đổi dịch vụ ngay trong màn (giữ nguyên điểm đón/điểm đến), danh sách gói
+// bên dưới luôn hiển thị đủ các gói của dịch vụ đang chọn (vd Xe hơi: 4 chỗ / 6 chỗ / Xe cao cấp).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { AppText, Icon, Icons, ServiceOption } from '@/components/ui';
+import { AppText, Chip, Icon, Icons, ServiceOption } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { SERVICE_GROUPS, URBAN_RIDE_KEYS, toServiceKey, type ServiceKey, type ServiceOptionDef } from '@/constants/mockBooking';
+import { SERVICE_GROUPS, URBAN_RIDE_KEYS, toServiceKey, type ServiceOptionDef } from '@/constants/mockBooking';
 import {
   useBooking,
   startBooking,
@@ -23,9 +25,6 @@ import {
 } from '@/services/bookingStore';
 import { BookingMap, RoundIconButton, StopList, ServiceInfoDialog, FlatFooter, useCurrentLocation, type MapStop } from '@/components/booking';
 
-/** Option kèm nhóm dịch vụ gốc — cần khi các nhóm gộp chung 1 danh sách (Xe máy ⇄ Xe hơi) */
-type RideOption = ServiceOptionDef & { groupKey: ServiceKey };
-
 export default function BookingScreen() {
   const { service, from, to } = useLocalSearchParams<{ service?: string; from?: string; to?: string }>();
   const serviceKey = toServiceKey(service);
@@ -34,7 +33,7 @@ export default function BookingScreen() {
   const { height } = useWindowDimensions();
   const location = useCurrentLocation();
   const [expanded, setExpanded] = useState(false);
-  const [info, setInfo] = useState<RideOption | null>(null);
+  const [info, setInfo] = useState<ServiceOptionDef | null>(null);
   const [sheetH, setSheetH] = useState(0);
 
   useEffect(() => {
@@ -60,13 +59,14 @@ export default function BookingScreen() {
 
   const group = SERVICE_GROUPS[state.service];
   const labels = group.labels;
-  // Xe máy và Xe hơi dùng chung 1 danh sách để đổi qua lại không cần thoát ra (xem URBAN_RIDE_KEYS)
-  const mergedKeys = URBAN_RIDE_KEYS.includes(state.service) ? URBAN_RIDE_KEYS : [state.service];
-  const options: RideOption[] = mergedKeys.flatMap((k) => SERVICE_GROUPS[k].options.map((o) => ({ ...o, groupKey: k })));
+  const options = group.options;
   const selected = options.find((o) => o.id === state.optionId) ?? options[0]!;
   const complete = state.receivers.filter(isReceiverComplete);
   const senderReady = !!state.sender.place && !!state.sender.name && !!state.sender.phone;
   const canConfirm = senderReady && (group.maxStops === 0 || complete.length > 0);
+
+  // Xe máy ⇄ Xe hơi: tab đổi dịch vụ ngay trong màn, giữ nguyên điểm đón/điểm đến (xem URBAN_RIDE_KEYS)
+  const tabKeys = URBAN_RIDE_KEYS.includes(state.service) ? URBAN_RIDE_KEYS : null;
 
   const stops = useMemo<MapStop[]>(() => {
     const list: MapStop[] = [];
@@ -85,12 +85,17 @@ export default function BookingScreen() {
     const index = addReceiver();
     router.push({ pathname: '/booking/location', params: { target: 'receiver', index: String(index) } });
   };
-  const onOptionPress = (o: RideOption) => {
+  const onTabPress = (key: (typeof URBAN_RIDE_KEYS)[number]) => {
+    if (key === state.service) return;
+    switchRideOption(key, SERVICE_GROUPS[key].options[0]!.id);
+    setExpanded(false);
+  };
+  const onOptionPress = (o: ServiceOptionDef) => {
     if (!expanded) {
       setExpanded(true);
       return;
     }
-    switchRideOption(o.groupKey, o.id);
+    switchRideOption(state.service, o.id);
     setExpanded(false);
   };
 
@@ -106,6 +111,14 @@ export default function BookingScreen() {
             {expanded ? 'Thu gọn' : 'Tất cả dịch vụ'}
           </AppText>
         </Pressable>
+
+        {tabKeys ? (
+          <View style={styles.tabs}>
+            {tabKeys.map((k) => (
+              <Chip key={k} label={SERVICE_GROUPS[k].title} icon={SERVICE_GROUPS[k].icon} active={k === state.service} onPress={() => onTabPress(k)} style={styles.tab} />
+            ))}
+          </View>
+        ) : null}
 
         <ScrollView style={{ maxHeight: height * 0.58 }} contentContainerStyle={{ paddingBottom: Spacing.sm }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.options}>
@@ -142,7 +155,7 @@ export default function BookingScreen() {
         option={info}
         onClose={() => setInfo(null)}
         onSelect={(o) => {
-          switchRideOption((o as RideOption).groupKey, o.id);
+          switchRideOption(state.service, o.id);
           setInfo(null);
           setExpanded(false);
         }}
@@ -165,6 +178,8 @@ const styles = StyleSheet.create({
     ...Shadow.lg,
   },
   handle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.sm },
+  tabs: { flexDirection: 'row', gap: Spacing.sm, paddingHorizontal: Spacing.screen, paddingBottom: Spacing.sm },
+  tab: { flex: 1, justifyContent: 'center' },
   options: { paddingHorizontal: Spacing.screen, gap: 4 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginHorizontal: Spacing.screen, marginVertical: Spacing.xs },
 });

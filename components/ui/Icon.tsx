@@ -161,6 +161,7 @@ export const Icons = {
   carSide: 'mci:car-side' as IconName,
   vanPassenger: 'mci:van-passenger' as IconName,
   hardHat: 'mci:account-hard-hat' as IconName,
+  luxuryCar: 'mci:car-limousine' as IconName,
   steering: 'mci:steering' as IconName,
   tools: 'mci:tools' as IconName,
 };
