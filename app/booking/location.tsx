@@ -74,6 +74,15 @@ export default function LocationScreen() {
     <Screen
       header={<AppHeader variant="dark" title={isReceiver ? labels.receiverLocationTitle : labels.senderLocationTitle} left="close" />}
       keyboardAvoiding={false}
+      footer={
+        <Pressable onPress={openMapPicker} style={styles.mapFooterRow}>
+          <Icon name={Icons.map} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
+          <AppText size={16} weight="bold" color={Colors.primary} style={{ flex: 1 }}>
+            Chọn trên bản đồ
+          </AppText>
+          <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
+        </Pressable>
+      }
     >
       <View style={styles.searchWrap}>
         <View style={styles.searchBox}>
@@ -155,15 +164,6 @@ export default function LocationScreen() {
             </Pressable>
           </Pressable>
         )}
-        ListFooterComponent={
-          <Pressable onPress={openMapPicker} style={[styles.row, { borderBottomWidth: 0 }]}>
-            <Icon name={Icons.map} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
-            <AppText size={16} weight="bold" color={Colors.primary} style={{ flex: 1 }}>
-              Chọn trên bản đồ
-            </AppText>
-            <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
-          </Pressable>
-        }
       />
     </Screen>
   );
@@ -189,5 +189,12 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
+  },
+  mapFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
   },
 });
