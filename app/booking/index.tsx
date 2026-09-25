@@ -64,7 +64,9 @@ export default function BookingScreen() {
   const labels = group.labels;
   const complete = state.receivers.filter(isReceiverComplete);
   const senderReady = !!state.sender.place && !!state.sender.name && !!state.sender.phone;
-  const canConfirm = senderReady && (group.maxStops === 0 || complete.length > 0);
+  // Gọi thợ / thuê nhân công (maxStops=0) không có điểm đến riêng → tính giá được ngay; còn lại cần chọn xong điểm đến.
+  const hasDestination = group.maxStops === 0 || complete.length > 0;
+  const canConfirm = senderReady && hasDestination;
 
   // Xe máy ⇄ Xe hơi: tab đổi dịch vụ ngay trong màn, giữ nguyên điểm đón/điểm đến (xem URBAN_RIDE_KEYS)
   const tabKeys = URBAN_RIDE_KEYS.includes(state.service) ? URBAN_RIDE_KEYS : null;
@@ -130,7 +132,8 @@ export default function BookingScreen() {
                 key={o.id}
                 name={o.name}
                 description={o.description}
-                price={formatVnd(computePrice(state, o.id).total)}
+                price={hasDestination ? formatVnd(computePrice(state, o.id).total) : undefined}
+                priceHint={hasDestination ? undefined : 'Chọn điểm đến'}
                 icon={o.icon}
                 selected={o.id === selected.id}
                 onPress={() => onOptionPress(o)}

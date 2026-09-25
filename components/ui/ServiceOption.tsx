@@ -9,6 +9,8 @@ interface ServiceOptionProps {
   name: string;
   description?: string;
   price?: string;
+  /** hiện thay cho price khi chưa đủ thông tin để tính giá (vd chưa chọn điểm đến) */
+  priceHint?: string;
   icon?: IconName;
   selected?: boolean;
   onPress?: () => void;
@@ -16,7 +18,7 @@ interface ServiceOptionProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export const ServiceOption: React.FC<ServiceOptionProps> = ({ name, description, price, icon = Icons.scooter, selected, onPress, onInfoPress, style }) => (
+export const ServiceOption: React.FC<ServiceOptionProps> = ({ name, description, price, priceHint, icon = Icons.scooter, selected, onPress, onInfoPress, style }) => (
   <Pressable onPress={onPress} style={[styles.row, selected && styles.rowSelected, style]}>
     <View style={styles.iconWrap}>
       <Icon name={icon} size={30} color={Colors.primary} />
@@ -42,6 +44,10 @@ export const ServiceOption: React.FC<ServiceOptionProps> = ({ name, description,
       <AppText weight="bold" size={17} color={Colors.primary}>
         {price}
       </AppText>
+    ) : priceHint ? (
+      <AppText size={12} color={Colors.textMuted} align="right" style={styles.priceHint}>
+        {priceHint}
+      </AppText>
     ) : null}
   </Pressable>
 );
@@ -59,6 +65,7 @@ const styles = StyleSheet.create({
   rowSelected: { backgroundColor: Colors.primaryBg, borderColor: Colors.primarySoft },
   iconWrap: { width: 44, alignItems: 'center', marginRight: Spacing.sm },
   nameRow: { flexDirection: 'row', alignItems: 'center' },
+  priceHint: { maxWidth: 84 },
 });
 
 export default ServiceOption;
