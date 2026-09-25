@@ -75,6 +75,8 @@ export interface BookingOptions {
   paymentMethod: PaymentMethod;
   /** Thuê nhân công: số block thời gian làm việc đã chọn cho hạng mục đang chọn (xem ServiceOptionDef.blockHours) */
   laborBlocks: number;
+  /** Thuê nhân công: số nhân công đã chọn (từ người thứ 2 giảm EXTRA_PRICES.laborGroupDiscountPercent) */
+  laborWorkers: number;
   /** Dọn nhà: tầng của nhà/căn hộ CŨ (điểm đi) — 0 = tầng trệt; có thang máy hay không (đủ tầng thì miễn phí) */
   movingFloorFrom: number;
   movingElevatorFrom: boolean;
@@ -86,6 +88,12 @@ export interface BookingOptions {
   movingDisassembly: boolean;
   /** Dọn nhà: id các đồ đặc biệt cần báo trước cho đội bốc xếp (xem MOVING_BULKY_ITEMS) */
   movingBulkyItems: string[];
+  /** Gọi thợ: mô tả sự cố cần sửa — hỏi ngay từ màn Thông tin liên hệ, không đợi tới bước Ghi chú cuối cùng */
+  handymanIssueNote: string;
+  /** Gọi thợ: ảnh hiện trạng đính kèm (uri cục bộ trên máy — BE chưa có API upload ảnh, xem buildOrderPayload) */
+  handymanPhotos: string[];
+  /** Gọi thợ: xử lý khẩn cấp, ưu tiên điều thợ ngay kể cả ngoài giờ (tính thêm EXTRA_PRICES.urgentCallout) */
+  handymanUrgent: boolean;
 }
 
 export type StopStatus = 'new' | 'picking' | 'picked' | 'delivering' | 'completed' | 'failed' | 'returned';
@@ -169,6 +177,7 @@ const defaultOptions = (): BookingOptions => ({
   promo: null,
   paymentMethod: 'cash',
   laborBlocks: 1,
+  laborWorkers: 1,
   movingFloorFrom: 0,
   movingElevatorFrom: false,
   movingFloorTo: 0,
@@ -176,6 +185,9 @@ const defaultOptions = (): BookingOptions => ({
   movingPacking: false,
   movingDisassembly: false,
   movingBulkyItems: [],
+  handymanIssueNote: '',
+  handymanPhotos: [],
+  handymanUrgent: false,
 });
 
 const emptyReceiver = (): Receiver => ({
@@ -250,12 +262,16 @@ export function switchRideOption(service: ServiceKey, optionId: string) {
 }
 
 /**
- * Thuê nhân công: chọn hạng mục kèm số block thời gian làm việc (vd 2 block × 4 giờ = 8 giờ) — xem
- * ServiceOptionDef.blockHours/maxBlocks. Dùng khi xác nhận từ dialog "Thông tin dịch vụ" thay vì
- * switchRideOption() vì cần lưu thêm số block đã chọn.
+ * Thuê nhân công: chọn hạng mục kèm số block thời gian làm việc (vd 2 block × 4 giờ = 8 giờ) và số
+ * nhân công (xem ServiceOptionDef.blockHours/maxBlocks/maxWorkers). Dùng khi xác nhận từ dialog
+ * "Thông tin dịch vụ" thay vì switchRideOption() vì cần lưu thêm 2 lựa chọn này.
  */
-export function selectLaborOption(service: ServiceKey, optionId: string, blocks: number) {
-  update((s) => ({ service, optionId, options: { ...s.options, laborBlocks: Math.max(1, Math.round(blocks) || 1) } }));
+export function selectLaborOption(service: ServiceKey, optionId: string, blocks: number, workers: number = 1) {
+  update((s) => ({
+    service,
+    optionId,
+    options: { ...s.options, laborBlocks: Math.max(1, Math.round(blocks) || 1), laborWorkers: Math.max(1, Math.round(workers) || 1) },
+  }));
 }
 
 /** Điền tên/SĐT người gửi từ hồ sơ đã đăng nhập (chỉ khi còn trống) */
@@ -405,9 +421,23 @@ export function computePrice(s: BookingState = state, optionId?: string): PriceS
   const lines: PriceLine[] = [{ label: SERVICE_GROUPS[s.service].labels.feeLabel, amount: base }];
   // Thuê nhân công: thời gian làm việc chọn theo block (opt.blockHours) — chỉ áp giá nhiều block cho
   // ĐÚNG hạng mục đang được chọn; các hạng mục khác trong danh sách vẫn xem giá khởi điểm (1 block).
-  const laborBlocks = s.service === 'labor' && id === s.optionId ? Math.max(1, s.options.laborBlocks || 1) : 1;
+  const isSelectedLabor = s.service === 'labor' && id === s.optionId;
+  const laborBlocks = isSelectedLabor ? Math.max(1, s.options.laborBlocks || 1) : 1;
   if (laborBlocks > 1) {
     lines.push({ label: `Thêm ${laborBlocks - 1} block (${(laborBlocks - 1) * (opt.blockHours ?? 0)} giờ)`, amount: base * (laborBlocks - 1) });
+  }
+  // Thuê nhân công: mỗi nhân công thêm từ người thứ 2 làm đủ số block như người đầu, được giảm giá
+  // (đúng lời hứa "Nhóm từ 2 người: giảm X%/người" đã ghi sẵn ở infoLines từng hạng mục).
+  const laborWorkers = isSelectedLabor ? Math.max(1, s.options.laborWorkers || 1) : 1;
+  if (laborWorkers > 1) {
+    const perWorker = base * laborBlocks;
+    const extraWorkers = laborWorkers - 1;
+    const discounted = Math.round(perWorker * (1 - EXTRA_PRICES.laborGroupDiscountPercent / 100));
+    lines.push({ label: `Thêm ${extraWorkers} nhân công (giảm ${EXTRA_PRICES.laborGroupDiscountPercent}%/người)`, amount: discounted * extraWorkers });
+  }
+  // Gọi thợ: phụ phí xử lý khẩn cấp, công khai ngay khi khách chọn (không phát sinh ẩn sau khảo sát)
+  if (s.service === 'handyman' && s.options.handymanUrgent) {
+    lines.push({ label: 'Xử lý khẩn cấp', amount: EXTRA_PRICES.urgentCallout });
   }
   const handDelivery = stops.filter((r) => r.handDelivery).length * EXTRA_PRICES.handDelivery;
   if (handDelivery) lines.push({ label: 'Giao hàng tận tay', amount: handDelivery });
@@ -463,6 +493,20 @@ function movingNote(s: BookingState): string {
     .join(' · ');
 }
 
+/** Gọi thợ: gộp mô tả sự cố + số ảnh đính kèm + mức độ khẩn cấp thành 1 dòng ghi chú cho đơn */
+function handymanNote(s: BookingState): string {
+  const o = s.options;
+  return [
+    o.handymanIssueNote.trim() ? `Sự cố: ${o.handymanIssueNote.trim()}` : '',
+    // Ảnh chỉ lưu cục bộ trên máy khách (uri file:// / blob:) — BE chưa có API upload ảnh nên KHÔNG gửi
+    // được ảnh thật lên server, chỉ báo số lượng để thợ biết khách có ảnh, có thể xin gửi qua Zalo/SMS.
+    o.handymanPhotos.length ? `Đã chụp ${o.handymanPhotos.length} ảnh hiện trạng (khách giữ trên máy)` : '',
+    o.handymanUrgent ? 'Yêu cầu xử lý khẩn cấp' : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 // ---------------------------------------------------------------- Payload BE
 /** Body cho POST /site/deliveryorders & /drymode (theo DeliveryOrders::add / addValidate) */
 export function buildOrderPayload(s: BookingState = state): Record<string, unknown> {
@@ -497,15 +541,17 @@ export function buildOrderPayload(s: BookingState = state): Record<string, unkno
     allow_driver_id_list: s.options.assignedDrivers,
     coupon_code: s.options.promo?.code ?? '',
     price_tip: s.options.tip * EXTRA_PRICES.tip,
-    // Thuê nhân công / Dọn nhà: BE chưa có field riêng cho thời gian làm việc theo block hay tầng
-    // lầu/đóng gói/tháo lắp/đồ đặc biệt → ghi vào note đơn để tài xế/đội chuyển nhà biết trước.
-    // TODO: chuyển sang field thật khi BE bổ sung.
+    // Thuê nhân công / Dọn nhà / Gọi thợ: BE chưa có field riêng cho thời gian làm việc theo block,
+    // số nhân công, tầng lầu/đóng gói/tháo lắp/đồ đặc biệt, hay mô tả sự cố/ảnh hiện trạng → ghi vào
+    // note đơn để tài xế/nhân công/thợ biết trước. TODO: chuyển sang field thật khi BE bổ sung.
     note: [
       s.options.note,
       s.service === 'labor' && s.options.laborBlocks > 1 && opt.blockHours
         ? `Thời gian làm việc: ${s.options.laborBlocks} block (${s.options.laborBlocks * opt.blockHours} giờ)`
         : '',
+      s.service === 'labor' && s.options.laborWorkers > 1 ? `Số nhân công: ${s.options.laborWorkers}` : '',
       isRental ? movingNote(s) : '',
+      s.service === 'handyman' ? handymanNote(s) : '',
     ]
       .filter(Boolean)
       .join(' · '),

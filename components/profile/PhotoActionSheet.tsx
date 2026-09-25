@@ -12,9 +12,13 @@ interface PhotoActionSheetProps {
   onClose: () => void;
   onPicked: (uri: string) => void;
   onError?: (message: string) => void;
+  /** false: không ép crop vuông (vd ảnh hiện trạng sự cố) — mặc định true (ảnh đại diện) */
+  allowsEditing?: boolean;
+  /** chỉ áp dụng khi allowsEditing=true */
+  aspect?: [number, number];
 }
 
-export const PhotoActionSheet: React.FC<PhotoActionSheetProps> = ({ visible, onClose, onPicked, onError }) => {
+export const PhotoActionSheet: React.FC<PhotoActionSheetProps> = ({ visible, onClose, onPicked, onError, allowsEditing = true, aspect = [1, 1] }) => {
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
 
@@ -41,8 +45,8 @@ export const PhotoActionSheet: React.FC<PhotoActionSheetProps> = ({ visible, onC
       }
       const options: ImagePicker.ImagePickerOptions = {
         mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
+        allowsEditing,
+        ...(allowsEditing ? { aspect } : null),
         quality: 0.8,
       };
       const result =

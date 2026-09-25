@@ -271,10 +271,11 @@ export default function BookingScreen() {
       <ServiceInfoDialog
         option={info}
         initialBlocks={info && info.id === state.optionId ? state.options.laborBlocks : 1}
+        initialWorkers={info && info.id === state.optionId ? state.options.laborWorkers : 1}
         onClose={() => setInfo(null)}
-        onSelect={(o, blocks) => {
+        onSelect={(o, blocks, workers) => {
           if (o.blockHours) {
-            selectLaborOption((o as RowOption).groupKey, o.id, blocks);
+            selectLaborOption((o as RowOption).groupKey, o.id, blocks, workers);
           } else {
             switchRideOption((o as RowOption).groupKey, o.id);
           }

@@ -10,6 +10,7 @@ export * from './SeatPicker';
 export * from './TripSchedulePicker';
 export * from './PackageSizePicker';
 export * from './FloorAccessPicker';
+export * from './PhotoAttachRow';
 export * from './StopList';
 export * from './OptionRow';
 export * from './ServiceInfoDialog';

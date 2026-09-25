@@ -198,6 +198,12 @@ export interface ServiceOptionDef {
   maxBlocks?: number;
   /** "Quy tắc làm việc" — hiển thị thành mục riêng trong dialog, tách khỏi infoLines (giá/thông tin chung) */
   workRules?: string[];
+  /**
+   * Thuê nhân công: có giá trị thì dialog cho chọn thêm "Số lượng nhân công" (Stepper 1..maxWorkers),
+   * mỗi người thêm từ người thứ 2 được giảm EXTRA_PRICES.laborGroupDiscountPercent (đúng lời hứa trong
+   * infoLines "Nhóm từ 2 người: giảm 5%/người" — trước đây chỉ ghi trong info, chưa có chỗ chọn thật).
+   */
+  maxWorkers?: number;
 }
 
 export interface ServiceGroupDef {
@@ -736,6 +742,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         infoLines: ['Gói 4 giờ: đ400.000 / 1 nhân công', 'Vượt giờ: đ90.000/giờ', 'Có bao tay, xe đẩy, dây ràng', 'Nhóm từ 2 người: giảm 5%/người', VAT_LINE],
         blockHours: 4,
         maxBlocks: 3,
+        maxWorkers: 5,
         workRules: [
           'Có mặt tại điểm hẹn đúng giờ; trễ quá 15 phút được huỷ và hoàn tiền',
           'Nghỉ giải lao 10 phút sau mỗi 2 giờ làm việc liên tục',
@@ -756,6 +763,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         infoLines: ['Gói 4 giờ: đ320.000', 'Vượt giờ: đ70.000/giờ', 'Tự mang dụng cụ vệ sinh cơ bản', 'Nhân viên có hồ sơ, đánh giá công khai', VAT_LINE],
         blockHours: 4,
         maxBlocks: 2,
+        maxWorkers: 3,
         workRules: [
           'Khách chuẩn bị sẵn nước sạch, điện để nhân viên làm việc',
           'Công việc ngoài phạm vi đã đặt (vd trông trẻ, nấu ăn) cần thoả thuận thêm trước',
@@ -776,6 +784,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         infoLines: ['Gói 8 giờ: đ550.000 / 1 nhân công', 'Vượt giờ: đ80.000/giờ', 'Có nón, giày bảo hộ', 'Đặt trước tối thiểu 12 giờ', VAT_LINE],
         blockHours: 8,
         maxBlocks: 2,
+        maxWorkers: 4,
         workRules: [
           'Khách cung cấp đầy đủ vật tư, dụng cụ thi công tại chỗ',
           'Nhân công chỉ phụ việc, không chịu trách nhiệm kỹ thuật thi công chính',
@@ -796,6 +805,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         infoLines: ['Gói 5 giờ: đ450.000 / 1 nhân sự', 'Vượt giờ: đ90.000/giờ', 'Đồng phục theo yêu cầu (+đ50.000)', 'Đặt trước tối thiểu 24 giờ', VAT_LINE],
         blockHours: 5,
         maxBlocks: 2,
+        maxWorkers: 8,
         workRules: [
           'Có mặt trước giờ sự kiện 30 phút để chuẩn bị',
           'Đồng phục theo yêu cầu tính thêm phí, đăng ký trước khi sự kiện diễn ra',
@@ -828,6 +838,11 @@ export const EXTRA_PRICES = {
   movingPacking: 150000,
   /** Dọn nhà: tháo lắp nội thất (giường, tủ, máy lạnh, kệ...) */
   movingDisassembly: 100000,
+  /** Gọi thợ: phụ phí xử lý khẩn cấp (ưu tiên điều thợ ngay, kể cả ngoài giờ) — thực tế các dịch vụ
+   *  sửa điện nước tại nhà đều có phụ phí ngoài giờ/khẩn cấp, công khai trước khi đặt */
+  urgentCallout: 50000,
+  /** Thuê nhân công: giảm giá mỗi nhân công thêm từ người thứ 2 trở đi (đúng như infoLines mỗi hạng mục đã ghi) */
+  laborGroupDiscountPercent: 5,
 } as const;
 
 /** Dọn nhà: đồ đặc biệt cần báo trước cho đội bốc xếp (ảnh hưởng nhân lực/dụng cụ cần mang theo) */
