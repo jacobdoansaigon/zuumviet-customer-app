@@ -1,7 +1,8 @@
 // app/booking/index.tsx — GH 1.1 / VT 1.1: bản đồ toàn màn + bottom sheet chọn dịch vụ (Siêu tốc / Siêu rẻ / Đồng giá 25k)
 // + lộ trình (người gửi → các điểm giao) → "Xác nhận". Param: service=delivery|transport|rental
-// Xe máy / Xe hơi: danh sách luôn hiện đủ các gói của dịch vụ đang chọn (không thu gọn về 1 dòng);
-// tab đổi dịch vụ ngay trong màn (giữ nguyên điểm đón/điểm đến); "Tất cả dịch vụ" gộp thêm gói của dịch vụ kia.
+// Chưa đủ điểm đón + điểm đến (maxStops > 0) → CHƯA hiện danh sách dịch vụ, chỉ hiện lộ trình để nhập.
+// Đủ lộ trình rồi mới hiện dịch vụ kèm giá thật. Xe máy / Xe hơi: danh sách luôn hiện đủ các gói của dịch vụ
+// đang chọn (không thu gọn về 1 dòng); tab đổi dịch vụ ngay trong màn; "Tất cả dịch vụ" gộp thêm gói dịch vụ kia.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -110,38 +111,55 @@ export default function BookingScreen() {
       <RoundIconButton icon={Icons.back} onPress={goBack} style={[styles.back, { top: insets.top + Spacing.md }]} accessibilityLabel="Quay lại" />
 
       <View style={styles.sheet} onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}>
-        <Pressable onPress={() => setExpanded((v) => !v)} style={styles.handle} accessibilityLabel={expanded ? 'Thu gọn' : 'Tất cả dịch vụ'}>
-          <Icon name="ion:swap-vertical" size={12} color={Colors.textMuted} />
-          <AppText size={11} color={Colors.textMuted} style={{ marginLeft: 4 }}>
-            {expanded ? 'Thu gọn' : 'Tất cả dịch vụ'}
-          </AppText>
-        </Pressable>
+        {hasDestination ? (
+          <>
+            <Pressable onPress={() => setExpanded((v) => !v)} style={styles.handle} accessibilityLabel={expanded ? 'Thu gọn' : 'Tất cả dịch vụ'}>
+              <Icon name="ion:swap-vertical" size={12} color={Colors.textMuted} />
+              <AppText size={11} color={Colors.textMuted} style={{ marginLeft: 4 }}>
+                {expanded ? 'Thu gọn' : 'Tất cả dịch vụ'}
+              </AppText>
+            </Pressable>
 
-        {tabKeys ? (
-          <View style={styles.tabs}>
-            {tabKeys.map((k) => (
-              <Chip key={k} label={SERVICE_GROUPS[k].title} icon={SERVICE_GROUPS[k].icon} active={k === state.service} onPress={() => onTabPress(k)} style={styles.tab} />
-            ))}
+            {tabKeys ? (
+              <View style={styles.tabs}>
+                {tabKeys.map((k) => (
+                  <Chip key={k} label={SERVICE_GROUPS[k].title} icon={SERVICE_GROUPS[k].icon} active={k === state.service} onPress={() => onTabPress(k)} style={styles.tab} />
+                ))}
+              </View>
+            ) : null}
+          </>
+        ) : (
+          // Chưa đủ lộ trình: chỉ nhắc nhập điểm đón/điểm đến, chưa hiện dịch vụ nào
+          <View style={styles.introRow}>
+            <AppText size={14} weight="bold" color={Colors.text}>
+              Nhập điểm đón và {labels.mapDropLabel.toLowerCase()}
+            </AppText>
+            <AppText size={12} color={Colors.textSecondary} style={{ marginTop: 2 }}>
+              Dịch vụ và giá sẽ hiện ra sau khi có đủ lộ trình
+            </AppText>
           </View>
-        ) : null}
+        )}
 
         <ScrollView style={{ maxHeight: height * 0.58 }} contentContainerStyle={{ paddingBottom: Spacing.sm }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <View style={styles.options}>
-            {options.map((o) => (
-              <ServiceOption
-                key={o.id}
-                name={o.name}
-                description={o.description}
-                price={hasDestination ? formatVnd(computePrice(state, o.id).total) : undefined}
-                priceHint={hasDestination ? undefined : 'Chọn điểm đến'}
-                icon={o.icon}
-                selected={o.id === selected.id}
-                onPress={() => onOptionPress(o)}
-                onInfoPress={() => setInfo(o)}
-              />
-            ))}
-          </View>
-          <View style={styles.divider} />
+          {hasDestination ? (
+            <>
+              <View style={styles.options}>
+                {options.map((o) => (
+                  <ServiceOption
+                    key={o.id}
+                    name={o.name}
+                    description={o.description}
+                    price={formatVnd(computePrice(state, o.id).total)}
+                    icon={o.icon}
+                    selected={o.id === selected.id}
+                    onPress={() => onOptionPress(o)}
+                    onInfoPress={() => setInfo(o)}
+                  />
+                ))}
+              </View>
+              <View style={styles.divider} />
+            </>
+          ) : null}
           <StopList
             sender={state.sender}
             receivers={state.receivers}
@@ -184,6 +202,7 @@ const styles = StyleSheet.create({
     ...Shadow.lg,
   },
   handle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.sm },
+  introRow: { paddingHorizontal: Spacing.screen, paddingTop: Spacing.base, paddingBottom: Spacing.sm },
   tabs: { flexDirection: 'row', gap: Spacing.sm, paddingHorizontal: Spacing.screen, paddingBottom: Spacing.sm },
   tab: { flex: 1, justifyContent: 'center' },
   options: { paddingHorizontal: Spacing.screen, gap: 4 },
