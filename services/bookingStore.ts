@@ -12,6 +12,7 @@ import {
   MOCK_DRIVER,
   FAVORITE_DRIVERS,
   PACKAGE_SIZES,
+  FREIGHT_WEIGHTS,
   SAMPLE_PLACES,
   HCM_CENTER,
   type ServiceKey,
@@ -51,6 +52,8 @@ export interface Receiver {
   packageSize: PackageSizeId;
   viewOption: ViewOptionId;
   handDelivery: boolean;
+  /** Vận tải: hàng lớn/nặng cần thêm nhân công bốc xếp lên/xuống (tính thêm phí) */
+  needsLoadingHelp: boolean;
 }
 
 export type PaymentMethod = 'cash' | 'wallet';
@@ -163,6 +166,7 @@ const emptyReceiver = (): Receiver => ({
   packageSize: 's',
   viewOption: 'view',
   handDelivery: false,
+  needsLoadingHelp: false,
 });
 
 const firstOptionId = (service: ServiceKey) => SERVICE_GROUPS[service].options[0]!.id;
@@ -369,6 +373,8 @@ export function computePrice(s: BookingState = state, optionId?: string): PriceS
   const lines: PriceLine[] = [{ label: SERVICE_GROUPS[s.service].labels.feeLabel, amount: base }];
   const handDelivery = stops.filter((r) => r.handDelivery).length * EXTRA_PRICES.handDelivery;
   if (handDelivery) lines.push({ label: 'Giao hàng tận tay', amount: handDelivery });
+  const loadingHelp = stops.filter((r) => r.needsLoadingHelp).length * EXTRA_PRICES.loadingHelp;
+  if (loadingHelp) lines.push({ label: 'Nhân công bốc xếp', amount: loadingHelp });
   if (s.options.returnToPickup) lines.push({ label: 'Quay lại điểm giao hàng', amount: EXTRA_PRICES.returnToPickup });
   if (s.options.handToCustomer) lines.push({ label: 'Gửi tận tay khách hàng', amount: s.options.handToCustomer * EXTRA_PRICES.handToCustomer });
   if (s.options.tip) lines.push({ label: 'Tiền tip', amount: s.options.tip * EXTRA_PRICES.tip });
@@ -398,6 +404,9 @@ export function buildOrderPayload(s: BookingState = state): Record<string, unkno
   const opt = getOption(s);
   const group = SERVICE_GROUPS[s.service];
   const pickup = s.sender.place;
+  // Vận tải dùng thang tải trọng riêng (FREIGHT_WEIGHTS) — không tra theo PACKAGE_SIZES của giao hàng nhỏ
+  const isTransport = s.service === 'transport';
+  const sizeList = isTransport ? FREIGHT_WEIGHTS : PACKAGE_SIZES;
   let stops = s.receivers.filter(isReceiverComplete);
   // Dịch vụ tận nơi (gọi thợ): BE bắt buộc có details → dùng chính địa điểm của khách làm điểm đến duy nhất
   if (group.kind === 'onsite' && stops.length === 0 && pickup) {
@@ -425,7 +434,7 @@ export function buildOrderPayload(s: BookingState = state): Record<string, unkno
     api_metric_place: 1,
     api_metric_distance_matrix_drymode: 1,
     details: stops.map((r) => ({
-      weight_id: PACKAGE_SIZES.find((p) => p.id === r.packageSize)?.weightId ?? 0,
+      weight_id: sizeList.find((p) => p.id === r.packageSize)?.weightId ?? 0,
       fullname: r.name,
       phone: r.phone,
       saved_location_id: r.place?.savedLocationId ?? 0,
@@ -435,8 +444,14 @@ export function buildOrderPayload(s: BookingState = state): Record<string, unkno
       wayout_long: r.place?.lng ?? 0,
       wayout_map_place_id: r.place?.placeId ?? '',
       cod: r.cod,
-      note: group.kind === 'delivery' ? [r.note, VIEW_NOTE[r.viewOption]].filter(Boolean).join(' · ') : r.note,
-      // TODO: id ServiceAddon "Giao hàng tận tay" chưa rõ → chưa gửi addon, chỉ tính giá phía app
+      // Vận tải: không có tuỳ chọn xem hàng (hàng lớn/nặng) → không chèn VIEW_NOTE, chỉ giữ ghi chú khách nhập
+      note:
+        group.kind === 'delivery' && !isTransport
+          ? [r.note, VIEW_NOTE[r.viewOption]].filter(Boolean).join(' · ')
+          : isTransport && r.needsLoadingHelp
+            ? [r.note, 'Cần nhân công bốc xếp'].filter(Boolean).join(' · ')
+            : r.note,
+      // TODO: id ServiceAddon "Giao hàng tận tay" / "Bốc xếp" chưa rõ → chưa gửi addon, chỉ tính giá phía app
       addons: [] as number[],
       hand_delivery: r.handDelivery ? 1 : 0,
     })),

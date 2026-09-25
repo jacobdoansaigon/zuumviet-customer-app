@@ -1,12 +1,14 @@
 // app/booking/receiver.tsx — GH 1.4.1 "Thông tin người nhận" (param index)
 // Giao hàng: địa chỉ, Giao hàng tận tay, họ tên/SĐT/COD/ghi chú, kích cỡ gói hàng (4 ô), tuỳ chọn xem hàng → "Xác Nhận"
+// Vận tải: hàng lớn/nặng — không có Giao hàng tận tay, không có tuỳ chọn xem hàng; đổi kích cỡ gói hàng
+// thành mức tải trọng (FREIGHT_WEIGHTS) và thêm tuỳ chọn "Cần người bốc xếp" (tính thêm phí)
 // Chở khách: chỉ địa chỉ điểm đến + bản đồ tràn khung (chạm để đổi) → "Xác Nhận"; tên/SĐT lấy của người đặt
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Icon, Icons, Radio, Screen, SwitchRow, TextField } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
-import { SERVICE_GROUPS, VIEW_OPTIONS, HCM_CENTER, type PackageSizeId, type ViewOptionId } from '@/constants/mockBooking';
+import { SERVICE_GROUPS, VIEW_OPTIONS, HCM_CENTER, FREIGHT_WEIGHTS, EXTRA_PRICES, type PackageSizeId, type ViewOptionId } from '@/constants/mockBooking';
 import { useBooking, ensureReceiver, updateReceiver, setReceiverPlace, isValidPhoneVn, formatThousands } from '@/services/bookingStore';
 import { AddressBlock, AddressMapPreview, ContactPickerSheet, FlatFooter, PackageSizePicker, ZaloPasteSheet, type MapStop } from '@/components/booking';
 
@@ -19,6 +21,8 @@ export default function ReceiverScreen() {
   const labels = group.labels;
   // Chở khách: chỉ cần điểm đến; tên/SĐT không bắt buộc (mặc định lấy của người đi)
   const isDelivery = group.kind === 'delivery';
+  // Vận tải: hàng lớn/nặng — không giao tận tay, không xem hàng, có thể cần thêm nhân công bốc xếp
+  const isTransport = state.service === 'transport';
 
   useEffect(() => {
     ensureReceiver(index);
@@ -31,6 +35,7 @@ export default function ReceiverScreen() {
   const [size, setSize] = useState<PackageSizeId>(receiver?.packageSize ?? 's');
   const [view, setView] = useState<ViewOptionId>(receiver?.viewOption ?? 'view');
   const [hand, setHand] = useState(receiver?.handDelivery ?? false);
+  const [loadingHelp, setLoadingHelp] = useState(receiver?.needsLoadingHelp ?? false);
   const [contacts, setContacts] = useState(false);
   const [zaloPaste, setZaloPaste] = useState(false);
 
@@ -68,6 +73,7 @@ export default function ReceiverScreen() {
       packageSize: size,
       viewOption: view,
       handDelivery: hand,
+      needsLoadingHelp: loadingHelp,
     });
     if (router.canGoBack()) router.back();
     else router.replace('/booking');
@@ -92,7 +98,17 @@ export default function ReceiverScreen() {
             </AppText>
           </Pressable>
 
-          <SwitchRow icon={Icons.handHold} label="Giao hàng tận tay" sublabel="đ10,000" value={hand} onValueChange={setHand} />
+          {isTransport ? (
+            <SwitchRow
+              icon={Icons.box}
+              label="Cần người bốc xếp"
+              sublabel={`đ${EXTRA_PRICES.loadingHelp.toLocaleString('vi-VN')}`}
+              value={loadingHelp}
+              onValueChange={setLoadingHelp}
+            />
+          ) : (
+            <SwitchRow icon={Icons.handHold} label="Giao hàng tận tay" sublabel="đ10,000" value={hand} onValueChange={setHand} />
+          )}
           <View style={styles.divider} />
 
           <TextField
@@ -128,14 +144,21 @@ export default function ReceiverScreen() {
           <TextField label="Ghi chú sản phẩm" value={note} onChangeText={setNote} placeholder="Ghi chú sản phẩm" containerStyle={styles.field} />
 
           <View style={{ marginTop: Spacing.lg }}>
-            <PackageSizePicker value={size} onChange={setSize} />
+            {isTransport && (
+              <AppText weight="bold" size={14} style={{ marginBottom: Spacing.sm }}>
+                Khối lượng hàng ước tính
+              </AppText>
+            )}
+            <PackageSizePicker value={size} onChange={setSize} sizes={isTransport ? FREIGHT_WEIGHTS : undefined} />
           </View>
 
-          <View style={styles.radios}>
-            {VIEW_OPTIONS.map((o) => (
-              <Radio key={o.id} selected={view === o.id} onPress={() => setView(o.id)} label={o.label} style={styles.radio} />
-            ))}
-          </View>
+          {!isTransport && (
+            <View style={styles.radios}>
+              {VIEW_OPTIONS.map((o) => (
+                <Radio key={o.id} selected={view === o.id} onPress={() => setView(o.id)} label={o.label} style={styles.radio} />
+              ))}
+            </View>
+          )}
         </View>
       ) : (
         <AddressMapPreview

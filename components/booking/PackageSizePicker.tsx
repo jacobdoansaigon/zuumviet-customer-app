@@ -3,16 +3,18 @@ import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppText, Icon, Icons } from '@/components/ui';
-import { PACKAGE_SIZES, type PackageSizeId } from '@/constants/mockBooking';
+import { PACKAGE_SIZES, type PackageSizeId, type PackageSizeDef } from '@/constants/mockBooking';
 
 interface Props {
   value: PackageSizeId;
   onChange: (v: PackageSizeId) => void;
+  /** Vận tải dùng mức tải trọng riêng (FREIGHT_WEIGHTS) thay vì kích cỡ gói nhỏ mặc định */
+  sizes?: PackageSizeDef[];
 }
 
-export const PackageSizePicker: React.FC<Props> = ({ value, onChange }) => (
+export const PackageSizePicker: React.FC<Props> = ({ value, onChange, sizes = PACKAGE_SIZES }) => (
   <View style={styles.row}>
-    {PACKAGE_SIZES.map((p, i) => {
+    {sizes.map((p, i) => {
       const on = p.id === value;
       return (
         <Pressable key={p.id} onPress={() => onChange(p.id)} style={[styles.tile, on && styles.tileOn, i > 0 && { marginLeft: Spacing.sm }]}>

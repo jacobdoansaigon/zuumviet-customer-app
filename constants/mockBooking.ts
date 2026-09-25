@@ -291,7 +291,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         perKmPrice: 12000,
         extraStopPrice: 30000,
         icon: Icons.truck,
-        infoLines: ['Phí tối thiểu (dưới 4km): đ150.000', '4km - 10km: đ12.000/km', 'Trên 10km: đ10.000/km', 'Bốc xếp: thoả thuận với tài xế', VAT_LINE],
+        infoLines: ['Phí tối thiểu (dưới 4km): đ150.000', '4km - 10km: đ12.000/km', 'Trên 10km: đ10.000/km', 'Cần bốc xếp: chọn thêm khi đặt (phụ phí)', VAT_LINE],
       },
       {
         id: 'tai-500',
@@ -303,7 +303,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         perKmPrice: 15000,
         extraStopPrice: 40000,
         icon: Icons.truck,
-        infoLines: ['Phí tối thiểu (dưới 4km): đ220.000', '4km - 10km: đ15.000/km', 'Trên 10km: đ12.000/km', 'Bốc xếp: thoả thuận với tài xế', VAT_LINE],
+        infoLines: ['Phí tối thiểu (dưới 4km): đ220.000', '4km - 10km: đ15.000/km', 'Trên 10km: đ12.000/km', 'Cần bốc xếp: chọn thêm khi đặt (phụ phí)', VAT_LINE],
       },
       {
         id: 'tai-1000',
@@ -315,7 +315,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         perKmPrice: 20000,
         extraStopPrice: 50000,
         icon: Icons.truck,
-        infoLines: ['Phí tối thiểu (dưới 4km): đ350.000', '4km - 10km: đ20.000/km', 'Trên 10km: đ16.000/km', 'Bốc xếp: thoả thuận với tài xế', VAT_LINE],
+        infoLines: ['Phí tối thiểu (dưới 4km): đ350.000', '4km - 10km: đ20.000/km', 'Trên 10km: đ16.000/km', 'Cần bốc xếp: chọn thêm khi đặt (phụ phí)', VAT_LINE],
       },
     ],
   },
@@ -737,6 +737,8 @@ export const EXTRA_PRICES = {
   handToCustomer: 35000,
   tip: 5000,
   handDelivery: 10000,
+  /** Vận tải: phụ phí nhân công bốc xếp lên/xuống hàng, tính theo mỗi điểm nhận */
+  loadingHelp: 100000,
 } as const;
 
 /** Số dư "Tài khoản" hiển thị ở sheet Hình thức thanh toán (mock, chưa có API ví) */
@@ -757,6 +759,15 @@ export const PACKAGE_SIZES: PackageSizeDef[] = [
   { id: 's', label: 'Nhỏ', sub: '0.5 - 1kg', weightId: 2 },
   { id: 'm', label: 'Vừa', sub: '1 -3kg', weightId: 3 },
   { id: 'l', label: 'Lớn', sub: '>3kg', weightId: 4 },
+];
+
+/** Vận tải (hàng lớn/nặng, không đi theo cân nhỏ như giao hàng): mức tải trọng riêng.
+ *  weightId: TODO map id thật của bảng service_weight bên Vận tải khi BE cung cấp — tạm để 5-8 để không trùng PACKAGE_SIZES. */
+export const FREIGHT_WEIGHTS: PackageSizeDef[] = [
+  { id: 'xs', label: 'Dưới 100kg', sub: 'Vài kiện nhỏ', weightId: 5 },
+  { id: 's', label: '100 - 300kg', sub: 'Đồ gia dụng', weightId: 6 },
+  { id: 'm', label: '300 - 600kg', sub: 'Nội thất, máy móc', weightId: 7 },
+  { id: 'l', label: 'Trên 600kg', sub: 'Hàng cồng kềnh', weightId: 8 },
 ];
 
 export type ViewOptionId = 'view' | 'view_check' | 'no_view';
