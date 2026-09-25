@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, TextInput, Pressable } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Colors, Spacing, BorderRadius } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, NO_WEB_OUTLINE } from '@/constants/theme';
 import { AppText, AppHeader, Screen, Button, TextField, StopMarker, Dialog, fontStyle, type IconName } from '@/components/ui';
 import { savedLocationsStore, savedLocationActions } from '@/services/profileStore';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
@@ -128,6 +128,6 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
     borderRadius: BorderRadius.xs,
   },
-  addressInput: { flex: 1, marginLeft: Spacing.md, fontSize: 16, color: Colors.text, paddingVertical: 0, minHeight: 24, lineHeight: 22 },
+  addressInput: { flex: 1, marginLeft: Spacing.md, fontSize: 16, color: Colors.text, paddingVertical: 0, minHeight: 24, lineHeight: 22, ...NO_WEB_OUTLINE },
   deleteBtn: { marginTop: Spacing['2xl'] },
 });

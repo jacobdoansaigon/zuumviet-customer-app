@@ -8,7 +8,7 @@ import React, { useMemo, useState } from 'react';
 import { View, TextInput, Pressable, FlatList, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Chip, Icon, Icons, Screen, StopMarker, fontStyle } from '@/components/ui';
-import { Colors, Spacing, BorderRadius, Sizes } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, Sizes, NO_WEB_OUTLINE } from '@/constants/theme';
 import { SAMPLE_PLACES, SAVED_LOCATIONS, HCM_CENTER, SERVICE_GROUPS, INTERCITY_CITIES, type SamplePlace, type IntercityCity } from '@/constants/mockBooking';
 import { useBooking, setSenderPlace, setReceiverPlace, placeFromSample, haversineKm, type Place } from '@/services/bookingStore';
 import { ZaloPasteSheet } from '@/components/booking';
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
   },
-  input: { flex: 1, fontSize: 16, color: Colors.text, marginLeft: Spacing.sm, paddingVertical: 0, height: Sizes.input - 3 },
+  input: { flex: 1, fontSize: 16, color: Colors.text, marginLeft: Spacing.sm, paddingVertical: 0, height: Sizes.input - 3, ...NO_WEB_OUTLINE },
   zaloRow: {
     flexDirection: 'row',
     alignItems: 'center',

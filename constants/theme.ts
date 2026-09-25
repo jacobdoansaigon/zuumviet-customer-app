@@ -234,6 +234,16 @@ export const Shadow = {
   },
 };
 
+/**
+ * Web: tắt viền focus mặc định của trình duyệt trên TextInput (react-native-web render ra <input>/
+ * <textarea> thật, browser tự vẽ thêm 1 khung outline — thường lệch màu/bo góc với viền focus tự vẽ
+ * của app → nhìn như 2 khung chồng nhau, rất xấu). RN's TextStyle chỉ khai type outlineStyle là
+ * 'solid'|'dotted'|'dashed' (không có 'none') dù react-native-web chạy đúng giá trị 'none' ở runtime
+ * — ép kiểu 1 lần ở đây để chỗ dùng không phải `as any` rải rác. Không ảnh hưởng app native (no-op).
+ * Trộn vào cuối object style của TextInput, vd: style={{ ...styles.input, ...NO_WEB_OUTLINE }}.
+ */
+export const NO_WEB_OUTLINE = { outlineStyle: 'none' } as unknown as { outlineStyle?: 'solid' | 'dotted' | 'dashed' };
+
 /** Kích cỡ chuẩn theo Figma */
 export const Sizes = {
   header: 56,

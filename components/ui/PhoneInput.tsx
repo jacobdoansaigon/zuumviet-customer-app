@@ -1,7 +1,7 @@
 // PhoneInput — ô nhập SĐT theo Figma (icon điện thoại, placeholder 077 996 3333, nút xoá)
 import React, { useState } from 'react';
 import { View, TextInput, Pressable, StyleSheet } from 'react-native';
-import { Colors, Spacing, BorderRadius, Sizes } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, Sizes, NO_WEB_OUTLINE } from '@/constants/theme';
 import { fontStyle } from './Text';
 import { Icon, Icons } from './Icon';
 
@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
   },
   containerFocused: { borderColor: Colors.primarySoft, backgroundColor: Colors.white },
   icon: { marginRight: Spacing.sm },
-  input: { flex: 1, fontSize: 17, color: Colors.text, paddingVertical: 0 },
+  input: { flex: 1, fontSize: 17, color: Colors.text, paddingVertical: 0, ...NO_WEB_OUTLINE },
 });
 
 export default PhoneInput;

@@ -10,7 +10,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { Colors, Spacing, BorderRadius, Sizes } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, Sizes, NO_WEB_OUTLINE } from '@/constants/theme';
 import { AppText, fontStyle } from './Text';
 import { Icon, Icons, type IconName } from './Icon';
 
@@ -172,6 +172,9 @@ const styles = StyleSheet.create({
     color: Colors.text,
     paddingVertical: 0,
     height: Sizes.input - 3,
+    // Web: bỏ viền focus mặc định của trình duyệt (outline) — box.boxFocused đã tự vẽ viền lavender,
+    // để mặc định sẽ chồng thêm 1 khung nữa (thường xanh) rất xấu, nhất là ô multiline.
+    ...NO_WEB_OUTLINE,
   },
   iconLeft: { marginRight: Spacing.sm },
   rightBtn: { marginLeft: Spacing.sm },

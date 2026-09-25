@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { View, TextInput, Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { AppHeader, AppText, BottomSheet, Checkbox, ErrorSheet, Icon, Icons, Screen, Stepper, fontStyle } from '@/components/ui';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing, NO_WEB_OUTLINE } from '@/constants/theme';
 import { EXTRA_PRICES, SERVICE_GROUPS } from '@/constants/mockBooking';
 import { useBooking, setOptions, computePrice, formatVnd, formatScheduleLabel, submitBooking, promoLabel } from '@/services/bookingStore';
 import { DriverPickerSheet, FlatFooter, OptionRow, PaymentSheet } from '@/components/booking';
@@ -196,7 +196,7 @@ export default function ConfirmScreen() {
 
 const styles = StyleSheet.create({
   noteRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: Spacing.screen, paddingVertical: Spacing.md },
-  noteInput: { flex: 1, fontSize: 15, color: Colors.text, paddingVertical: 0, minHeight: 44, textAlignVertical: 'top' },
+  noteInput: { flex: 1, fontSize: 15, color: Colors.text, paddingVertical: 0, minHeight: 44, textAlignVertical: 'top', ...NO_WEB_OUTLINE },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border, backgroundColor: Colors.white },
   directRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.screen, paddingVertical: Spacing.md },
   directIcon: {
