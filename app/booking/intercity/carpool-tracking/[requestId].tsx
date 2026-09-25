@@ -42,7 +42,7 @@ export default function CarpoolTrackingScreen() {
   const share = async () => {
     const res = await shareTrackingLink({
       title: 'Theo dõi chuyến xe ghép của tôi trên ZuumViet',
-      message: `Mình đang đi xe ghép tới ${req.destinationLabel}, khởi hành ${req.dateLabel}. Bạn theo dõi giúp mình nhé.`,
+      message: `Mình đang đi xe ghép tới ${req.destinationLabel}, khởi hành ${req.departLabel}. Bạn theo dõi giúp mình nhé.`,
       url: buildTrackingLink('carpool', req.id),
     });
     setToast(res === 'copied' ? 'Đã sao chép liên kết chia sẻ' : res === 'unavailable' ? 'Thiết bị không hỗ trợ chia sẻ' : 'Đã mở hộp thoại chia sẻ');
@@ -80,9 +80,14 @@ export default function CarpoolTrackingScreen() {
         <View style={styles.routeRow}>
           <Icon name="mci:map-marker-distance" size={16} color={Colors.primary} />
           <AppText size={13} color={Colors.textSecondary} style={{ marginLeft: 6, flex: 1 }} numberOfLines={2}>
-            TP. Hồ Chí Minh → {req.destinationLabel} · {req.dateLabel} · {req.timeLabel}
+            TP. Hồ Chí Minh → {req.destinationLabel} · {req.departLabel}
           </AppText>
         </View>
+        {req.returnLabel ? (
+          <AppText size={12} color={Colors.primary} weight="semiBold" style={{ marginBottom: Spacing.xs }}>
+            Khứ hồi · về lúc {req.returnLabel}
+          </AppText>
+        ) : null}
 
         {req.status === 'searching' ? (
           <View style={styles.searchingCard}>

@@ -29,6 +29,7 @@ export default function ConfirmScreen() {
   const group = SERVICE_GROUPS[state.service];
   const labels = group.labels;
   const isDelivery = group.kind === 'delivery';
+  const isIntercity = state.service === 'intercity';
   const stopsCount = group.maxStops === 0 ? 0 : Math.max(1, state.receivers.length);
   const providerLower = labels.provider.toLowerCase();
 
@@ -129,7 +130,14 @@ export default function ConfirmScreen() {
         </>
       ) : null}
       <OptionRow icon={Icons.cash} label="Tiền tip" sub="đ 5,000 / lần" right={<Stepper value={opt.tip} onChange={(v) => setOptions({ tip: v })} max={20} />} />
-      <OptionRow icon={Icons.calendar} label="Thời gian lựa chọn" value={formatScheduleLabel(opt.scheduledAt)} chevron onPress={() => setTimeSheet(true)} />
+      <OptionRow
+        icon={Icons.calendar}
+        label={isIntercity ? 'Ngày giờ đi' : 'Thời gian lựa chọn'}
+        value={formatScheduleLabel(opt.scheduledAt)}
+        chevron={!isIntercity}
+        onPress={isIntercity ? undefined : () => setTimeSheet(true)}
+      />
+      {isIntercity && opt.returnAt ? <OptionRow icon={Icons.calendar} label="Ngày giờ về" value={formatScheduleLabel(opt.returnAt)} /> : null}
       <OptionRow
         icon="mci:account-outline"
         label={`${labels.provider} chỉ định`}

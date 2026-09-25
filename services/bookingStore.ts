@@ -61,6 +61,8 @@ export interface BookingOptions {
   tip: number;
   /** epoch ms; null = "Bây giờ" */
   scheduledAt: number | null;
+  /** epoch ms giờ về (chỉ Xe đường dài — Thuê cả xe khứ hồi); null = một chiều */
+  returnAt: number | null;
   assignedDrivers: number[];
   note: string;
   promo: PromoDef | null;
@@ -88,6 +90,7 @@ export interface TrackedOrder {
   serviceName: string;
   serviceDescription: string;
   scheduledAt: number | null;
+  returnAt: number | null;
   distanceKm: number;
   promoLabel: string | null;
   paymentMethod: PaymentMethod;
@@ -139,6 +142,7 @@ const defaultOptions = (): BookingOptions => ({
   handToCustomer: 0,
   tip: 0,
   scheduledAt: null,
+  returnAt: null,
   assignedDrivers: [],
   note: '',
   promo: null,
@@ -463,6 +467,7 @@ export function trackedFromDraft(id: string, s: BookingState = state, price: Pri
     serviceName: opt.name,
     serviceDescription: opt.description,
     scheduledAt: s.options.scheduledAt,
+    returnAt: s.options.returnAt,
     distanceKm: price.distanceKm,
     promoLabel: promoLabel(s.options.promo),
     paymentMethod: s.options.paymentMethod,
@@ -623,6 +628,7 @@ export function normalizeApiOrder(o: DeliveryOrder, base?: TrackedOrder | null):
     serviceName: base?.serviceName ?? 'Giao hàng',
     serviceDescription: base?.serviceDescription ?? '',
     scheduledAt: pickupDate > 0 ? pickupDate * 1000 : null,
+    returnAt: base?.returnAt ?? null,
     distanceKm: distanceKm || base?.distanceKm || 0,
     promoLabel: coupon ? (discount > 0 && discount <= 100 ? `Giảm ${discount}%` : `Mã ${coupon}`) : (base?.promoLabel ?? null),
     paymentMethod: num(o.payment_method) === 1 ? 'wallet' : 'cash',

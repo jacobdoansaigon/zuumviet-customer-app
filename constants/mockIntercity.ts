@@ -99,6 +99,52 @@ export function buildDateOptions(count = 6): DateOption[] {
   return out;
 }
 
+/* ------------------------------------------------------------------ */
+/* Lịch trình đi / về — dùng chung cho Thuê cả xe & Xe ghép            */
+/* ------------------------------------------------------------------ */
+
+export type TripType = 'oneway' | 'roundtrip';
+
+export interface TripScheduleValue {
+  tripType: TripType;
+  departDateKey: string;
+  departTime: string;
+  returnDateKey: string;
+  returnTime: string;
+}
+
+/** Giờ khởi hành thường gặp cho tuyến liên tỉnh */
+export const DEPART_TIME_CHOICES = ['05:00', '06:00', '07:00', '08:00', '09:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'];
+export const DEFAULT_DEPART_TIME = '06:00';
+export const DEFAULT_RETURN_TIME = '18:00';
+
+/** Ghép ngày (yyyy-mm-dd) + giờ ("06:00") thành epoch ms */
+export function dateTimeToTs(dateKey: string, time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  const d = new Date(`${dateKey}T00:00:00`);
+  d.setHours(h || 0, m || 0, 0, 0);
+  return d.getTime();
+}
+
+/** Ngày gần nhất trong danh sách mà giờ đã chọn vẫn còn ở tương lai (mặc định "6:00 sáng" không rơi vào quá khứ) */
+export function nextAvailableDateKey(dateOptions: DateOption[], time: string): string {
+  for (const d of dateOptions) {
+    if (dateTimeToTs(d.key, time) > Date.now()) return d.key;
+  }
+  return dateOptions[dateOptions.length - 1]?.key ?? dateOptions[0]!.key;
+}
+
+/** Mặc định: chỉ chiều đi, khởi hành 6:00 sáng (ngày gần nhất chưa qua giờ này) */
+export function defaultTripSchedule(dateOptions: DateOption[]): TripScheduleValue {
+  const departDateKey = nextAvailableDateKey(dateOptions, DEFAULT_DEPART_TIME);
+  return { tripType: 'oneway', departDateKey, departTime: DEFAULT_DEPART_TIME, returnDateKey: departDateKey, returnTime: DEFAULT_RETURN_TIME };
+}
+
+export function formatDateOptionLabel(dateOptions: DateOption[], key: string): string {
+  const d = dateOptions.find((o) => o.key === key);
+  return d ? `${d.label} ${d.sub}` : key;
+}
+
 export interface TimeSlot {
   id: 'all' | 'early' | 'morning' | 'afternoon' | 'evening';
   label: string;

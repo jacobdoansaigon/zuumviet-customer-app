@@ -1,9 +1,10 @@
-// services/carpoolRequestStore.ts — "Xe ghép" kiểu ĐẶT YÊU CẦU (khác Mua vé xe): khách chọn số chỗ, thời gian,
-// hàng hoá, nơi trả (tận nơi hay ra bến gần) rồi GỬI YÊU CẦU. Tài xế đang chạy xe ghép tuyến đó "nhận cuốc"
-// (mô phỏng) rồi hệ thống mới hiện chi tiết xe/tài xế cho khách — khác với Mua vé xe (duyệt sẵn từng chuyến,
-// chọn ghế ngay). Tách riêng khỏi services/intercityTicketStore.ts (bán vé theo chuyến cố định của nhà xe).
+// services/carpoolRequestStore.ts — "Xe ghép" kiểu ĐẶT YÊU CẦU (khác Mua vé xe): khách chọn số chỗ, lịch trình
+// (một chiều mặc định, khởi hành 6:00 sáng, hoặc khứ hồi có ngày giờ về), hàng hoá, nơi trả (tận nơi hay ra
+// bến gần) rồi GỬI YÊU CẦU. Tài xế đang chạy xe ghép tuyến đó "nhận cuốc" (mô phỏng) rồi hệ thống mới hiện
+// chi tiết xe/tài xế cho khách — khác với Mua vé xe (duyệt sẵn từng chuyến, chọn ghế ngay). Tách riêng khỏi
+// services/intercityTicketStore.ts (bán vé theo chuyến cố định của nhà xe).
 import { useSyncExternalStore } from 'react';
-import { carpoolsForCity, type CarpoolListing } from '@/constants/mockIntercity';
+import { buildDateOptions, carpoolsForCity, defaultTripSchedule, formatDateOptionLabel, type CarpoolListing, type TripScheduleValue } from '@/constants/mockIntercity';
 import { getContact } from '@/services/intercityTicketStore';
 
 export type CarpoolRequestStatus = 'searching' | 'matched' | 'cancelled';
@@ -14,8 +15,11 @@ export interface CarpoolRequest {
   cityId: string;
   cityName: string;
   destinationLabel: string;
-  dateLabel: string;
-  timeLabel: string;
+  schedule: TripScheduleValue;
+  /** đã format sẵn để hiển thị, vd "Hôm nay 25/09 · 06:00" */
+  departLabel: string;
+  /** rỗng nếu chỉ chiều đi */
+  returnLabel: string;
   seatCount: number;
   hasCargo: boolean;
   cargoNote: string;
@@ -30,15 +34,16 @@ export interface CarpoolRequest {
 
 interface DraftState {
   seatCount: number;
-  dateKey: string;
-  timeLabel: string;
+  schedule: TripScheduleValue;
   hasCargo: boolean;
   cargoNote: string;
   dropoffPref: DropoffPref;
 }
 
+const DATE_OPTIONS = buildDateOptions();
+
 function defaultDraft(): DraftState {
-  return { seatCount: 1, dateKey: new Date().toISOString().slice(0, 10), timeLabel: '', hasCargo: false, cargoNote: '', dropoffPref: 'station' };
+  return { seatCount: 1, schedule: defaultTripSchedule(DATE_OPTIONS), hasCargo: false, cargoNote: '', dropoffPref: 'station' };
 }
 
 let draft: DraftState = defaultDraft();
@@ -67,12 +72,8 @@ export function setSeatCount(n: number) {
   draft = { ...draft, seatCount: Math.max(1, Math.min(6, n)) };
   emit();
 }
-export function setCarpoolDate(dateKey: string) {
-  draft = { ...draft, dateKey };
-  emit();
-}
-export function setCarpoolTime(timeLabel: string) {
-  draft = { ...draft, timeLabel };
+export function setCarpoolSchedule(patch: Partial<TripScheduleValue>) {
+  draft = { ...draft, schedule: { ...draft.schedule, ...patch } };
   emit();
 }
 export function setCarpoolCargo(hasCargo: boolean, cargoNote = '') {
@@ -87,15 +88,17 @@ export function setDropoffPref(pref: DropoffPref) {
 const uid = () => `cq-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 
 /** Gửi yêu cầu xe ghép — trạng thái ban đầu "searching", mô phỏng tài xế nhận cuốc do màn tracking tự gọi acceptCarpoolRequest sau vài giây. */
-export async function submitCarpoolRequest(cityId: string, cityName: string, destinationLabel: string, dateLabel: string): Promise<CarpoolRequest> {
+export async function submitCarpoolRequest(cityId: string, cityName: string, destinationLabel: string): Promise<CarpoolRequest> {
   const contact = await getContact();
+  const schedule = draft.schedule;
   const req: CarpoolRequest = {
     id: uid(),
     cityId,
     cityName,
     destinationLabel,
-    dateLabel,
-    timeLabel: draft.timeLabel || 'Trong hôm nay',
+    schedule,
+    departLabel: `${formatDateOptionLabel(DATE_OPTIONS, schedule.departDateKey)} · ${schedule.departTime}`,
+    returnLabel: schedule.tripType === 'roundtrip' ? `${formatDateOptionLabel(DATE_OPTIONS, schedule.returnDateKey)} · ${schedule.returnTime}` : '',
     seatCount: draft.seatCount,
     hasCargo: draft.hasCargo,
     cargoNote: draft.cargoNote,

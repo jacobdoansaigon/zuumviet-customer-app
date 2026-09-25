@@ -1,21 +1,15 @@
-// app/booking/intercity/carpool-request.tsx — "Xe ghép": khách chọn số chỗ, thời gian, hàng hoá, yêu cầu
-// đón/trả tận nơi hay ra bến gần rồi GỬI YÊU CẦU (chưa thấy xe/tài xế cụ thể). Tài xế xe ghép đang chạy tuyến
-// này "nhận cuốc" (mô phỏng ở màn carpool-tracking) rồi mới gửi chi tiết xe cho khách.
+// app/booking/intercity/carpool-request.tsx — "Xe ghép": khách chọn số chỗ, lịch trình (một chiều mặc định,
+// khởi hành 6:00 sáng, hoặc khứ hồi có ngày giờ về), hàng hoá, yêu cầu đón/trả tận nơi hay ra bến gần rồi GỬI
+// YÊU CẦU (chưa thấy xe/tài xế cụ thể). Tài xế xe ghép đang chạy tuyến này "nhận cuốc" (mô phỏng ở màn
+// carpool-tracking) rồi mới gửi chi tiết xe cho khách.
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Button, Icon, Icons, Radio, Screen, Stepper, SwitchRow, TextField } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { buildDateOptions, suggestNearestCity } from '@/constants/mockIntercity';
-import {
-  useCarpoolDraft,
-  setSeatCount,
-  setCarpoolDate,
-  setCarpoolTime,
-  setCarpoolCargo,
-  setDropoffPref,
-  submitCarpoolRequest,
-} from '@/services/carpoolRequestStore';
+import { TripSchedulePicker } from '@/components/booking';
+import { useCarpoolDraft, setSeatCount, setCarpoolSchedule, setCarpoolCargo, setDropoffPref, submitCarpoolRequest } from '@/services/carpoolRequestStore';
 
 const DATE_OPTIONS = buildDateOptions();
 
@@ -23,9 +17,7 @@ export default function CarpoolRequestScreen() {
   const { cityId, cityName, destinationLabel } = useLocalSearchParams<{ cityId?: string; cityName?: string; destinationLabel?: string }>();
   const draft = useCarpoolDraft();
   const [cargoNote, setCargoNoteLocal] = useState('');
-  const [timeText, setTimeText] = useState('');
   const [sending, setSending] = useState(false);
-  const dateLabel = DATE_OPTIONS.find((d) => d.key === draft.dateKey);
 
   // Điểm đến chưa khớp tỉnh/thành đang phục vụ → vẫn nhận yêu cầu, dùng tài xế của tỉnh gần nhất để mô phỏng ghép chuyến
   const fallback = !cityId ? suggestNearestCity() : null;
@@ -37,9 +29,8 @@ export default function CarpoolRequestScreen() {
     if (sending) return;
     setSending(true);
     try {
-      setCarpoolTime(timeText.trim());
       setCarpoolCargo(draft.hasCargo, cargoNote);
-      const req = await submitCarpoolRequest(finalCityId, finalCityName, finalDestLabel, dateLabel ? `${dateLabel.label} ${dateLabel.sub}` : 'Hôm nay');
+      const req = await submitCarpoolRequest(finalCityId, finalCityName, finalDestLabel);
       router.replace({ pathname: '/booking/intercity/carpool-tracking/[requestId]', params: { requestId: req.id } });
     } finally {
       setSending(false);
@@ -79,19 +70,9 @@ export default function CarpoolRequestScreen() {
           </View>
         </View>
 
-        <AppText size={15} weight="bold" style={styles.sectionTitle}>
-          Ngày đi
-        </AppText>
-        <View style={styles.dateWrap}>
-          {DATE_OPTIONS.map((d) => (
-            <Radio key={d.key} selected={d.key === draft.dateKey} onPress={() => setCarpoolDate(d.key)} label={`${d.label} ${d.sub}`} style={styles.dateRow} />
-          ))}
+        <View style={styles.scheduleWrap}>
+          <TripSchedulePicker value={draft.schedule} onChange={setCarpoolSchedule} dateOptions={DATE_OPTIONS} />
         </View>
-
-        <AppText size={15} weight="bold" style={styles.sectionTitle}>
-          Giờ mong muốn
-        </AppText>
-        <TextField placeholder="Ví dụ: khoảng 7 giờ sáng, hoặc trước 12h trưa..." value={timeText} onChangeText={setTimeText} />
 
         <AppText size={15} weight="bold" style={styles.sectionTitle}>
           Đón / trả
@@ -150,9 +131,8 @@ const styles = StyleSheet.create({
     ...Shadow.sm,
   },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  scheduleWrap: { marginTop: Spacing.xl },
   sectionTitle: { marginTop: Spacing.xl, marginBottom: Spacing.sm },
-  dateWrap: { gap: 2 },
-  dateRow: { paddingVertical: Spacing.xs },
   choiceGroup: { gap: 2 },
   choiceRow: { paddingVertical: Spacing.sm },
   choiceSub: { marginLeft: 34, marginTop: -6, marginBottom: 4 },

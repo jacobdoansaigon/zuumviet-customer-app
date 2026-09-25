@@ -7,6 +7,7 @@ export * from './FlatFooter';
 export * from './AddressBlock';
 export * from './AddressMapPreview';
 export * from './SeatPicker';
+export * from './TripSchedulePicker';
 export * from './PackageSizePicker';
 export * from './StopList';
 export * from './OptionRow';

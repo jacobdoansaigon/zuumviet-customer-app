@@ -1,14 +1,18 @@
-// app/booking/intercity/charter.tsx — "Thuê cả xe": chọn hạng xe riêng (4 → 45 chỗ). Dùng lại nguyên bộ máy
-// đặt xe hiện có (confirm.tsx → tracking.tsx) — Xe lớn (16/29/45 chỗ) hiện có thể chưa có xe đăng ký sẵn liên
-// tục, khách ghi rõ nhu cầu ở phần "Ghi chú" (màn Xác nhận) để nhà xe/tài xế phù hợp nhận cuốc.
-import React, { useState } from 'react';
+// app/booking/intercity/charter.tsx — "Thuê cả xe": chọn hạng xe riêng (4 → 45 chỗ) + lịch trình (một chiều
+// mặc định, khởi hành 6:00 sáng, hoặc khứ hồi có ngày giờ về). Dùng lại nguyên bộ máy đặt xe hiện có
+// (confirm.tsx → tracking.tsx) — Xe lớn (16/29/45 chỗ) hiện có thể chưa có xe đăng ký sẵn liên tục, khách ghi
+// rõ nhu cầu ở phần "Ghi chú" (màn Xác nhận) để nhà xe/tài xế phù hợp nhận cuốc.
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { AppHeader, AppText, Button, Icon, Screen, ServiceOption } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
 import { SERVICE_GROUPS, type ServiceOptionDef } from '@/constants/mockBooking';
-import { useBooking, isReceiverComplete, switchRideOption, computePrice, formatVnd } from '@/services/bookingStore';
-import { ServiceInfoDialog } from '@/components/booking';
+import { useBooking, isReceiverComplete, switchRideOption, setOptions, computePrice, formatVnd } from '@/services/bookingStore';
+import { ServiceInfoDialog, TripSchedulePicker } from '@/components/booking';
+import { buildDateOptions, defaultTripSchedule, dateTimeToTs, type TripScheduleValue } from '@/constants/mockIntercity';
+
+const DATE_OPTIONS = buildDateOptions();
 
 export default function CharterScreen() {
   const state = useBooking();
@@ -16,7 +20,16 @@ export default function CharterScreen() {
   const options = group.options;
   const selected = options.find((o) => o.id === state.optionId) ?? options[0]!;
   const [info, setInfo] = useState<ServiceOptionDef | null>(null);
+  const [schedule, setSchedule] = useState<TripScheduleValue>(() => defaultTripSchedule(DATE_OPTIONS));
   const destLabel = state.receivers.filter(isReceiverComplete)[0]?.place?.title ?? '';
+
+  // Đồng bộ lịch trình đã chọn vào đơn (dùng chung field scheduledAt/returnAt sẵn có của bookingStore)
+  useEffect(() => {
+    setOptions({
+      scheduledAt: dateTimeToTs(schedule.departDateKey, schedule.departTime),
+      returnAt: schedule.tripType === 'roundtrip' ? dateTimeToTs(schedule.returnDateKey, schedule.returnTime) : null,
+    });
+  }, [schedule]);
 
   const pick = (o: ServiceOptionDef) => {
     switchRideOption('intercity', o.id);
@@ -35,6 +48,12 @@ export default function CharterScreen() {
             TP. Hồ Chí Minh → {destLabel}
           </AppText>
         </View>
+
+        <TripSchedulePicker value={schedule} onChange={(patch) => setSchedule((s) => ({ ...s, ...patch }))} dateOptions={DATE_OPTIONS} />
+
+        <AppText size={15} weight="bold" style={styles.sectionTitle}>
+          Chọn hạng xe
+        </AppText>
         <View style={styles.options}>
           {options.map((o) => (
             <ServiceOption
@@ -68,5 +87,6 @@ export default function CharterScreen() {
 const styles = StyleSheet.create({
   body: { padding: Spacing.screen, gap: Spacing.md },
   routeRow: { flexDirection: 'row', alignItems: 'center' },
+  sectionTitle: { marginTop: Spacing.sm },
   options: { gap: 4 },
 });

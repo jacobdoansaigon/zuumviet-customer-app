@@ -97,9 +97,16 @@ export const TrackingSheet: React.FC<Props> = ({ order, expanded, onToggle, onMo
         ) : phase === 'scheduled' ? (
           <>
             <Icon name={Icons.calendar} size={26} color={Colors.secondary} style={styles.headIcon} />
-            <AppText weight="bold" size={15} style={{ flex: 1 }}>
-              Đơn hàng sẽ được lên lịch lúc {formatScheduleLabel(order.scheduledAt)}
-            </AppText>
+            <View style={{ flex: 1 }}>
+              <AppText weight="bold" size={15}>
+                Đơn hàng sẽ được lên lịch lúc {formatScheduleLabel(order.scheduledAt)}
+              </AppText>
+              {order.returnAt ? (
+                <AppText size={12} color={Colors.textSecondary} style={{ marginTop: 2 }}>
+                  Khứ hồi · về lúc {formatScheduleLabel(order.returnAt)}
+                </AppText>
+              ) : null}
+            </View>
             {more}
           </>
         ) : phase === 'notfound' ? (
@@ -196,6 +203,11 @@ export const TrackingSheet: React.FC<Props> = ({ order, expanded, onToggle, onMo
             </AppText>
           ) : null}
           <RouteStops stops={stops} titleSize={14} />
+          {order.returnAt ? (
+            <AppText weight="semiBold" size={13} color={Colors.primary} style={{ marginTop: Spacing.sm }}>
+              Khứ hồi · về lúc {formatScheduleLabel(order.returnAt)}
+            </AppText>
+          ) : null}
           <AppText weight="bold" size={14} style={{ marginTop: Spacing.md }}>
             Ghi chú
           </AppText>
