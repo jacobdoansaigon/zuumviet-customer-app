@@ -6,6 +6,7 @@ import { useSyncExternalStore } from 'react';
 import { orderApi, ORDER_STATUS, getStoredCustomer, type DeliveryOrder } from '@/services/api';
 import {
   SERVICE_GROUPS,
+  SERVICE_KEYS,
   EXTRA_PRICES,
   DEFAULT_SENDER_PLACE,
   MOCK_DRIVER,
@@ -205,6 +206,15 @@ export function selectOption(optionId: string) {
   if (state.optionId !== optionId) update({ optionId });
 }
 
+/**
+ * Đổi loại xe ngay trong màn đặt (vd Xe máy ⇄ Xe hơi, xem URBAN_RIDE_KEYS) mà không reset
+ * điểm đón/điểm đến — khác startBooking() vốn dùng khi bắt đầu luồng đặt mới từ Home.
+ */
+export function switchRideOption(service: ServiceKey, optionId: string) {
+  if (state.service === service && state.optionId === optionId) return;
+  update({ service, optionId });
+}
+
 /** Điền tên/SĐT người gửi từ hồ sơ đã đăng nhập (chỉ khi còn trống) */
 export async function hydrateSender() {
   if (state.sender.name && state.sender.phone) return;
@@ -304,8 +314,15 @@ export function resetDraft() {
 
 // ---------------------------------------------------------------- Giá & khoảng cách
 export function getOption(s: BookingState = state, optionId?: string): ServiceOptionDef {
+  const id = optionId ?? s.optionId;
+  // ID duy nhất trên toàn bộ app → tìm xuyên nhóm để giá xem trước đúng khi các nhóm
+  // được gộp chung 1 danh sách (vd Xe máy ⇄ Xe hơi, xem switchRideOption/URBAN_RIDE_KEYS)
+  for (const key of SERVICE_KEYS) {
+    const found = SERVICE_GROUPS[key].options.find((o) => o.id === id);
+    if (found) return found;
+  }
   const opts = SERVICE_GROUPS[s.service].options;
-  return opts.find((o) => o.id === (optionId ?? s.optionId)) ?? opts[0]!;
+  return opts[0]!;
 }
 
 export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {

@@ -655,6 +655,13 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
   },
 };
 
+/**
+ * Xe máy và Xe hơi cùng là "chở khách nội thành" → gộp chung 1 danh sách trong màn đặt xe
+ * để đổi qua lại loại xe mà không phải thoát ra ngoài (giữ nguyên điểm đón/điểm đến đã chọn).
+ * Xe đường dài / Gọi tài xế có luồng đặt khác (đặt trước, thuê xe/tài xế riêng) nên không gộp.
+ */
+export const URBAN_RIDE_KEYS: ServiceKey[] = ['bike', 'car'];
+
 /** Phụ phí theo Figma GH 1.6 / GH 1.4.1 */
 export const EXTRA_PRICES = {
   returnToPickup: 35000,

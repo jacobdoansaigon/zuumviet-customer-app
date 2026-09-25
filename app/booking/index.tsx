@@ -6,13 +6,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AppText, Icon, Icons, ServiceOption } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { SERVICE_GROUPS, toServiceKey, type ServiceOptionDef } from '@/constants/mockBooking';
+import { SERVICE_GROUPS, URBAN_RIDE_KEYS, toServiceKey, type ServiceKey, type ServiceOptionDef } from '@/constants/mockBooking';
 import {
   useBooking,
   startBooking,
   hydrateSender,
   prefillRoute,
-  selectOption,
+  switchRideOption,
   addReceiver,
   removeReceiver,
   pruneIncompleteReceivers,
@@ -23,6 +23,9 @@ import {
 } from '@/services/bookingStore';
 import { BookingMap, RoundIconButton, StopList, ServiceInfoDialog, FlatFooter, useCurrentLocation, type MapStop } from '@/components/booking';
 
+/** Option kèm nhóm dịch vụ gốc — cần khi các nhóm gộp chung 1 danh sách (Xe máy ⇄ Xe hơi) */
+type RideOption = ServiceOptionDef & { groupKey: ServiceKey };
+
 export default function BookingScreen() {
   const { service, from, to } = useLocalSearchParams<{ service?: string; from?: string; to?: string }>();
   const serviceKey = toServiceKey(service);
@@ -31,7 +34,7 @@ export default function BookingScreen() {
   const { height } = useWindowDimensions();
   const location = useCurrentLocation();
   const [expanded, setExpanded] = useState(false);
-  const [info, setInfo] = useState<ServiceOptionDef | null>(null);
+  const [info, setInfo] = useState<RideOption | null>(null);
   const [sheetH, setSheetH] = useState(0);
 
   useEffect(() => {
@@ -57,7 +60,10 @@ export default function BookingScreen() {
 
   const group = SERVICE_GROUPS[state.service];
   const labels = group.labels;
-  const selected = group.options.find((o) => o.id === state.optionId) ?? group.options[0]!;
+  // Xe máy và Xe hơi dùng chung 1 danh sách để đổi qua lại không cần thoát ra (xem URBAN_RIDE_KEYS)
+  const mergedKeys = URBAN_RIDE_KEYS.includes(state.service) ? URBAN_RIDE_KEYS : [state.service];
+  const options: RideOption[] = mergedKeys.flatMap((k) => SERVICE_GROUPS[k].options.map((o) => ({ ...o, groupKey: k })));
+  const selected = options.find((o) => o.id === state.optionId) ?? options[0]!;
   const complete = state.receivers.filter(isReceiverComplete);
   const senderReady = !!state.sender.place && !!state.sender.name && !!state.sender.phone;
   const canConfirm = senderReady && (group.maxStops === 0 || complete.length > 0);
@@ -79,12 +85,12 @@ export default function BookingScreen() {
     const index = addReceiver();
     router.push({ pathname: '/booking/location', params: { target: 'receiver', index: String(index) } });
   };
-  const onOptionPress = (o: ServiceOptionDef) => {
+  const onOptionPress = (o: RideOption) => {
     if (!expanded) {
       setExpanded(true);
       return;
     }
-    selectOption(o.id);
+    switchRideOption(o.groupKey, o.id);
     setExpanded(false);
   };
 
@@ -103,7 +109,7 @@ export default function BookingScreen() {
 
         <ScrollView style={{ maxHeight: height * 0.58 }} contentContainerStyle={{ paddingBottom: Spacing.sm }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.options}>
-            {(expanded ? group.options : [selected]).map((o) => (
+            {(expanded ? options : [selected]).map((o) => (
               <ServiceOption
                 key={o.id}
                 name={o.name}
@@ -136,7 +142,7 @@ export default function BookingScreen() {
         option={info}
         onClose={() => setInfo(null)}
         onSelect={(o) => {
-          selectOption(o.id);
+          switchRideOption((o as RideOption).groupKey, o.id);
           setInfo(null);
           setExpanded(false);
         }}
