@@ -3,16 +3,24 @@
 // Chưa đủ điểm đón + điểm đến (maxStops > 0) → CHƯA hiện danh sách dịch vụ, chỉ hiện lộ trình để nhập.
 // Đủ lộ trình rồi mới hiện dịch vụ kèm giá thật. Xe máy / Xe hơi: danh sách luôn hiện đủ các gói của dịch vụ
 // đang chọn (không thu gọn về 1 dòng); tab đổi dịch vụ ngay trong màn; "Tất cả dịch vụ" gộp thêm gói dịch vụ kia.
-// Xe đường dài: điểm đến khớp 1 tỉnh/thành đang có tuyến → thêm thẻ mở màn "Xe ghép & Mua vé xe" (chọn ngày/giờ,
-// chọn ghế, xem chi tiết nhà xe) ở app/booking/intercity/[cityId].tsx; 3 gói "đặt xe riêng" vẫn luôn có sẵn bên
-// dưới. Không khớp → gợi ý tỉnh/bến xe gần nhất đang phục vụ để khách đổi điểm đến hoặc đặt xe riêng tới đó.
+// Xe đường dài: điểm đến xong → hiện thẳng 3 phương án đi (Thuê cả xe / Xe ghép / Mua vé xe) ngay trên màn
+// này (không cần qua màn trung gian) — Mua vé xe chỉ bật khi điểm đến khớp 1 tỉnh/thành đang có nhà xe chạy,
+// không khớp thì gợi ý tỉnh/bến xe gần nhất đang phục vụ.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AppText, Chip, Icon, Icons, ServiceOption } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { SERVICE_GROUPS, URBAN_RIDE_KEYS, toServiceKey, type ServiceKey, type ServiceOptionDef } from '@/constants/mockBooking';
+import {
+  SERVICE_GROUPS,
+  URBAN_RIDE_KEYS,
+  toServiceKey,
+  matchIntercityCity,
+  suggestNearestCity,
+  type ServiceKey,
+  type ServiceOptionDef,
+} from '@/constants/mockBooking';
 import {
   useBooking,
   startBooking,
@@ -80,10 +88,11 @@ export default function BookingScreen() {
       ? tabKeys.flatMap((k) => SERVICE_GROUPS[k].options.map((o) => ({ ...o, groupKey: k })))
       : group.options.map((o) => ({ ...o, groupKey: state.service }));
 
-  // Xe đường dài: sau khi có điểm đến, không hiện thẳng danh sách hạng xe — dẫn sang màn "Chọn phương án đi"
-  // (Thuê cả xe / Xe ghép / Mua vé xe) ở app/booking/intercity/choose.tsx.
+  // Xe đường dài: sau khi có điểm đến, hiện thẳng 3 phương án đi ngay trên màn này (không hiện danh sách hạng xe).
   const isIntercity = state.service === 'intercity';
   const destPlace = complete[0]?.place ?? null;
+  const matchedCity = isIntercity && destPlace ? matchIntercityCity(`${destPlace.title} ${destPlace.address}`) : null;
+  const nearestCity = isIntercity && hasDestination && !matchedCity ? suggestNearestCity() : null;
   const options: RowOption[] = baseOptions;
   const selected = options.find((o) => o.id === state.optionId) ?? options[0]!;
 
@@ -126,6 +135,18 @@ export default function BookingScreen() {
     />
   );
 
+  // Xe đường dài: 3 phương án đi, bấm vào là đi thẳng — không có bước "chọn rồi xác nhận" riêng.
+  const openCharter = () => router.push('/booking/intercity/charter');
+  const openCarpool = () =>
+    router.push({
+      pathname: '/booking/intercity/carpool-request',
+      params: matchedCity ? { cityId: matchedCity.id, cityName: matchedCity.name, destinationLabel: destPlace?.title ?? '' } : { destinationLabel: destPlace?.title ?? '' },
+    });
+  const openTickets = () => {
+    if (!matchedCity) return;
+    router.push({ pathname: '/booking/intercity/[cityId]', params: { cityId: matchedCity.id } });
+  };
+
   return (
     <View style={styles.root}>
       <BookingMap stops={stops} bottomPadding={sheetH} />
@@ -165,20 +186,58 @@ export default function BookingScreen() {
           {hasDestination ? (
             <>
               {isIntercity ? (
-                <Pressable onPress={() => router.push('/booking/intercity/choose')} style={styles.marketplaceCard}>
-                  <View style={styles.marketplaceIcon}>
-                    <Icon name="mci:bus" size={22} color={Colors.white} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <AppText size={14} weight="bold" color={Colors.text}>
+                <View style={styles.intercityChoices}>
+                  <View style={styles.sectionLabel}>
+                    <AppText size={12} weight="semiBold" color={Colors.textSecondary}>
                       Chọn phương án đi {destPlace?.title ?? ''}
                     </AppText>
-                    <AppText size={12} color={Colors.textSecondary} style={{ marginTop: 2 }}>
-                      Thuê cả xe · Xe ghép · Mua vé xe
-                    </AppText>
                   </View>
-                  <Icon name={Icons.chevronRight} size={18} color={Colors.gray400} />
-                </Pressable>
+
+                  <Pressable onPress={openCharter} style={styles.marketplaceCard}>
+                    <View style={styles.marketplaceIcon}>
+                      <Icon name={Icons.carSide} size={22} color={Colors.white} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <AppText size={14} weight="bold" color={Colors.text}>
+                        Thuê cả xe
+                      </AppText>
+                      <AppText size={12} color={Colors.textSecondary} style={{ marginTop: 2 }}>
+                        Xe riêng theo yêu cầu · 4 đến 45 chỗ, đón tận nơi
+                      </AppText>
+                    </View>
+                    <Icon name={Icons.chevronRight} size={18} color={Colors.gray400} />
+                  </Pressable>
+
+                  <Pressable onPress={openCarpool} style={styles.marketplaceCard}>
+                    <View style={styles.marketplaceIcon}>
+                      <Icon name="mci:car-multiple" size={22} color={Colors.white} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <AppText size={14} weight="bold" color={Colors.text}>
+                        Xe ghép
+                      </AppText>
+                      <AppText size={12} color={Colors.textSecondary} style={{ marginTop: 2 }}>
+                        Chọn số chỗ, thời gian — gửi yêu cầu để tài xế nhận cuốc
+                      </AppText>
+                    </View>
+                    <Icon name={Icons.chevronRight} size={18} color={Colors.gray400} />
+                  </Pressable>
+
+                  <Pressable onPress={openTickets} disabled={!matchedCity} style={[styles.marketplaceCard, !matchedCity && styles.marketplaceCardDisabled]}>
+                    <View style={[styles.marketplaceIcon, !matchedCity && styles.marketplaceIconDisabled]}>
+                      <Icon name="mci:bus" size={22} color={matchedCity ? Colors.white : Colors.gray400} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <AppText size={14} weight="bold" color={matchedCity ? Colors.text : Colors.textSecondary}>
+                        Mua vé xe
+                      </AppText>
+                      <AppText size={12} color={Colors.textSecondary} style={{ marginTop: 2 }}>
+                        {matchedCity ? 'Chọn nhà xe, chuyến, ghế ngồi, vé điện tử' : `Chưa có nhà xe tới đây · gần nhất ${nearestCity?.name} (${nearestCity?.distanceKm}km)`}
+                      </AppText>
+                    </View>
+                    {matchedCity ? <Icon name={Icons.chevronRight} size={18} color={Colors.gray400} /> : null}
+                  </Pressable>
+                </View>
               ) : (
                 <View style={styles.options}>{options.map(renderOption)}</View>
               )}
@@ -197,11 +256,9 @@ export default function BookingScreen() {
           />
         </ScrollView>
 
-        <FlatFooter
-          title={isIntercity ? 'Chọn phương án đi' : canConfirm ? 'Xác nhận' : labels.confirmHint}
-          disabled={isIntercity ? !hasDestination : !canConfirm}
-          onPress={() => router.push(isIntercity ? '/booking/intercity/choose' : '/booking/confirm')}
-        />
+        {isIntercity && hasDestination ? null : (
+          <FlatFooter title={canConfirm ? 'Xác nhận' : labels.confirmHint} disabled={!canConfirm} onPress={() => router.push('/booking/confirm')} />
+        )}
       </View>
 
       <ServiceInfoDialog
@@ -237,18 +294,17 @@ const styles = StyleSheet.create({
   options: { paddingHorizontal: Spacing.screen, gap: 4 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginHorizontal: Spacing.screen, marginVertical: Spacing.xs },
   sectionLabel: { paddingHorizontal: Spacing.screen, paddingTop: Spacing.sm, paddingBottom: 2 },
+  intercityChoices: { paddingHorizontal: Spacing.screen, gap: Spacing.sm },
   marketplaceCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: Spacing.screen,
-    marginTop: Spacing.xs,
-    marginBottom: Spacing.sm,
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     borderWidth: 1.5,
     borderColor: Colors.primarySoft,
     backgroundColor: Colors.primaryBg,
   },
+  marketplaceCardDisabled: { borderColor: Colors.border, backgroundColor: Colors.surfaceAlt },
   marketplaceIcon: {
     width: 40,
     height: 40,
@@ -258,13 +314,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: Spacing.md,
   },
-  suggestCard: {
-    flexDirection: 'row',
-    marginHorizontal: Spacing.screen,
-    marginTop: Spacing.xs,
-    marginBottom: Spacing.sm,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.primaryBg,
-  },
+  marketplaceIconDisabled: { backgroundColor: Colors.gray200 },
 });

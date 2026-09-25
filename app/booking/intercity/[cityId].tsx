@@ -1,6 +1,6 @@
 // app/booking/intercity/[cityId].tsx — Mua vé xe đi {city}: chọn ngày đi + khung giờ, xem chuyến theo từng
 // nhà xe (1 nhà xe có thể chạy nhiều chuyến/ngày). Xe ghép giờ là màn riêng (carpool-request.tsx, mô hình
-// gửi yêu cầu → tài xế nhận cuốc), không còn ở màn kết quả này — xem app/booking/intercity/choose.tsx.
+// gửi yêu cầu → tài xế nhận cuốc), không còn ở màn kết quả này — vào từ 3 thẻ phương án ở app/booking/index.tsx.
 import React, { useMemo, useState } from 'react';
 import { View, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
