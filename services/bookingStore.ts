@@ -662,6 +662,22 @@ export async function submitBooking(): Promise<SubmitResult> {
   return { orderId: mock.id, mock: true, error: apiError };
 }
 
+/**
+ * "Chọn tài xế trực tiếp": khách đã gặp tài xế ngoài đời và quét mã QR của họ để đặt chuyến ngay,
+ * bỏ qua bước tìm/ghép tài xế. Chưa có API cho luồng này ở BE → tạo thẳng đơn mock ở trạng thái "đã nhận".
+ */
+export function submitBookingWithDriver(driver: DriverDef): SubmitResult {
+  const s = state;
+  const price = computePrice(s);
+  const order = trackedFromDraft(`mock-${uid()}`, s, price, true);
+  order.driver = driver;
+  order.status = ORDER_STATUS.ACCEPTED;
+  order.etaMinutes = 5;
+  rememberOrder(order);
+  resetDraft();
+  return { orderId: order.id, mock: true, error: null };
+}
+
 // ---------------------------------------------------------------- Format helpers
 export function formatVnd(n: number, opts?: { space?: boolean }): string {
   const s = Math.round(Math.abs(n))

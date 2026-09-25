@@ -60,6 +60,21 @@ export default function ConfirmScreen() {
 
   const footer = (
     <View style={styles.footer}>
+      <Pressable style={styles.directRow} onPress={() => router.push('/booking/scan-driver')} accessibilityRole="button">
+        <View style={styles.directIcon}>
+          <Icon name="mci:qrcode-scan" size={20} color={Colors.white} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <AppText size={14} weight="bold" color={Colors.text}>
+            Chọn {providerLower} trực tiếp
+          </AppText>
+          <AppText size={12} color={Colors.textSecondary}>
+            Quét mã QR {providerLower} đưa để đặt chuyến ngay
+          </AppText>
+        </View>
+        <Icon name={Icons.chevronRight} size={18} color={Colors.gray400} />
+      </Pressable>
+      <View style={styles.directDivider} />
       <View style={styles.payRow}>
         <Pressable style={styles.payHalf} onPress={() => router.push('/booking/promo')}>
           <Icon name={Icons.ticket} size={22} color={Colors.primary} />
@@ -171,6 +186,17 @@ const styles = StyleSheet.create({
   noteRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: Spacing.screen, paddingVertical: Spacing.md },
   noteInput: { flex: 1, fontSize: 15, color: Colors.text, paddingVertical: 0, minHeight: 44, textAlignVertical: 'top' },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border, backgroundColor: Colors.white },
+  directRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.screen, paddingVertical: Spacing.md },
+  directIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  directDivider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginHorizontal: Spacing.screen },
   payRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.md },
   payHalf: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   vDivider: { width: StyleSheet.hairlineWidth, height: 24, backgroundColor: Colors.gray300 },

@@ -763,6 +763,45 @@ export const FAVORITE_DRIVERS: DriverDef[] = [
 /** Tài xế mock được "ghép" khi BE chưa trả thông tin tài xế */
 export const MOCK_DRIVER: DriverDef = FAVORITE_DRIVERS[0]!;
 
+/**
+ * Dựng hồ sơ tài xế từ mã QR quét được (Chọn tài xế trực tiếp).
+ * Hỗ trợ 3 dạng mã: JSON đầy đủ {id,name,plate,...} do app tài xế phát sinh,
+ * mã "ZV-DRIVER-<id>" khớp với FAVORITE_DRIVERS, hoặc chuỗi bất kỳ (demo) → tài xế mẫu kèm mã đã quét.
+ */
+export function resolveScannedDriver(raw: string): DriverDef {
+  const code = raw.trim();
+  try {
+    const j = JSON.parse(code);
+    if (j && typeof j === 'object' && (j.name || j.id)) {
+      return {
+        id: Number(j.id) || Date.now() % 100000,
+        name: String(j.name ?? 'Tài xế đã xác thực'),
+        plate: String(j.plate ?? j.bienso ?? '—'),
+        vehicle: String(j.vehicle ?? j.xe ?? ''),
+        rating: Number(j.rating) || 5,
+        reviews: Number(j.reviews) || 0,
+        phone: String(j.phone ?? ''),
+      };
+    }
+  } catch {
+    /* không phải JSON — thử các dạng khác bên dưới */
+  }
+  const idMatch = code.match(/(?:ZV-DRIVER-|driver[/:]?)(\d+)/i);
+  if (idMatch) {
+    const found = FAVORITE_DRIVERS.find((d) => d.id === Number(idMatch[1]));
+    if (found) return found;
+  }
+  return {
+    id: Date.now() % 100000,
+    name: 'Tài xế đã xác thực',
+    plate: `Mã: ${code.slice(0, 16)}`,
+    vehicle: '',
+    rating: 5,
+    reviews: 0,
+    phone: '',
+  };
+}
+
 export interface ContactDef {
   name: string;
   phone: string;

@@ -50,6 +50,12 @@
           "photosPermission": "\u1ee8ng d\u1ee5ng c\u1ea7n truy c\u1eadp \u1ea3nh \u0111\u1ec3 t\u1ea3i l\u00ean gi\u1ea5y t\u1edd t\u00e0i x\u1ebf.",
           "cameraPermission": "\u1ee8ng d\u1ee5ng c\u1ea7n camera \u0111\u1ec3 ch\u1ee5p gi\u1ea5y t\u1edd t\u00e0i x\u1ebf."
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "\u1ee8ng d\u1ee5ng c\u1ea7n camera \u0111\u1ec3 qu\u00e9t m\u00e3 QR c\u1ee7a t\u00e0i x\u1ebf."
+        }
       ]
     ]
   }
