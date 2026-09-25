@@ -1,5 +1,5 @@
-// ServiceCard — card trắng bo 12 đè lên header: lưới dịch vụ 4 cột (icon tím + label)
-// Hàng 1: Xe máy / Xe hơi / Xe 6 chỗ / Xe đường dài — Hàng 2: Giao hàng / Vận tải / Dọn nhà / Gọi tài xế
+// ServiceCard — card trắng bo 12 đè lên header: lưới dịch vụ 3 cột × 3 hàng (icon tím + label)
+// Hàng 1: Xe máy / Xe hơi / Xe đường dài — Hàng 2: Giao hàng / Vận tải / Dọn nhà — Hàng 3: Gọi tài xế / Gọi thợ / Thuê nhân công
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
@@ -10,7 +10,7 @@ export type HomeServiceKey = ServiceKey;
 
 export type HomeService = { key: HomeServiceKey; label: string; icon: IconName };
 
-const HOME_ORDER: HomeServiceKey[] = ['bike', 'car', 'car6', 'intercity', 'delivery', 'transport', 'rental', 'driver'];
+const HOME_ORDER: HomeServiceKey[] = ['bike', 'car', 'intercity', 'delivery', 'transport', 'rental', 'driver', 'handyman', 'labor'];
 
 export const HOME_SERVICES: HomeService[] = HOME_ORDER.map((key) => ({
   key,
@@ -21,11 +21,11 @@ export const HOME_SERVICES: HomeService[] = HOME_ORDER.map((key) => ({
 interface ServiceCardProps {
   onSelect: (key: HomeServiceKey) => void;
   services?: HomeService[];
-  /** số cột (mặc định 4) */
+  /** số cột (mặc định 3) */
   columns?: number;
 }
 
-export const ServiceCard: React.FC<ServiceCardProps> = ({ onSelect, services = HOME_SERVICES, columns = 4 }) => (
+export const ServiceCard: React.FC<ServiceCardProps> = ({ onSelect, services = HOME_SERVICES, columns = 3 }) => (
   <View style={styles.card}>
     {services.map((s) => (
       <Pressable
@@ -36,9 +36,9 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ onSelect, services = H
         accessibilityLabel={s.label}
       >
         <View style={styles.iconWrap}>
-          <Icon name={s.icon} size={34} color={Colors.primary} />
+          <Icon name={s.icon} size={36} color={Colors.primary} />
         </View>
-        <AppText size={13} weight="semiBold" color={Colors.text} align="center" numberOfLines={1}>
+        <AppText size={14} weight="semiBold" color={Colors.text} align="center" numberOfLines={1}>
           {s.label}
         </AppText>
       </Pressable>
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
   },
   item: { alignItems: 'center', paddingVertical: Spacing.sm, paddingHorizontal: 2, borderRadius: BorderRadius.md },
   pressed: { backgroundColor: Colors.primaryBg },
-  iconWrap: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  iconWrap: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
 });
 
 export default ServiceCard;

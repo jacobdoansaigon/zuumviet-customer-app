@@ -3,9 +3,9 @@
 // mã ưu đãi, tài xế yêu thích, danh bạ → toàn bộ mock nằm ở đây (đánh dấu rõ ràng để thay sau).
 import { Icons, type IconName } from '@/components/ui/Icon';
 
-export type ServiceKey = 'delivery' | 'transport' | 'rental' | 'bike' | 'car' | 'car6' | 'intercity' | 'driver' | 'handyman';
+export type ServiceKey = 'delivery' | 'transport' | 'rental' | 'bike' | 'car' | 'car6' | 'intercity' | 'driver' | 'handyman' | 'labor';
 
-export const SERVICE_KEYS: ServiceKey[] = ['delivery', 'transport', 'rental', 'bike', 'car', 'car6', 'intercity', 'driver', 'handyman'];
+export const SERVICE_KEYS: ServiceKey[] = ['delivery', 'transport', 'rental', 'bike', 'car', 'car6', 'intercity', 'driver', 'handyman', 'labor'];
 
 export function toServiceKey(v: unknown): ServiceKey {
   return typeof v === 'string' && (SERVICE_KEYS as string[]).includes(v) ? (v as ServiceKey) : 'delivery';
@@ -126,6 +126,22 @@ export const ONSITE_LABELS: ServiceLabels = {
   trackingDone: 'Hoàn thành công việc',
 };
 
+/** Thuê nhân công: giống gọi thợ (1 địa điểm), đổi cách gọi "Nhân công" */
+export const LABOR_LABELS: ServiceLabels = {
+  ...ONSITE_LABELS,
+  provider: 'Nhân công',
+  feeLabel: 'Phí thuê nhân công',
+  senderLocationTitle: 'Địa điểm làm việc',
+  senderLocationPlaceholder: 'Nhập địa điểm cần nhân công',
+  senderStatus: 'Địa điểm làm việc',
+  confirmTitle: 'Xác nhận thuê nhân công',
+  confirmHint: 'Vui lòng nhập địa điểm làm việc',
+  trackingAccepted: 'Nhân công đang đến',
+  trackingEta: '{eta} phút nữa Nhân công đến nơi',
+  trackingDelivering: 'Đang làm việc',
+  trackingDone: 'Hoàn thành công việc',
+};
+
 export interface ServiceOptionDef {
   id: string;
   /** service_id gửi lên BE (POST /site/deliveryorders). TODO: map theo bảng `service` thật trên Railway */
@@ -156,6 +172,46 @@ export interface ServiceGroupDef {
 }
 
 const VAT_LINE = '* Giá đã bao gồm VAT';
+
+/** Gói xe 6-7 chỗ — nằm trong nhóm Xe hơi (và nhóm car6 cũ để tương thích link) */
+const SIX_SEAT_OPTIONS: ServiceOptionDef[] = [
+  {
+    id: 'xe-6-cho',
+    serviceId: 51,
+    name: 'Xe 6 chỗ',
+    description: 'SUV / MPV, tối đa 6 khách',
+    basePrice: 38000,
+    includedKm: 2,
+    perKmPrice: 13000,
+    extraStopPrice: 0,
+    icon: Icons.carSeat,
+    infoLines: ['Giá mở cửa (2km đầu): đ38.000', 'Mỗi km tiếp theo: đ13.000', 'Phụ phí giờ cao điểm: +đ10.000', 'Khoang hành lý rộng', VAT_LINE],
+  },
+  {
+    id: 'xe-7-cho',
+    serviceId: 53,
+    name: 'Xe 7 chỗ',
+    description: 'Fortuner, Innova… tối đa 7 khách',
+    basePrice: 42000,
+    includedKm: 2,
+    perKmPrice: 14500,
+    extraStopPrice: 0,
+    icon: Icons.carSeat,
+    infoLines: ['Giá mở cửa (2km đầu): đ42.000', 'Mỗi km tiếp theo: đ14.500', 'Phụ phí giờ cao điểm: +đ10.000', 'Phù hợp gia đình, nhóm bạn', VAT_LINE],
+  },
+  {
+    id: 'xe-6-cho-san-bay',
+    serviceId: 55,
+    name: 'Xe 6 chỗ sân bay',
+    description: 'Đưa đón sân bay, giá trọn gói',
+    basePrice: 250000,
+    includedKm: 15,
+    perKmPrice: 10000,
+    extraStopPrice: 0,
+    icon: Icons.carSeat,
+    infoLines: ['Trọn gói 15km đầu: đ250.000', 'Vượt km: đ10.000/km', 'Đã gồm phí ra vào sân bay', 'Chờ tối đa 30 phút sau giờ hạ cánh', VAT_LINE],
+  },
+];
 
 export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
   delivery: {
@@ -375,8 +431,10 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         icon: Icons.carSide,
         infoLines: ['Giá mở cửa (2km đầu): đ38.000', 'Mỗi km tiếp theo: đ13.500', 'Xe đời 2020 trở lên, có nước suối', 'Tài xế đánh giá 4.9★ trở lên', VAT_LINE],
       },
+      ...SIX_SEAT_OPTIONS,
     ],
   },
+  // Nhóm cũ "Xe 6 chỗ" — không còn trên lưới trang chủ, giữ để link/gợi ý cũ vẫn mở được
   car6: {
     key: 'car6',
     title: 'Xe 6 chỗ',
@@ -384,44 +442,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
     kind: 'ride',
     labels: RIDE_LABELS,
     maxStops: 1,
-    options: [
-      {
-        id: 'xe-6-cho',
-        serviceId: 51,
-        name: 'Xe 6 chỗ',
-        description: 'SUV / MPV, tối đa 6 khách',
-        basePrice: 38000,
-        includedKm: 2,
-        perKmPrice: 13000,
-        extraStopPrice: 0,
-        icon: Icons.carSeat,
-        infoLines: ['Giá mở cửa (2km đầu): đ38.000', 'Mỗi km tiếp theo: đ13.000', 'Phụ phí giờ cao điểm: +đ10.000', 'Khoang hành lý rộng', VAT_LINE],
-      },
-      {
-        id: 'xe-7-cho',
-        serviceId: 53,
-        name: 'Xe 7 chỗ',
-        description: 'Fortuner, Innova… tối đa 7 khách',
-        basePrice: 42000,
-        includedKm: 2,
-        perKmPrice: 14500,
-        extraStopPrice: 0,
-        icon: Icons.carSeat,
-        infoLines: ['Giá mở cửa (2km đầu): đ42.000', 'Mỗi km tiếp theo: đ14.500', 'Phụ phí giờ cao điểm: +đ10.000', 'Phù hợp gia đình, nhóm bạn', VAT_LINE],
-      },
-      {
-        id: 'xe-6-cho-san-bay',
-        serviceId: 55,
-        name: 'Xe 6 chỗ sân bay',
-        description: 'Đưa đón sân bay, giá trọn gói',
-        basePrice: 250000,
-        includedKm: 15,
-        perKmPrice: 10000,
-        extraStopPrice: 0,
-        icon: Icons.carSeat,
-        infoLines: ['Trọn gói 15km đầu: đ250.000', 'Vượt km: đ10.000/km', 'Đã gồm phí ra vào sân bay', 'Chờ tối đa 30 phút sau giờ hạ cánh', VAT_LINE],
-      },
-    ],
+    options: SIX_SEAT_OPTIONS,
   },
   driver: {
     key: 'driver',
@@ -571,6 +592,64 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         extraStopPrice: 0,
         icon: Icons.lock,
         infoLines: ['Phí gọi thợ: đ120.000', 'Mở khoá cửa / xe: từ đ150.000', 'Thay ổ khoá: báo giá theo loại', 'Yêu cầu xuất trình giấy tờ chứng minh sở hữu', VAT_LINE],
+      },
+    ],
+  },
+  labor: {
+    key: 'labor',
+    title: 'Thuê nhân công',
+    icon: Icons.hardHat,
+    kind: 'onsite',
+    labels: LABOR_LABELS,
+    maxStops: 0,
+    options: [
+      {
+        id: 'boc-xep-4h',
+        serviceId: 81,
+        name: 'Bốc xếp 4 giờ',
+        description: '1 nhân công, khuân vác, sắp xếp kho',
+        basePrice: 400000,
+        includedKm: 0,
+        perKmPrice: 0,
+        extraStopPrice: 0,
+        icon: Icons.hardHat,
+        infoLines: ['Gói 4 giờ: đ400.000 / 1 nhân công', 'Vượt giờ: đ90.000/giờ', 'Có bao tay, xe đẩy, dây ràng', 'Nhóm từ 2 người: giảm 5%/người', VAT_LINE],
+      },
+      {
+        id: 'giup-viec-4h',
+        serviceId: 83,
+        name: 'Giúp việc theo giờ',
+        description: 'Dọn dẹp, lau nhà, giặt ủi, 4 giờ',
+        basePrice: 320000,
+        includedKm: 0,
+        perKmPrice: 0,
+        extraStopPrice: 0,
+        icon: 'mci:broom',
+        infoLines: ['Gói 4 giờ: đ320.000', 'Vượt giờ: đ70.000/giờ', 'Tự mang dụng cụ vệ sinh cơ bản', 'Nhân viên có hồ sơ, đánh giá công khai', VAT_LINE],
+      },
+      {
+        id: 'phu-ho-1-ngay',
+        serviceId: 85,
+        name: 'Phụ hồ / công trình 1 ngày',
+        description: '8 giờ, phụ việc xây dựng, sửa chữa',
+        basePrice: 550000,
+        includedKm: 0,
+        perKmPrice: 0,
+        extraStopPrice: 0,
+        icon: 'mci:shovel',
+        infoLines: ['Gói 8 giờ: đ550.000 / 1 nhân công', 'Vượt giờ: đ80.000/giờ', 'Có nón, giày bảo hộ', 'Đặt trước tối thiểu 12 giờ', VAT_LINE],
+      },
+      {
+        id: 'nhan-su-su-kien',
+        serviceId: 87,
+        name: 'Nhân sự sự kiện',
+        description: 'Chạy bàn, tạp vụ, hỗ trợ sự kiện, 5 giờ',
+        basePrice: 450000,
+        includedKm: 0,
+        perKmPrice: 0,
+        extraStopPrice: 0,
+        icon: 'mci:account-group-outline',
+        infoLines: ['Gói 5 giờ: đ450.000 / 1 nhân sự', 'Vượt giờ: đ90.000/giờ', 'Đồng phục theo yêu cầu (+đ50.000)', 'Đặt trước tối thiểu 24 giờ', VAT_LINE],
       },
     ],
   },
