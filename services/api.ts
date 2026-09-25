@@ -400,6 +400,23 @@ export const customerApi = {
     }),
 };
 
+/** "Dán từ Zalo": gửi nguyên đoạn tin nhắn đã copy để BE gọi LLM tách tên/SĐT/địa chỉ/ghi chú. */
+export interface ParsedAddress {
+  name: string;
+  phone: string;
+  address: string;
+  note: string;
+}
+
+export const addressParseApi = {
+  parse: (text: string) =>
+    request<ParsedAddress>('/site/addressparses', {
+      method: 'POST',
+      auth: true,
+      body: { text },
+    }),
+};
+
 export const orderApi = {
   getOrders: (status?: number) =>
     request<{ total: number; items: DeliveryOrder[] }>('/site/deliveryorders', {

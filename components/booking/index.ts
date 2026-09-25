@@ -15,4 +15,5 @@ export * from './ServiceInfoDialog';
 export * from './DriverPickerSheet';
 export * from './PaymentSheet';
 export * from './ContactPickerSheet';
+export * from './ZaloPasteSheet';
 export * from './TrackingSheet';

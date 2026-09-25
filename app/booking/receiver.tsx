@@ -2,13 +2,13 @@
 // Giao hàng: địa chỉ, Giao hàng tận tay, họ tên/SĐT/COD/ghi chú, kích cỡ gói hàng (4 ô), tuỳ chọn xem hàng → "Xác Nhận"
 // Chở khách: chỉ địa chỉ điểm đến + bản đồ tràn khung (chạm để đổi) → "Xác Nhận"; tên/SĐT lấy của người đặt
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Pressable, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AppHeader, Icons, Radio, Screen, SwitchRow, TextField } from '@/components/ui';
+import { AppHeader, AppText, Icon, Icons, Radio, Screen, SwitchRow, TextField } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
-import { SERVICE_GROUPS, VIEW_OPTIONS, type PackageSizeId, type ViewOptionId } from '@/constants/mockBooking';
-import { useBooking, ensureReceiver, updateReceiver, isValidPhoneVn, formatThousands } from '@/services/bookingStore';
-import { AddressBlock, AddressMapPreview, ContactPickerSheet, FlatFooter, PackageSizePicker, type MapStop } from '@/components/booking';
+import { SERVICE_GROUPS, VIEW_OPTIONS, HCM_CENTER, type PackageSizeId, type ViewOptionId } from '@/constants/mockBooking';
+import { useBooking, ensureReceiver, updateReceiver, setReceiverPlace, isValidPhoneVn, formatThousands } from '@/services/bookingStore';
+import { AddressBlock, AddressMapPreview, ContactPickerSheet, FlatFooter, PackageSizePicker, ZaloPasteSheet, type MapStop } from '@/components/booking';
 
 export default function ReceiverScreen() {
   const { index: indexParam } = useLocalSearchParams<{ index?: string }>();
@@ -32,11 +32,23 @@ export default function ReceiverScreen() {
   const [view, setView] = useState<ViewOptionId>(receiver?.viewOption ?? 'view');
   const [hand, setHand] = useState(receiver?.handDelivery ?? false);
   const [contacts, setContacts] = useState(false);
+  const [zaloPaste, setZaloPaste] = useState(false);
 
   const place = receiver?.place ?? null;
   const valid = !!place && (!isDelivery || (name.trim().length >= 2 && isValidPhoneVn(phone)));
 
   const openPicker = () => router.push({ pathname: '/booking/location', params: { target: 'receiver', index: String(index), back: '1' } });
+
+  // "Dán từ Zalo": chỉ ghi đè trường nào thực sự tách được, giữ nguyên phần khách đã tự nhập
+  const applyZaloPaste = (r: { name: string; phone: string; address: string; note: string }) => {
+    if (r.name) setName(r.name);
+    if (r.phone) setPhone(r.phone);
+    if (r.note) setNote((n) => n || r.note);
+    if (r.address) {
+      const anchor = place ?? state.sender.place ?? HCM_CENTER;
+      setReceiverPlace(index, { title: r.address, address: r.address, lat: anchor.lat + 0.006, lng: anchor.lng + 0.004, source: 'search' });
+    }
+  };
 
   // Bản đồ xem trước (chở khách): điểm đón + điểm đến
   const mapStops = useMemo<MapStop[]>(() => {
@@ -72,6 +84,13 @@ export default function ReceiverScreen() {
       {isDelivery ? (
         <View style={styles.body}>
           <AddressBlock address={place?.address} placeholder={labels.receiverPlaceholder} markerType="dropoff" onChange={openPicker} />
+
+          <Pressable onPress={() => setZaloPaste(true)} style={styles.zaloRow}>
+            <Icon name={Icons.paste} size={18} color={Colors.primary} style={{ marginRight: Spacing.sm }} />
+            <AppText size={14} weight="bold" color={Colors.primary}>
+              Dán từ Zalo — tự điền tên, SĐT, địa chỉ
+            </AppText>
+          </Pressable>
 
           <SwitchRow icon={Icons.handHold} label="Giao hàng tận tay" sublabel="đ10,000" value={hand} onValueChange={setHand} />
           <View style={styles.divider} />
@@ -137,6 +156,7 @@ export default function ReceiverScreen() {
           setPhone(c.phone);
         }}
       />
+      <ZaloPasteSheet visible={zaloPaste} onClose={() => setZaloPaste(false)} includeContact onApply={applyZaloPaste} />
     </Screen>
   );
 }
@@ -147,4 +167,5 @@ const styles = StyleSheet.create({
   field: { marginTop: Spacing.base },
   radios: { marginTop: Spacing.lg },
   radio: { paddingVertical: Spacing.md },
+  zaloRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.md },
 });

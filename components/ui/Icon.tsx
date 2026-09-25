@@ -118,6 +118,8 @@ export const Icons = {
   location: 'ion:location-outline' as IconName,
   locationFilled: 'ion:location' as IconName,
   map: 'ion:map-outline' as IconName,
+  paste: 'ion:clipboard-outline' as IconName,
+  sparkles: 'ion:sparkles-outline' as IconName,
   navigate: 'ion:navigate' as IconName,
   locate: 'ion:locate' as IconName,
   bookmark: 'ion:bookmark-outline' as IconName,

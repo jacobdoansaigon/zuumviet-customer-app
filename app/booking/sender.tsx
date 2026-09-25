@@ -2,13 +2,13 @@
 // Chở khách (Xe máy / Xe hơi / Xe đường dài / Gọi tài xế): chỉ địa chỉ + bản đồ tràn khung (chạm để đổi) → "Xác Nhận";
 // tên/SĐT lấy sẵn từ hồ sơ đăng nhập (hydrateSender), không cần hỏi lại.
 import React, { useMemo, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { AppHeader, Icons, Screen, TextField } from '@/components/ui';
-import { Spacing } from '@/constants/theme';
-import { SERVICE_GROUPS } from '@/constants/mockBooking';
-import { useBooking, setSenderInfo, isValidPhoneVn } from '@/services/bookingStore';
-import { AddressBlock, AddressMapPreview, ContactPickerSheet, FlatFooter, type MapStop } from '@/components/booking';
+import { AppHeader, AppText, Icon, Icons, Screen, TextField } from '@/components/ui';
+import { Colors, Spacing } from '@/constants/theme';
+import { SERVICE_GROUPS, HCM_CENTER } from '@/constants/mockBooking';
+import { useBooking, setSenderInfo, setSenderPlace, isValidPhoneVn } from '@/services/bookingStore';
+import { AddressBlock, AddressMapPreview, ContactPickerSheet, FlatFooter, ZaloPasteSheet, type MapStop } from '@/components/booking';
 
 export default function SenderScreen() {
   const state = useBooking();
@@ -18,6 +18,7 @@ export default function SenderScreen() {
   const [name, setName] = useState(state.sender.name);
   const [phone, setPhone] = useState(state.sender.phone);
   const [contacts, setContacts] = useState(false);
+  const [zaloPaste, setZaloPaste] = useState(false);
   const place = state.sender.place;
   const valid = isRide ? !!place : name.trim().length >= 2 && isValidPhoneVn(phone) && !!place;
 
@@ -32,6 +33,16 @@ export default function SenderScreen() {
     if (!isRide) setSenderInfo({ name: name.trim(), phone: phone.trim() });
     if (router.canGoBack()) router.back();
     else router.replace('/booking');
+  };
+
+  // "Dán từ Zalo": chỉ ghi đè trường nào thực sự tách được, giữ nguyên phần khách đã tự nhập
+  const applyZaloPaste = (r: { name: string; phone: string; address: string; note: string }) => {
+    if (r.name) setName(r.name);
+    if (r.phone) setPhone(r.phone);
+    if (r.address) {
+      const anchor = place ?? HCM_CENTER;
+      setSenderPlace({ title: r.address, address: r.address, lat: anchor.lat + 0.006, lng: anchor.lng + 0.004, source: 'search' });
+    }
   };
 
   return (
@@ -55,6 +66,14 @@ export default function SenderScreen() {
       ) : (
         <View style={styles.body}>
           <AddressBlock address={place?.address} placeholder={labels.senderLocationPlaceholder} onChange={openPicker} />
+
+          <Pressable onPress={() => setZaloPaste(true)} style={styles.zaloRow}>
+            <Icon name={Icons.paste} size={18} color={Colors.primary} style={{ marginRight: Spacing.sm }} />
+            <AppText size={14} weight="bold" color={Colors.primary}>
+              Dán từ Zalo — tự điền tên, SĐT, địa chỉ
+            </AppText>
+          </Pressable>
+
           <TextField
             label={labels.senderNameLabel}
             required
@@ -64,7 +83,7 @@ export default function SenderScreen() {
             autoCapitalize="words"
             iconRight={Icons.contacts}
             onIconRightPress={() => setContacts(true)}
-            containerStyle={{ marginTop: Spacing.lg }}
+            containerStyle={{ marginTop: Spacing.base }}
           />
           <TextField
             label="Số điện thoại"
@@ -85,10 +104,12 @@ export default function SenderScreen() {
           setPhone(c.phone);
         }}
       />
+      <ZaloPasteSheet visible={zaloPaste} onClose={() => setZaloPaste(false)} includeContact onApply={applyZaloPaste} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   body: { padding: Spacing.screen },
+  zaloRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.md },
 });

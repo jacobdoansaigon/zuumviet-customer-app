@@ -10,6 +10,7 @@ import { AppHeader, AppText, Chip, Icon, Icons, Screen, StopMarker, fontStyle } 
 import { Colors, Spacing, BorderRadius, Sizes } from '@/constants/theme';
 import { SAMPLE_PLACES, SAVED_LOCATIONS, HCM_CENTER, SERVICE_GROUPS, INTERCITY_CITIES, type SamplePlace, type IntercityCity } from '@/constants/mockBooking';
 import { useBooking, setSenderPlace, setReceiverPlace, placeFromSample, haversineKm, type Place } from '@/services/bookingStore';
+import { ZaloPasteSheet } from '@/components/booking';
 
 type Result = SamplePlace & { km: number };
 
@@ -33,6 +34,7 @@ export default function LocationScreen() {
   const [query, setQuery] = useState(current && current.source !== 'default' ? current.address : '');
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState<Record<string, boolean>>(() => Object.fromEntries(SAMPLE_PLACES.filter((p) => p.saved).map((p) => [p.id, true])));
+  const [zaloPaste, setZaloPaste] = useState(false);
   const origin = state.sender.place ?? HCM_CENTER;
 
   // Xe đường dài: gợi ý mặc định là các tỉnh/thành đang có tuyến (thay cho "Vị trí đã lưu" trong TP.HCM) —
@@ -70,18 +72,33 @@ export default function LocationScreen() {
 
   const openMapPicker = () => router.push({ pathname: '/booking/pick-on-map', params: { target, index: String(index), back } });
 
+  // "Dán từ Zalo": chỉ cần địa chỉ ở màn này (tên/SĐT được điền ở màn Thông tin người gửi/nhận) — chọn xong đi thẳng
+  const applyZaloPaste = (r: { address: string }) => {
+    if (!r.address) return;
+    choose({ id: `zalo-${Date.now()}`, title: r.address, address: r.address, lat: origin.lat + 0.012, lng: origin.lng + 0.008 });
+  };
+
   return (
     <Screen
       header={<AppHeader variant="dark" title={isReceiver ? labels.receiverLocationTitle : labels.senderLocationTitle} left="close" />}
       keyboardAvoiding={false}
       footer={
-        <Pressable onPress={openMapPicker} style={styles.mapFooterRow}>
-          <Icon name={Icons.map} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
-          <AppText size={16} weight="bold" color={Colors.primary} style={{ flex: 1 }}>
-            Chọn trên bản đồ
-          </AppText>
-          <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
-        </Pressable>
+        <View>
+          <Pressable onPress={() => setZaloPaste(true)} style={[styles.mapFooterRow, { borderTopWidth: 0, paddingBottom: 0 }]}>
+            <Icon name={Icons.paste} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
+            <AppText size={16} weight="bold" color={Colors.primary} style={{ flex: 1 }}>
+              Dán từ Zalo
+            </AppText>
+            <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
+          </Pressable>
+          <Pressable onPress={openMapPicker} style={styles.mapFooterRow}>
+            <Icon name={Icons.map} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
+            <AppText size={16} weight="bold" color={Colors.primary} style={{ flex: 1 }}>
+              Chọn trên bản đồ
+            </AppText>
+            <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
+          </Pressable>
+        </View>
       }
     >
       <View style={styles.searchWrap}>
@@ -165,6 +182,7 @@ export default function LocationScreen() {
           </Pressable>
         )}
       />
+      <ZaloPasteSheet visible={zaloPaste} onClose={() => setZaloPaste(false)} includeContact={false} onApply={applyZaloPaste} />
     </Screen>
   );
 }
