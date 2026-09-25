@@ -1,16 +1,17 @@
 // app/booking/sender.tsx — GH 1.3 "Thông tin người gửi" (giao hàng / gọi thợ): địa chỉ + họ tên (danh bạ), SĐT → "Xác Nhận"
 // Dọn nhà: thêm tầng/thang máy của nhà cũ (điểm đi) — ảnh hưởng phụ phí bốc xếp, khác Giao hàng/Vận tải.
-// Gọi thợ: thêm mô tả sự cố + ảnh hiện trạng (để thợ nắm tình hình trước khi tới) + mức khẩn cấp (phụ phí).
+// Gọi thợ: mô tả sự cố/ảnh hiện trạng/khẩn cấp hỏi ở bước chọn loại thợ (xem HandymanJobDialog trong
+// app/booking/index.tsx), KHÔNG hỏi ở đây — màn này chỉ còn địa chỉ + tên/SĐT như mọi dịch vụ khác.
 // Chở khách (Xe máy / Xe hơi / Xe đường dài / Tài xế lái thay): chỉ địa chỉ + bản đồ tràn khung (chạm để đổi) → "Xác Nhận";
 // tên/SĐT lấy sẵn từ hồ sơ đăng nhập (hydrateSender), không cần hỏi lại.
 import React, { useMemo, useState } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { AppHeader, AppText, Icon, Icons, Screen, SwitchRow, TextField } from '@/components/ui';
+import { AppHeader, AppText, Icon, Icons, Screen, TextField } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
-import { SERVICE_GROUPS, HCM_CENTER, EXTRA_PRICES } from '@/constants/mockBooking';
+import { SERVICE_GROUPS, HCM_CENTER } from '@/constants/mockBooking';
 import { useBooking, setSenderInfo, setSenderPlace, setOptions, isValidPhoneVn } from '@/services/bookingStore';
-import { AddressBlock, AddressMapPreview, ContactPickerSheet, FlatFooter, FloorAccessPicker, PhotoAttachRow, ZaloPasteSheet, type MapStop } from '@/components/booking';
+import { AddressBlock, AddressMapPreview, ContactPickerSheet, FlatFooter, FloorAccessPicker, ZaloPasteSheet, type MapStop } from '@/components/booking';
 
 export default function SenderScreen() {
   const state = useBooking();
@@ -19,15 +20,10 @@ export default function SenderScreen() {
   const isRide = group.kind === 'ride';
   // Dọn nhà: nhà cũ (điểm đi) cũng cần biết tầng/thang máy — khác hẳn Giao hàng/Vận tải
   const isRental = state.service === 'rental';
-  // Gọi thợ: cần biết trước sự cố gì, có ảnh càng tốt, và có khẩn cấp không — khác Thuê nhân công/Dọn nhà
-  const isHandyman = state.service === 'handyman';
   const [name, setName] = useState(state.sender.name);
   const [phone, setPhone] = useState(state.sender.phone);
   const [floor, setFloor] = useState(state.options.movingFloorFrom);
   const [elevator, setElevator] = useState(state.options.movingElevatorFrom);
-  const [issueNote, setIssueNote] = useState(state.options.handymanIssueNote);
-  const [photos, setPhotos] = useState(state.options.handymanPhotos);
-  const [urgent, setUrgent] = useState(state.options.handymanUrgent);
   const [contacts, setContacts] = useState(false);
   const [zaloPaste, setZaloPaste] = useState(false);
   const place = state.sender.place;
@@ -43,7 +39,6 @@ export default function SenderScreen() {
   const confirm = () => {
     if (!isRide) setSenderInfo({ name: name.trim(), phone: phone.trim() });
     if (isRental) setOptions({ movingFloorFrom: floor, movingElevatorFrom: elevator });
-    if (isHandyman) setOptions({ handymanIssueNote: issueNote.trim(), handymanPhotos: photos, handymanUrgent: urgent });
     if (router.canGoBack()) router.back();
     else router.replace('/booking');
   };
@@ -109,34 +104,6 @@ export default function SenderScreen() {
           />
 
           {isRental ? <FloorAccessPicker label="Nhà/căn hộ cũ" floor={floor} elevator={elevator} onFloorChange={setFloor} onElevatorChange={setElevator} /> : null}
-
-          {isHandyman ? (
-            <>
-              <TextField
-                label="Mô tả sự cố"
-                value={issueNote}
-                onChangeText={setIssueNote}
-                placeholder="Vd: bóng đèn phòng khách chớp tắt, quạt trần kêu to..."
-                multiline
-                numberOfLines={3}
-                containerStyle={{ marginTop: Spacing.base }}
-              />
-
-              <AppText weight="bold" size={14} style={{ marginTop: Spacing.lg, marginBottom: Spacing.sm }}>
-                Ảnh hiện trạng (nếu có)
-              </AppText>
-              <PhotoAttachRow photos={photos} onChange={setPhotos} />
-
-              <SwitchRow
-                icon={Icons.alert}
-                label="Xử lý khẩn cấp"
-                sublabel={`đ${EXTRA_PRICES.urgentCallout.toLocaleString('vi-VN')} · ưu tiên điều thợ ngay, kể cả ngoài giờ`}
-                value={urgent}
-                onValueChange={setUrgent}
-                style={{ marginTop: Spacing.lg }}
-              />
-            </>
-          ) : null}
         </View>
       )}
       <ContactPickerSheet

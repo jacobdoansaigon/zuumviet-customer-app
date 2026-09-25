@@ -28,6 +28,7 @@ import {
   prefillRoute,
   switchRideOption,
   selectLaborOption,
+  setOptions,
   addReceiver,
   removeReceiver,
   pruneIncompleteReceivers,
@@ -36,7 +37,7 @@ import {
   formatVnd,
   applyGpsToDefaultPlace,
 } from '@/services/bookingStore';
-import { BookingMap, RoundIconButton, StopList, ServiceInfoDialog, FlatFooter, useCurrentLocation, type MapStop } from '@/components/booking';
+import { BookingMap, RoundIconButton, StopList, ServiceInfoDialog, HandymanJobDialog, FlatFooter, useCurrentLocation, type MapStop, type HandymanJobDetail } from '@/components/booking';
 
 /** Option kèm nhóm dịch vụ gốc — cần khi "Tất cả dịch vụ" gộp thêm gói của dịch vụ liên quan (vd Xe máy ⇄ Xe hơi) */
 type RowOption = ServiceOptionDef & { groupKey: ServiceKey };
@@ -50,6 +51,7 @@ export default function BookingScreen() {
   const location = useCurrentLocation();
   const [expanded, setExpanded] = useState(false);
   const [info, setInfo] = useState<RowOption | null>(null);
+  const [jobOption, setJobOption] = useState<RowOption | null>(null);
   const [sheetH, setSheetH] = useState(0);
 
   useEffect(() => {
@@ -126,6 +128,12 @@ export default function BookingScreen() {
       setInfo(o);
       return;
     }
+    // Gọi thợ: mở "Chi tiết công việc" (mô tả sự cố/ảnh/khẩn cấp) ngay khi bấm vào 1 loại thợ — tách
+    // hẳn khỏi màn "Thông tin liên hệ" vốn giống hệt màn nhập địa chỉ của mọi dịch vụ khác.
+    if (state.service === 'handyman') {
+      setJobOption(o);
+      return;
+    }
     switchRideOption(o.groupKey, o.id);
     setExpanded(false);
   };
@@ -138,7 +146,7 @@ export default function BookingScreen() {
       icon={o.icon}
       selected={o.id === selected.id}
       onPress={() => onOptionPress(o)}
-      onInfoPress={() => setInfo(o)}
+      onInfoPress={() => (state.service === 'handyman' ? setJobOption(o) : setInfo(o))}
     />
   );
 
@@ -280,6 +288,22 @@ export default function BookingScreen() {
             switchRideOption((o as RowOption).groupKey, o.id);
           }
           setInfo(null);
+          setExpanded(false);
+        }}
+      />
+
+      <HandymanJobDialog
+        option={jobOption}
+        initial={
+          jobOption && jobOption.id === state.optionId
+            ? { issueNote: state.options.handymanIssueNote, photos: state.options.handymanPhotos, urgent: state.options.handymanUrgent }
+            : { issueNote: '', photos: [], urgent: false }
+        }
+        onClose={() => setJobOption(null)}
+        onSelect={(o, detail: HandymanJobDetail) => {
+          switchRideOption((o as RowOption).groupKey, o.id);
+          setOptions({ handymanIssueNote: detail.issueNote, handymanPhotos: detail.photos, handymanUrgent: detail.urgent });
+          setJobOption(null);
           setExpanded(false);
         }}
       />
