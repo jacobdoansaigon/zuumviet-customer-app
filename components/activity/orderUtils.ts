@@ -1,7 +1,8 @@
 // Tiện ích cho "Hoạt động của tôi": map DeliveryOrder (BE) → ActivityOrder, nhãn/màu trạng thái, định dạng ngày & tiền
 import { ORDER_STATUS, type DeliveryOrder } from '@/services/api';
 import { Colors } from '@/constants/theme';
-import { Icons, type IconName } from '@/components/ui';
+import { SERVICE_GROUPS } from '@/constants/mockBooking';
+import { type IconName } from '@/components/ui';
 import type {
   ActivityDriver,
   ActivityOrder,
@@ -12,12 +13,13 @@ import type {
 
 export type ActivityFilter = 'all' | ActivityService;
 
-/** Chip lọc theo Figma: Tất cả / Đặt xe / Giao hàng / Vận tải */
+/** Thứ tự đúng như lưới trang chủ (components/home/ServiceCard.tsx) — đủ 9 danh mục, không gộp
+ *  chung "Đặt xe" nữa. Nhãn/icon lấy thẳng từ SERVICE_GROUPS để không phải khai trùng ở 2 nơi. */
+const ACTIVITY_SERVICE_ORDER: ActivityService[] = ['bike', 'car', 'intercity', 'delivery', 'transport', 'rental', 'driver', 'handyman', 'labor'];
+
 export const ACTIVITY_FILTERS: { label: string; value: ActivityFilter }[] = [
   { label: 'Tất cả', value: 'all' },
-  { label: 'Đặt xe', value: 'ride' },
-  { label: 'Giao hàng', value: 'delivery' },
-  { label: 'Vận tải', value: 'transport' },
+  ...ACTIVITY_SERVICE_ORDER.map((key) => ({ label: SERVICE_GROUPS[key].title, value: key as ActivityFilter })),
 ];
 
 /** Nhãn chi tiết theo từng trạng thái BE (giữ nguyên mapping của màn Đơn hàng cũ) */
@@ -75,9 +77,7 @@ export function statusColor(status: number) {
 }
 
 export function serviceIcon(service: ActivityService): IconName {
-  if (service === 'transport') return Icons.truck;
-  if (service === 'ride') return Icons.scooter;
-  return Icons.scooter;
+  return SERVICE_GROUPS[service].icon;
 }
 
 export function filterOrders(orders: ActivityOrder[], filter: ActivityFilter) {
@@ -190,22 +190,33 @@ const toMs = (v: unknown): number | undefined => {
 
 const first = <T>(...vals: (T | undefined)[]) => vals.find((v) => v !== undefined);
 
+/**
+ * BE chưa có field "loại dịch vụ" cố định (schema /site/deliveryorders vẫn đang thay đổi) → đoán qua
+ * vài field hay gặp. Thứ tự khớp: từ khoá đặc trưng nhất trước để đỡ nhận nhầm (vd "thợ điện" phải
+ * khớp handyman trước khi rơi xuống delivery mặc định). Không có cách nào chắc chắn 100% cho tới khi
+ * BE trả về đúng service_key khớp ServiceKey của app — xem constants/mockBooking.ts.
+ */
 function detectService(raw: Raw): ActivityService {
   const hint = [raw.service_type, raw.service, raw.vehicle_type, raw.service_name, raw.type]
     .map((v) => (typeof v === 'string' ? v : obj(v) ? str(obj(v)!.name) : undefined))
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
+  if (/(thợ|sửa chữa|handyman|electrician|plumber)/.test(hint)) return 'handyman';
+  if (/(nhân công|bốc xếp|phụ hồ|lao động|\blabor\b|\bmover)/.test(hint)) return 'labor';
+  if (/(dọn nhà|chuyển nhà|\brental\b|\bmoving\b)/.test(hint)) return 'rental';
+  if (/(lái thay|tài xế riêng|driver hire)/.test(hint)) return 'driver';
+  if (/(đường dài|liên tỉnh|intercity|limousine|xe ghép)/.test(hint)) return 'intercity';
   if (/(tải|tai|truck|van|transport|cargo)/.test(hint)) return 'transport';
-  if (/(ride|bike|car|xe máy|xe hơi|taxi|đặt xe)/.test(hint)) return 'ride';
+  if (/(xe máy|scooter|motorbike|\bmoto\b)/.test(hint)) return 'bike';
+  if (/(xe hơi|xe 4 chỗ|sedan|taxi|\bcar\b)/.test(hint)) return 'car';
   return 'delivery';
 }
 
 function detectServiceName(raw: Raw, service: ActivityService) {
   const svc = obj(raw.service);
   const name = first(str(raw.service_name), svc ? str(svc.name) : undefined, str(raw.service_type), str(raw.vehicle_type));
-  if (name) return name;
-  return service === 'transport' ? 'Vận tải' : service === 'ride' ? 'Xe máy' : 'Giao hàng';
+  return name ?? SERVICE_GROUPS[service].title;
 }
 
 function stopStatusFrom(v: unknown): ActivityStopStatus | undefined {

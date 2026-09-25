@@ -2,8 +2,9 @@
 // Dữ liệu bám theo Figma: Hoạt động 1.2 (danh sách), 1.3/1.4 (chi tiết chuyến), Đánh giá tài xế.
 import { ORDER_STATUS } from '@/services/api';
 
-/** Nhóm dịch vụ tương ứng chip lọc: Đặt xe / Giao hàng / Vận tải */
-export type ActivityService = 'ride' | 'delivery' | 'transport';
+/** Nhóm dịch vụ tương ứng chip lọc "Hoạt động của tôi" — đủ 9 dịch vụ như lưới trang chủ
+ *  (components/home/ServiceCard.tsx), không gộp chung "Đặt xe" nữa để lọc được chi tiết hơn. */
+export type ActivityService = 'bike' | 'car' | 'intercity' | 'delivery' | 'transport' | 'rental' | 'driver' | 'handyman' | 'labor';
 
 export type ActivityStopStatus = 'pending' | 'picked' | 'delivering' | 'done' | 'failed';
 
@@ -128,7 +129,7 @@ export const MOCK_ORDERS: ActivityOrder[] = [
   {
     id: '1002',
     code: '716-208-0021',
-    service: 'ride',
+    service: 'bike',
     serviceName: 'Xe máy',
     status: ORDER_STATUS.ASSIGNING,
     createdAt: at(0, 8, 2),
@@ -147,7 +148,7 @@ export const MOCK_ORDERS: ActivityOrder[] = [
   {
     id: '1003',
     code: '716-207-6172',
-    service: 'ride',
+    service: 'bike',
     serviceName: 'Xe máy',
     status: ORDER_STATUS.COMPLETED,
     createdAt: at(0, 12, 19),
@@ -211,7 +212,7 @@ export const MOCK_ORDERS: ActivityOrder[] = [
   {
     id: '1007',
     code: '712-004-7710',
-    service: 'ride',
+    service: 'car',
     serviceName: 'Xe hơi',
     status: ORDER_STATUS.DRIVER_CANCELLED,
     createdAt: new Date(2019, 8, 8, 19, 19).getTime(),
@@ -219,5 +220,67 @@ export const MOCK_ORDERS: ActivityOrder[] = [
     dropoffs: [{ title: 'Nhà', address: '400 Huỳnh Văn Bánh, Phường 14, Phú Nhuận' }],
     driver: DRIVERS.nguyenVanA,
     payment: { method: 'cash', methodLabel: 'Tiền mặt', tip: 0, total: 0 },
+  },
+  // ── Bổ sung đủ 9 danh mục cho chip lọc (trước đây chỉ có ride/delivery/transport) ────
+  {
+    id: '1008',
+    code: '711-330-5567',
+    service: 'intercity',
+    serviceName: 'Xe 7 chỗ đường dài',
+    status: ORDER_STATUS.COMPLETED,
+    createdAt: at(5, 6, 0),
+    pickup: { title: 'Bến xe Miền Đông mới', address: 'Quốc lộ 1, Thành phố Thủ Đức', status: 'done' },
+    dropoffs: [{ title: 'Bến xe Vũng Tàu', address: '52 Nam Kỳ Khởi Nghĩa, TP. Vũng Tàu', status: 'done' }],
+    driver: DRIVERS.nguyenVanA,
+    payment: { method: 'wallet', methodLabel: 'Tài khoản', tip: 0, total: 450000 },
+    rating: { stars: 5, tags: ['Chạy an toàn'], favorite: false, blocked: false },
+  },
+  {
+    id: '1009',
+    code: '710-118-9902',
+    service: 'rental',
+    serviceName: 'Gói căn hộ',
+    status: ORDER_STATUS.COMPLETED,
+    createdAt: at(7, 8, 30),
+    pickup: { title: 'Chung cư Sunrise City', address: 'Nguyễn Hữu Thọ, Quận 7, Hồ Chí Minh', status: 'done' },
+    dropoffs: [{ title: 'Nhà mới', address: '20 Nguyễn Thị Thập, Quận 7, Hồ Chí Minh', status: 'done' }],
+    driver: DRIVERS.jubeBowman,
+    payment: { method: 'cash', methodLabel: 'Tiền mặt', tip: 100000, total: 1800000 },
+  },
+  {
+    id: '1010',
+    code: '709-004-2231',
+    service: 'driver',
+    serviceName: 'Xe hơi',
+    status: ORDER_STATUS.COMPLETED,
+    createdAt: at(9, 22, 10),
+    pickup: { title: 'Nhà hàng Ngon 138', address: 'Nam Kỳ Khởi Nghĩa, Quận 3, Hồ Chí Minh', status: 'done' },
+    dropoffs: [{ title: 'Nhà', address: '182 Lê Đại Hành, Phường 15, Quận 11', status: 'done' }],
+    driver: DRIVERS.phanThanhTung,
+    payment: { method: 'cash', methodLabel: 'Tiền mặt', tip: 20000, total: 170000 },
+    rating: { stars: 5, tags: ['Rất hài lòng', 'Thái độ tốt'], favorite: true, blocked: false },
+  },
+  {
+    id: '1011',
+    code: '708-441-7765',
+    service: 'handyman',
+    serviceName: 'Thợ điện',
+    status: ORDER_STATUS.COMPLETED,
+    createdAt: at(11, 14, 45),
+    pickup: { title: 'Nhà riêng', address: 'Tòa nhà A2 - Khu chung cư Xi Grand Court, Quận 10', status: 'done' },
+    dropoffs: [{ title: 'Nhà riêng', address: 'Tòa nhà A2 - Khu chung cư Xi Grand Court, Quận 10', status: 'done' }],
+    payment: { method: 'cash', methodLabel: 'Tiền mặt', tip: 0, total: 150000 },
+    note: 'Ổ cắm phòng ngủ bị chập, có mùi khét',
+  },
+  {
+    id: '1012',
+    code: '707-229-8834',
+    service: 'labor',
+    serviceName: 'Bốc xếp 4 giờ',
+    status: ORDER_STATUS.COMPLETED,
+    createdAt: at(14, 9, 0),
+    pickup: { title: 'Kho Tân Thuận', address: 'Lô C, KCX Tân Thuận, Quận 7, Hồ Chí Minh', status: 'done' },
+    dropoffs: [{ title: 'Kho Tân Thuận', address: 'Lô C, KCX Tân Thuận, Quận 7, Hồ Chí Minh', status: 'done' }],
+    payment: { method: 'cash', methodLabel: 'Tiền mặt', tip: 0, total: 1100000 },
   },
 ];
