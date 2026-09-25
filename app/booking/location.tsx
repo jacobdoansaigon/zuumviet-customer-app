@@ -3,6 +3,7 @@
 // Xe đường dài: dùng ĐÚNG 1 giao diện nhập địa chỉ như Đặt xe / Giao hàng (ô tìm kiếm, gợi ý theo khoảng
 // cách, "Dùng địa chỉ đã nhập" khi không khớp) — chỉ khác nguồn gợi ý mặc định là các tỉnh/thành đang có
 // tuyến xe ghép & vé xe (constants/mockIntercity.ts) thay vì các địa điểm đã lưu trong TP.HCM.
+// "Dán từ Zalo" luôn nằm sát dưới ô nhập địa chỉ (không đặt ở footer) — "Chọn trên bản đồ" ở footer.
 import React, { useMemo, useState } from 'react';
 import { View, TextInput, Pressable, FlatList, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -83,22 +84,13 @@ export default function LocationScreen() {
       header={<AppHeader variant="dark" title={isReceiver ? labels.receiverLocationTitle : labels.senderLocationTitle} left="close" />}
       keyboardAvoiding={false}
       footer={
-        <View>
-          <Pressable onPress={() => setZaloPaste(true)} style={[styles.mapFooterRow, { borderTopWidth: 0, paddingBottom: 0 }]}>
-            <Icon name={Icons.paste} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
-            <AppText size={16} weight="bold" color={Colors.primary} style={{ flex: 1 }}>
-              Dán từ Zalo
-            </AppText>
-            <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
-          </Pressable>
-          <Pressable onPress={openMapPicker} style={styles.mapFooterRow}>
-            <Icon name={Icons.map} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
-            <AppText size={16} weight="bold" color={Colors.primary} style={{ flex: 1 }}>
-              Chọn trên bản đồ
-            </AppText>
-            <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
-          </Pressable>
-        </View>
+        <Pressable onPress={openMapPicker} style={styles.mapFooterRow}>
+          <Icon name={Icons.map} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
+          <AppText size={16} weight="bold" color={Colors.primary} style={{ flex: 1 }}>
+            Chọn trên bản đồ
+          </AppText>
+          <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
+        </Pressable>
       }
     >
       <View style={styles.searchWrap}>
@@ -129,6 +121,15 @@ export default function LocationScreen() {
             </Pressable>
           ) : null}
         </View>
+
+        {/* Luôn nằm sát dưới khung nhập địa chỉ, không phụ thuộc danh sách gợi ý dài/ngắn */}
+        <Pressable onPress={() => setZaloPaste(true)} style={styles.zaloRow}>
+          <Icon name={Icons.paste} size={20} color={Colors.primary} style={{ marginRight: Spacing.sm }} />
+          <AppText size={15} weight="bold" color={Colors.primary} style={{ flex: 1 }}>
+            Dán từ Zalo
+          </AppText>
+          <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
+        </Pressable>
 
         {isIntercityDest ? null : (
           <View style={styles.chips}>
@@ -198,6 +199,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   input: { flex: 1, fontSize: 16, color: Colors.text, marginLeft: Spacing.sm, paddingVertical: 0, height: Sizes.input - 3 },
+  zaloRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', marginTop: Spacing.md },
   chip: { marginRight: Spacing.sm, marginBottom: Spacing.sm },
   row: {
