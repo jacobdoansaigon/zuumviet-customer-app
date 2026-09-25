@@ -117,6 +117,7 @@ export const Icons = {
   note: 'ion:document-text-outline' as IconName,
   location: 'ion:location-outline' as IconName,
   locationFilled: 'ion:location' as IconName,
+  map: 'ion:map-outline' as IconName,
   navigate: 'ion:navigate' as IconName,
   locate: 'ion:locate' as IconName,
   bookmark: 'ion:bookmark-outline' as IconName,

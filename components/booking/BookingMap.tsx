@@ -8,7 +8,7 @@ import { HCM_CENTER } from '@/constants/mockBooking';
 import { MapMarkerView, MARKER_SIZE } from './MapMarkerView';
 import type { BookingMapProps } from './mapTypes';
 
-export const BookingMap: React.FC<BookingMapProps> = ({ stops, center, showsUserLocation = true, showRoute = true, bottomPadding = 0, style }) => {
+export const BookingMap: React.FC<BookingMapProps> = ({ stops, center, showsUserLocation = true, showRoute = true, bottomPadding = 0, style, onRegionChangeComplete }) => {
   const ref = useRef<MapView | null>(null);
   const [ready, setReady] = useState(false);
   const first = stops[0];
@@ -48,6 +48,7 @@ export const BookingMap: React.FC<BookingMapProps> = ({ stops, center, showsUser
       showsCompass={false}
       toolbarEnabled={false}
       mapPadding={{ top: 0, right: 0, bottom: bottomPadding, left: 0 }}
+      onRegionChangeComplete={onRegionChangeComplete ? (r) => onRegionChangeComplete({ lat: r.latitude, lng: r.longitude }) : undefined}
     >
       {showRoute && routeCoords.length >= 2 ? <Polyline coordinates={routeCoords} strokeColor={Colors.primary} strokeWidth={4} lineCap="round" /> : null}
       {stops.map((s) => (

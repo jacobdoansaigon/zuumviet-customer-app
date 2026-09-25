@@ -20,4 +20,6 @@ export interface BookingMapProps {
   /** phần đáy bị bottom sheet che (px) để canh khung nhìn */
   bottomPadding?: number;
   style?: StyleProp<ViewStyle>;
+  /** "Chọn trên bản đồ": kéo bản đồ (native) → báo toạ độ tâm khung hình mới, dùng làm ghim đang chọn */
+  onRegionChangeComplete?: (center: { lat: number; lng: number }) => void;
 }

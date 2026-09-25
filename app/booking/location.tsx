@@ -68,6 +68,8 @@ export default function LocationScreen() {
 
   const showTyped = dirty && query.trim().length > 3 && !results.some((r) => r.address.toLowerCase() === query.trim().toLowerCase());
 
+  const openMapPicker = () => router.push({ pathname: '/booking/pick-on-map', params: { target, index: String(index), back } });
+
   return (
     <Screen
       header={<AppHeader variant="dark" title={isReceiver ? labels.receiverLocationTitle : labels.senderLocationTitle} left="close" />}
@@ -153,6 +155,15 @@ export default function LocationScreen() {
             </Pressable>
           </Pressable>
         )}
+        ListFooterComponent={
+          <Pressable onPress={openMapPicker} style={[styles.row, { borderBottomWidth: 0 }]}>
+            <Icon name={Icons.map} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
+            <AppText size={16} weight="bold" color={Colors.primary} style={{ flex: 1 }}>
+              Chọn trên bản đồ
+            </AppText>
+            <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
+          </Pressable>
+        }
       />
     </Screen>
   );
