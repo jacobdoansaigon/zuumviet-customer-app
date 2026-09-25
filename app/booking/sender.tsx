@@ -1,5 +1,5 @@
 // app/booking/sender.tsx — GH 1.3 "Thông tin người gửi" (giao hàng / gọi thợ): địa chỉ + họ tên (danh bạ), SĐT → "Xác Nhận"
-// Chở khách (Xe máy / Xe hơi / Xe đường dài / Gọi tài xế): chỉ địa chỉ + bản đồ tràn khung (chạm để đổi) → "Xác Nhận";
+// Chở khách (Xe máy / Xe hơi / Xe đường dài / Tài xế lái thay): chỉ địa chỉ + bản đồ tràn khung (chạm để đổi) → "Xác Nhận";
 // tên/SĐT lấy sẵn từ hồ sơ đăng nhập (hydrateSender), không cần hỏi lại.
 import React, { useMemo, useState } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';

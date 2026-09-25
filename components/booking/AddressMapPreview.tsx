@@ -1,6 +1,6 @@
 // AddressMapPreview — màn "chỉ xem": khối địa chỉ (padded) phía trên + bản đồ tràn hết phần còn lại của khung
 // (không viền, không bo góc, không margin), chạm bản đồ hoặc "Thay đổi địa chỉ" đều mở lại màn chọn địa điểm.
-// Dùng cho điểm đi / điểm đến của các dịch vụ chở khách (Xe máy, Xe hơi, Xe đường dài, Gọi tài xế).
+// Dùng cho điểm đi / điểm đến của các dịch vụ chở khách (Xe máy, Xe hơi, Xe đường dài, Tài xế lái thay).
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Colors, Spacing } from '@/constants/theme';

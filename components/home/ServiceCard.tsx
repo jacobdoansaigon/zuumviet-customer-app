@@ -1,5 +1,5 @@
 // ServiceCard — card trắng bo 12 đè lên header: lưới dịch vụ 3 cột × 3 hàng (icon tím + label)
-// Hàng 1: Xe máy / Xe hơi / Xe đường dài — Hàng 2: Giao hàng / Vận tải / Dọn nhà — Hàng 3: Gọi tài xế / Gọi thợ / Thuê nhân công
+// Hàng 1: Xe máy / Xe hơi / Xe đường dài — Hàng 2: Giao hàng / Vận tải / Dọn nhà — Hàng 3: Tài xế lái thay / Gọi thợ / Thuê nhân công
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';

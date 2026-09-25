@@ -1,6 +1,6 @@
 // services/intercityTicketStore.ts — trạng thái đặt Mua vé xe đường dài: ngày đi, ghế đã chọn, hàng hoá,
 // đón/trả tại nhà hay bến xe. Tách riêng khỏi services/bookingStore.ts vì đây là sản phẩm bán theo GHẾ trên
-// 1 chuyến cố định của nhà xe (không phải thuê nguyên xe tính theo khoảng cách như Xe máy/Xe hơi/Gọi tài xế).
+// 1 chuyến cố định của nhà xe (không phải thuê nguyên xe tính theo khoảng cách như Xe máy/Xe hơi/Tài xế lái thay).
 // Xe ghép (đặt yêu cầu → tài xế nhận cuốc) dùng store riêng: services/carpoolRequestStore.ts.
 import { useSyncExternalStore } from 'react';
 import { getStoredCustomer } from '@/services/api';

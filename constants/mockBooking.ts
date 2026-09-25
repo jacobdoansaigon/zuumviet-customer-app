@@ -458,47 +458,37 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
   },
   driver: {
     key: 'driver',
-    title: 'Gọi tài xế',
+    title: 'Tài xế lái thay',
     icon: Icons.steering,
     kind: 'ride',
     labels: RIDE_LABELS,
     maxStops: 1,
+    // Tài xế đến lái xe CỦA BẠN đưa bạn về (không phải xe của hãng) — 2 loại theo phương tiện,
+    // giá khác hẳn nhau nên tách riêng thay vì gộp chung 1 gói theo giờ như trước.
     options: [
       {
-        id: 'tai-xe-chuyen',
+        id: 'lai-thay-xe-may',
         serviceId: 61,
-        name: 'Tài xế theo chuyến',
-        description: 'Lái xe của bạn, tính theo km',
+        name: 'Xe máy',
+        description: 'Tài xế lái xe máy của bạn, bạn ngồi sau',
+        basePrice: 80000,
+        includedKm: 5,
+        perKmPrice: 6000,
+        extraStopPrice: 0,
+        icon: Icons.scooter,
+        infoLines: ['Phí tối thiểu (5km đầu): đ80.000', 'Mỗi km tiếp theo: đ6.000', 'Tài xế có bằng lái xe máy hợp lệ', 'Xăng, phí gửi xe (nếu có) do chủ xe chi trả', VAT_LINE],
+      },
+      {
+        id: 'lai-thay-xe-hoi',
+        serviceId: 63,
+        name: 'Xe hơi',
+        description: 'Tài xế lái xe hơi của bạn, bạn ngồi ghế sau',
         basePrice: 150000,
         includedKm: 10,
         perKmPrice: 8000,
         extraStopPrice: 0,
-        icon: Icons.steering,
+        icon: Icons.carSide,
         infoLines: ['Phí tối thiểu (10km đầu): đ150.000', 'Mỗi km tiếp theo: đ8.000', 'Tài xế có bằng B2 trở lên, tối thiểu 3 năm kinh nghiệm', 'Xăng, phí cầu đường do chủ xe chi trả', VAT_LINE],
-      },
-      {
-        id: 'tai-xe-4h',
-        serviceId: 63,
-        name: 'Tài xế 4 giờ',
-        description: 'Thuê tài xế nửa ngày, tối đa 60km',
-        basePrice: 450000,
-        includedKm: 60,
-        perKmPrice: 5000,
-        extraStopPrice: 0,
-        icon: Icons.steering,
-        infoLines: ['Giá thuê 4 giờ: đ450.000 (60km đầu)', 'Vượt km: đ5.000/km', 'Vượt giờ: đ100.000/giờ', 'Xăng, phí cầu đường do chủ xe chi trả', VAT_LINE],
-      },
-      {
-        id: 'tai-xe-8h',
-        serviceId: 65,
-        name: 'Tài xế 8 giờ',
-        description: 'Thuê tài xế cả ngày, tối đa 120km',
-        basePrice: 800000,
-        includedKm: 120,
-        perKmPrice: 5000,
-        extraStopPrice: 0,
-        icon: Icons.steering,
-        infoLines: ['Giá thuê 8 giờ: đ800.000 (120km đầu)', 'Vượt km: đ5.000/km', 'Vượt giờ: đ100.000/giờ', 'Xăng, phí cầu đường do chủ xe chi trả', VAT_LINE],
       },
     ],
   },
@@ -727,7 +717,7 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
 /**
  * Xe máy và Xe hơi cùng là "chở khách nội thành" → gộp chung 1 danh sách trong màn đặt xe
  * để đổi qua lại loại xe mà không phải thoát ra ngoài (giữ nguyên điểm đón/điểm đến đã chọn).
- * Xe đường dài / Gọi tài xế có luồng đặt khác (đặt trước, thuê xe/tài xế riêng) nên không gộp.
+ * Xe đường dài / Tài xế lái thay có luồng đặt khác (đặt trước, thuê xe/tài xế riêng) nên không gộp.
  */
 export const URBAN_RIDE_KEYS: ServiceKey[] = ['bike', 'car'];
 
