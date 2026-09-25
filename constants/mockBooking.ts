@@ -159,6 +159,16 @@ export interface ServiceOptionDef {
   icon: IconName;
   /** các dòng trong dialog "Thông tin dịch vụ" (copy đúng Figma GH 1.2) */
   infoLines: string[];
+  /**
+   * Thuê nhân công: có giá trị thì hạng mục này chọn "Thời gian làm việc" theo block (vd 4 giờ/block,
+   * 8 giờ/block tuỳ hạng mục) thay vì chọn ngay khi bấm vào — bấm vào hạng mục sẽ mở dialog chọn số
+   * block + xem quy tắc làm việc trước khi xác nhận (xem ServiceInfoDialog, selectLaborOption).
+   */
+  blockHours?: number;
+  /** số block tối đa được chọn cho hạng mục này (mặc định 3 nếu có blockHours) */
+  maxBlocks?: number;
+  /** "Quy tắc làm việc" — hiển thị thành mục riêng trong dialog, tách khỏi infoLines (giá/thông tin chung) */
+  workRules?: string[];
 }
 
 export interface ServiceGroupDef {
@@ -673,6 +683,14 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         extraStopPrice: 0,
         icon: Icons.hardHat,
         infoLines: ['Gói 4 giờ: đ400.000 / 1 nhân công', 'Vượt giờ: đ90.000/giờ', 'Có bao tay, xe đẩy, dây ràng', 'Nhóm từ 2 người: giảm 5%/người', VAT_LINE],
+        blockHours: 4,
+        maxBlocks: 3,
+        workRules: [
+          'Có mặt tại điểm hẹn đúng giờ; trễ quá 15 phút được huỷ và hoàn tiền',
+          'Nghỉ giải lao 10 phút sau mỗi 2 giờ làm việc liên tục',
+          'Báo trước nếu hàng cồng kềnh, dễ vỡ hoặc ở tầng cao không có thang máy',
+          'Huỷ trước giờ hẹn ít nhất 1 giờ để không mất phí',
+        ],
       },
       {
         id: 'giup-viec-4h',
@@ -685,6 +703,14 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         extraStopPrice: 0,
         icon: 'mci:broom',
         infoLines: ['Gói 4 giờ: đ320.000', 'Vượt giờ: đ70.000/giờ', 'Tự mang dụng cụ vệ sinh cơ bản', 'Nhân viên có hồ sơ, đánh giá công khai', VAT_LINE],
+        blockHours: 4,
+        maxBlocks: 2,
+        workRules: [
+          'Khách chuẩn bị sẵn nước sạch, điện để nhân viên làm việc',
+          'Công việc ngoài phạm vi đã đặt (vd trông trẻ, nấu ăn) cần thoả thuận thêm trước',
+          'Nghỉ giải lao 10 phút sau mỗi 2 giờ',
+          'Huỷ trước giờ hẹn ít nhất 2 giờ để không mất phí',
+        ],
       },
       {
         id: 'phu-ho-1-ngay',
@@ -697,6 +723,14 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         extraStopPrice: 0,
         icon: 'mci:shovel',
         infoLines: ['Gói 8 giờ: đ550.000 / 1 nhân công', 'Vượt giờ: đ80.000/giờ', 'Có nón, giày bảo hộ', 'Đặt trước tối thiểu 12 giờ', VAT_LINE],
+        blockHours: 8,
+        maxBlocks: 2,
+        workRules: [
+          'Khách cung cấp đầy đủ vật tư, dụng cụ thi công tại chỗ',
+          'Nhân công chỉ phụ việc, không chịu trách nhiệm kỹ thuật thi công chính',
+          'Nghỉ trưa 1 giờ, không tính vào giờ làm việc',
+          'Huỷ trong vòng 6 giờ trước giờ hẹn mất 30% phí',
+        ],
       },
       {
         id: 'nhan-su-su-kien',
@@ -709,6 +743,14 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         extraStopPrice: 0,
         icon: 'mci:account-group-outline',
         infoLines: ['Gói 5 giờ: đ450.000 / 1 nhân sự', 'Vượt giờ: đ90.000/giờ', 'Đồng phục theo yêu cầu (+đ50.000)', 'Đặt trước tối thiểu 24 giờ', VAT_LINE],
+        blockHours: 5,
+        maxBlocks: 2,
+        workRules: [
+          'Có mặt trước giờ sự kiện 30 phút để chuẩn bị',
+          'Đồng phục theo yêu cầu tính thêm phí, đăng ký trước khi sự kiện diễn ra',
+          'Nghỉ giải lao luân phiên, đảm bảo luôn có người trực',
+          'Huỷ trong vòng 12 giờ trước giờ hẹn mất 30% phí',
+        ],
       },
     ],
   },

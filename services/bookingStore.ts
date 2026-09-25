@@ -72,6 +72,8 @@ export interface BookingOptions {
   note: string;
   promo: PromoDef | null;
   paymentMethod: PaymentMethod;
+  /** Thuê nhân công: số block thời gian làm việc đã chọn cho hạng mục đang chọn (xem ServiceOptionDef.blockHours) */
+  laborBlocks: number;
 }
 
 export type StopStatus = 'new' | 'picking' | 'picked' | 'delivering' | 'completed' | 'failed' | 'returned';
@@ -154,6 +156,7 @@ const defaultOptions = (): BookingOptions => ({
   note: '',
   promo: null,
   paymentMethod: 'cash',
+  laborBlocks: 1,
 });
 
 const emptyReceiver = (): Receiver => ({
@@ -225,6 +228,15 @@ export function selectOption(optionId: string) {
 export function switchRideOption(service: ServiceKey, optionId: string) {
   if (state.service === service && state.optionId === optionId) return;
   update({ service, optionId });
+}
+
+/**
+ * Thuê nhân công: chọn hạng mục kèm số block thời gian làm việc (vd 2 block × 4 giờ = 8 giờ) — xem
+ * ServiceOptionDef.blockHours/maxBlocks. Dùng khi xác nhận từ dialog "Thông tin dịch vụ" thay vì
+ * switchRideOption() vì cần lưu thêm số block đã chọn.
+ */
+export function selectLaborOption(service: ServiceKey, optionId: string, blocks: number) {
+  update((s) => ({ service, optionId, options: { ...s.options, laborBlocks: Math.max(1, Math.round(blocks) || 1) } }));
 }
 
 /** Điền tên/SĐT người gửi từ hồ sơ đã đăng nhập (chỉ khi còn trống) */
@@ -364,6 +376,7 @@ export function routeDistanceKm(s: BookingState = state): number {
 
 export function computePrice(s: BookingState = state, optionId?: string): PriceSummary {
   const opt = getOption(s, optionId);
+  const id = optionId ?? s.optionId;
   const distanceKm = routeDistanceKm(s);
   const stops = s.receivers.filter(isReceiverComplete);
   const extraKm = Math.max(0, Math.ceil(distanceKm) - opt.includedKm);
@@ -371,6 +384,12 @@ export function computePrice(s: BookingState = state, optionId?: string): PriceS
   const base = opt.basePrice + extraKm * opt.perKmPrice + extraStops * opt.extraStopPrice;
 
   const lines: PriceLine[] = [{ label: SERVICE_GROUPS[s.service].labels.feeLabel, amount: base }];
+  // Thuê nhân công: thời gian làm việc chọn theo block (opt.blockHours) — chỉ áp giá nhiều block cho
+  // ĐÚNG hạng mục đang được chọn; các hạng mục khác trong danh sách vẫn xem giá khởi điểm (1 block).
+  const laborBlocks = s.service === 'labor' && id === s.optionId ? Math.max(1, s.options.laborBlocks || 1) : 1;
+  if (laborBlocks > 1) {
+    lines.push({ label: `Thêm ${laborBlocks - 1} block (${(laborBlocks - 1) * (opt.blockHours ?? 0)} giờ)`, amount: base * (laborBlocks - 1) });
+  }
   const handDelivery = stops.filter((r) => r.handDelivery).length * EXTRA_PRICES.handDelivery;
   if (handDelivery) lines.push({ label: 'Giao hàng tận tay', amount: handDelivery });
   const loadingHelp = stops.filter((r) => r.needsLoadingHelp).length * EXTRA_PRICES.loadingHelp;
@@ -430,7 +449,16 @@ export function buildOrderPayload(s: BookingState = state): Record<string, unkno
     allow_driver_id_list: s.options.assignedDrivers,
     coupon_code: s.options.promo?.code ?? '',
     price_tip: s.options.tip * EXTRA_PRICES.tip,
-    note: s.options.note,
+    // Thuê nhân công: BE chưa có field thời gian làm việc/số block riêng → ghi vào note đơn để tài
+    // xế/nhân công biết trước. TODO: chuyển sang field thật khi BE bổ sung.
+    note: [
+      s.options.note,
+      s.service === 'labor' && s.options.laborBlocks > 1 && opt.blockHours
+        ? `Thời gian làm việc: ${s.options.laborBlocks} block (${s.options.laborBlocks * opt.blockHours} giờ)`
+        : '',
+    ]
+      .filter(Boolean)
+      .join(' · '),
     api_metric_place: 1,
     api_metric_distance_matrix_drymode: 1,
     details: stops.map((r) => ({

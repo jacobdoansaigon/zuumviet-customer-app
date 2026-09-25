@@ -27,6 +27,7 @@ import {
   hydrateSender,
   prefillRoute,
   switchRideOption,
+  selectLaborOption,
   addReceiver,
   removeReceiver,
   pruneIncompleteReceivers,
@@ -119,6 +120,12 @@ export default function BookingScreen() {
     switchRideOption(key, SERVICE_GROUPS[key].options[0]!.id);
   };
   const onOptionPress = (o: RowOption) => {
+    // Thuê nhân công: hạng mục chọn thời gian làm việc theo block → mở dialog (thay vì chọn ngay)
+    // để khách chọn số block và xem quy tắc làm việc trước khi xác nhận.
+    if (o.blockHours) {
+      setInfo(o);
+      return;
+    }
     switchRideOption(o.groupKey, o.id);
     setExpanded(false);
   };
@@ -263,9 +270,14 @@ export default function BookingScreen() {
 
       <ServiceInfoDialog
         option={info}
+        initialBlocks={info && info.id === state.optionId ? state.options.laborBlocks : 1}
         onClose={() => setInfo(null)}
-        onSelect={(o) => {
-          switchRideOption((o as RowOption).groupKey, o.id);
+        onSelect={(o, blocks) => {
+          if (o.blockHours) {
+            selectLaborOption((o as RowOption).groupKey, o.id, blocks);
+          } else {
+            switchRideOption((o as RowOption).groupKey, o.id);
+          }
           setInfo(null);
           setExpanded(false);
         }}
