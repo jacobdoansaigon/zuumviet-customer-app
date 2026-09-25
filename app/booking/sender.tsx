@@ -1,4 +1,5 @@
 // app/booking/sender.tsx — GH 1.3 "Thông tin người gửi" (giao hàng / gọi thợ): địa chỉ + họ tên (danh bạ), SĐT → "Xác Nhận"
+// Dọn nhà: thêm tầng/thang máy của nhà cũ (điểm đi) — ảnh hưởng phụ phí bốc xếp, khác Giao hàng/Vận tải.
 // Chở khách (Xe máy / Xe hơi / Xe đường dài / Tài xế lái thay): chỉ địa chỉ + bản đồ tràn khung (chạm để đổi) → "Xác Nhận";
 // tên/SĐT lấy sẵn từ hồ sơ đăng nhập (hydrateSender), không cần hỏi lại.
 import React, { useMemo, useState } from 'react';
@@ -7,16 +8,20 @@ import { router } from 'expo-router';
 import { AppHeader, AppText, Icon, Icons, Screen, TextField } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
 import { SERVICE_GROUPS, HCM_CENTER } from '@/constants/mockBooking';
-import { useBooking, setSenderInfo, setSenderPlace, isValidPhoneVn } from '@/services/bookingStore';
-import { AddressBlock, AddressMapPreview, ContactPickerSheet, FlatFooter, ZaloPasteSheet, type MapStop } from '@/components/booking';
+import { useBooking, setSenderInfo, setSenderPlace, setOptions, isValidPhoneVn } from '@/services/bookingStore';
+import { AddressBlock, AddressMapPreview, ContactPickerSheet, FlatFooter, FloorAccessPicker, ZaloPasteSheet, type MapStop } from '@/components/booking';
 
 export default function SenderScreen() {
   const state = useBooking();
   const group = SERVICE_GROUPS[state.service];
   const labels = group.labels;
   const isRide = group.kind === 'ride';
+  // Dọn nhà: nhà cũ (điểm đi) cũng cần biết tầng/thang máy — khác hẳn Giao hàng/Vận tải
+  const isRental = state.service === 'rental';
   const [name, setName] = useState(state.sender.name);
   const [phone, setPhone] = useState(state.sender.phone);
+  const [floor, setFloor] = useState(state.options.movingFloorFrom);
+  const [elevator, setElevator] = useState(state.options.movingElevatorFrom);
   const [contacts, setContacts] = useState(false);
   const [zaloPaste, setZaloPaste] = useState(false);
   const place = state.sender.place;
@@ -31,6 +36,7 @@ export default function SenderScreen() {
 
   const confirm = () => {
     if (!isRide) setSenderInfo({ name: name.trim(), phone: phone.trim() });
+    if (isRental) setOptions({ movingFloorFrom: floor, movingElevatorFrom: elevator });
     if (router.canGoBack()) router.back();
     else router.replace('/booking');
   };
@@ -94,6 +100,8 @@ export default function SenderScreen() {
             keyboardType="phone-pad"
             containerStyle={{ marginTop: Spacing.base }}
           />
+
+          {isRental ? <FloorAccessPicker label="Nhà/căn hộ cũ" floor={floor} elevator={elevator} onFloorChange={setFloor} onElevatorChange={setElevator} /> : null}
         </View>
       )}
       <ContactPickerSheet

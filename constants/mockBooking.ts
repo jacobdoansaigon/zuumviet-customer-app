@@ -100,6 +100,35 @@ export const RIDE_LABELS: ServiceLabels = {
   trackingDone: 'Chuyến đi hoàn thành',
 };
 
+/** Dọn nhà: 2 địa chỉ (nhà cũ/nhà mới) nhưng không phải "giao hàng" — đổi hết nhãn cho đúng ngữ cảnh
+ *  (không dùng DELIVERY_LABELS vì chữ "giao hàng/người nhận" không hợp với một cuộc chuyển nhà). */
+export const RENTAL_LABELS: ServiceLabels = {
+  provider: 'Đội chuyển nhà',
+  feeLabel: 'Cước dọn nhà',
+  senderPlaceholder: 'Nhập thông tin nhà cũ',
+  senderStatus: 'Đang đến lấy đồ',
+  senderScreenTitle: 'Thông tin nhà cũ (điểm đi)',
+  senderNameLabel: 'Họ và tên người liên hệ',
+  senderPhonePlaceholder: 'Số điện thoại liên hệ',
+  senderLocationTitle: 'Địa chỉ nhà cũ',
+  senderLocationPlaceholder: 'Nhập địa chỉ nhà/căn hộ cũ',
+  receiverPlaceholder: 'Nhập địa chỉ nhà mới',
+  receiverAddPlaceholder: '+ Thêm địa chỉ nhà mới',
+  receiverStatus: 'Đang chuyển đến',
+  receiverScreenTitle: 'Thông tin nhà mới (điểm đến)',
+  receiverLocationTitle: 'Địa chỉ nhà mới',
+  receiverLocationPlaceholder: 'Nhập địa chỉ nhà/căn hộ mới',
+  confirmTitle: 'Xác nhận dọn nhà',
+  confirmHint: 'Vui lòng chọn địa chỉ nhà mới',
+  stopUnit: 'điểm đến',
+  mapPickupLabel: 'Nhà cũ',
+  mapDropLabel: 'Nhà mới',
+  trackingAccepted: 'Đội chuyển nhà đang đến',
+  trackingEta: '{eta} phút nữa đội chuyển nhà đến nơi',
+  trackingDelivering: 'Đang vận chuyển',
+  trackingDone: 'Dọn nhà thành công',
+};
+
 export const ONSITE_LABELS: ServiceLabels = {
   provider: 'Thợ',
   feeLabel: 'Phí gọi thợ',
@@ -334,8 +363,11 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
     title: 'Dọn nhà',
     icon: Icons.van,
     kind: 'delivery',
-    labels: DELIVERY_LABELS,
+    labels: RENTAL_LABELS,
     maxStops: 1,
+    // Giá gói = xe + số bốc xếp cơ bản (đúng cách chành xe/taxi tải thật tính: xe + bốc xếp là 2 khoản
+    // riêng, cộng thêm phụ phí tầng lầu/đóng gói/tháo lắp) — các phụ phí này hỏi riêng ở màn sau
+    // (app/booking/sender.tsx + receiver.tsx), KHÔNG gộp sẵn vào gói như trước để giá minh bạch hơn.
     options: [
       {
         id: 'tron-goi-phong-tro',
@@ -347,31 +379,50 @@ export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
         perKmPrice: 15000,
         extraStopPrice: 0,
         icon: Icons.van,
-        infoLines: ['Trọn gói: đ900.000 (15km đầu)', 'Xe tải nhỏ 500kg + 2 nhân viên bốc xếp', 'Bao gồm bọc chống sốc đồ dễ vỡ', 'Vượt km: đ15.000/km', VAT_LINE],
+        infoLines: [
+          'Trọn gói: đ900.000 (15km đầu)',
+          'Xe tải nhỏ 500kg + 2 nhân viên bốc xếp',
+          'Vượt km: đ15.000/km',
+          'Đóng gói, tháo lắp nội thất, tầng lầu không thang máy: chọn thêm ở bước sau (phụ phí)',
+          VAT_LINE,
+        ],
       },
       {
         id: 'tron-goi-can-ho',
         serviceId: 23,
         name: 'Gói căn hộ',
-        description: 'Xe tải trung + 3 bốc xếp, tháo lắp nội thất',
+        description: 'Xe tải trung + 3 bốc xếp, trong 15km',
         basePrice: 1800000,
         includedKm: 15,
         perKmPrice: 20000,
         extraStopPrice: 0,
         icon: Icons.truck,
-        infoLines: ['Trọn gói: đ1.800.000 (15km đầu)', 'Xe tải trung 1000kg + 3 nhân viên bốc xếp', 'Tháo lắp giường, tủ, máy lạnh (1 bộ)', 'Thùng carton, băng keo, màng PE miễn phí', 'Vượt km: đ20.000/km', VAT_LINE],
+        infoLines: [
+          'Trọn gói: đ1.800.000 (15km đầu)',
+          'Xe tải trung 1000kg + 3 nhân viên bốc xếp',
+          'Vượt km: đ20.000/km',
+          'Đóng gói, tháo lắp nội thất, tầng lầu không thang máy: chọn thêm ở bước sau (phụ phí)',
+          VAT_LINE,
+        ],
       },
       {
         id: 'tron-goi-nha-pho',
         serviceId: 25,
         name: 'Gói nhà phố / văn phòng',
-        description: 'Xe tải lớn + 4 bốc xếp, đóng gói toàn bộ',
+        description: 'Xe tải lớn + 4 bốc xếp, trong 20km',
         basePrice: 3500000,
         includedKm: 20,
         perKmPrice: 25000,
         extraStopPrice: 0,
         icon: Icons.truck,
-        infoLines: ['Trọn gói: đ3.500.000 (20km đầu)', 'Xe tải lớn 2000kg + 4 nhân viên bốc xếp', 'Đóng gói, tháo lắp và sắp xếp lại tại điểm đến', 'Khảo sát miễn phí trước 1 ngày', 'Vượt km: đ25.000/km', VAT_LINE],
+        infoLines: [
+          'Trọn gói: đ3.500.000 (20km đầu)',
+          'Xe tải lớn 2000kg + 4 nhân viên bốc xếp',
+          'Vượt km: đ25.000/km',
+          'Khảo sát miễn phí trước 1 ngày',
+          'Đóng gói, tháo lắp nội thất, tầng lầu không thang máy: chọn thêm ở bước sau (phụ phí)',
+          VAT_LINE,
+        ],
       },
     ],
   },
@@ -771,7 +822,25 @@ export const EXTRA_PRICES = {
   handDelivery: 10000,
   /** Vận tải: phụ phí nhân công bốc xếp lên/xuống hàng, tính theo mỗi điểm nhận */
   loadingHelp: 100000,
+  /** Dọn nhà: phụ phí mỗi tầng KHÔNG có thang máy (tầng trệt/tầng 1 miễn phí), tính riêng từng đầu đi/đến */
+  movingFloorFee: 50000,
+  /** Dọn nhà: đóng gói toàn bộ đồ đạc (thùng carton, màng PE, bọc đồ dễ vỡ) */
+  movingPacking: 150000,
+  /** Dọn nhà: tháo lắp nội thất (giường, tủ, máy lạnh, kệ...) */
+  movingDisassembly: 100000,
 } as const;
+
+/** Dọn nhà: đồ đặc biệt cần báo trước cho đội bốc xếp (ảnh hưởng nhân lực/dụng cụ cần mang theo) */
+export const MOVING_BULKY_ITEMS: { id: string; label: string }[] = [
+  { id: 'fridge', label: 'Tủ lạnh lớn' },
+  { id: 'washer', label: 'Máy giặt' },
+  { id: 'ac', label: 'Máy lạnh (cần tháo/lắp)' },
+  { id: 'piano', label: 'Đàn piano/organ' },
+  { id: 'safe', label: 'Tủ sắt / két sắt' },
+  { id: 'fish_tank', label: 'Hồ cá / bể cá' },
+  { id: 'plant', label: 'Cây cảnh lớn' },
+  { id: 'other', label: 'Khác' },
+];
 
 /** Số dư "Tài khoản" hiển thị ở sheet Hình thức thanh toán (mock, chưa có API ví) */
 export const WALLET_BALANCE = 24000;

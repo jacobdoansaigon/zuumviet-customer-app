@@ -2,15 +2,17 @@
 // Giao hàng: địa chỉ, Giao hàng tận tay, họ tên/SĐT/COD/ghi chú, kích cỡ gói hàng (4 ô), tuỳ chọn xem hàng → "Xác Nhận"
 // Vận tải: hàng lớn/nặng — không có Giao hàng tận tay, không có tuỳ chọn xem hàng; đổi kích cỡ gói hàng
 // thành mức tải trọng (FREIGHT_WEIGHTS) và thêm tuỳ chọn "Cần người bốc xếp" (tính thêm phí)
+// Dọn nhà: KHÔNG phải giao hàng/vận tải — không có COD, kích cỡ gói hàng hay xem hàng. Thay bằng tầng/thang
+// máy nhà mới, tuỳ chọn đóng gói + tháo lắp nội thất, và danh sách đồ đặc biệt cần báo trước đội bốc xếp.
 // Chở khách: chỉ địa chỉ điểm đến + bản đồ tràn khung (chạm để đổi) → "Xác Nhận"; tên/SĐT lấy của người đặt
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AppHeader, AppText, Icon, Icons, Radio, Screen, SwitchRow, TextField } from '@/components/ui';
+import { AppHeader, AppText, Chip, Icon, Icons, Radio, Screen, SwitchRow, TextField } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
-import { SERVICE_GROUPS, VIEW_OPTIONS, HCM_CENTER, FREIGHT_WEIGHTS, EXTRA_PRICES, type PackageSizeId, type ViewOptionId } from '@/constants/mockBooking';
-import { useBooking, ensureReceiver, updateReceiver, setReceiverPlace, isValidPhoneVn, formatThousands } from '@/services/bookingStore';
-import { AddressBlock, AddressMapPreview, ContactPickerSheet, FlatFooter, PackageSizePicker, ZaloPasteSheet, type MapStop } from '@/components/booking';
+import { SERVICE_GROUPS, VIEW_OPTIONS, HCM_CENTER, FREIGHT_WEIGHTS, MOVING_BULKY_ITEMS, EXTRA_PRICES, type PackageSizeId, type ViewOptionId } from '@/constants/mockBooking';
+import { useBooking, ensureReceiver, updateReceiver, setReceiverPlace, setOptions, isValidPhoneVn, formatThousands } from '@/services/bookingStore';
+import { AddressBlock, AddressMapPreview, ContactPickerSheet, FlatFooter, FloorAccessPicker, PackageSizePicker, ZaloPasteSheet, type MapStop } from '@/components/booking';
 
 export default function ReceiverScreen() {
   const { index: indexParam } = useLocalSearchParams<{ index?: string }>();
@@ -23,6 +25,8 @@ export default function ReceiverScreen() {
   const isDelivery = group.kind === 'delivery';
   // Vận tải: hàng lớn/nặng — không giao tận tay, không xem hàng, có thể cần thêm nhân công bốc xếp
   const isTransport = state.service === 'transport';
+  // Dọn nhà: khác hẳn giao hàng/vận tải — xem comment đầu file
+  const isRental = state.service === 'rental';
 
   useEffect(() => {
     ensureReceiver(index);
@@ -36,8 +40,15 @@ export default function ReceiverScreen() {
   const [view, setView] = useState<ViewOptionId>(receiver?.viewOption ?? 'view');
   const [hand, setHand] = useState(receiver?.handDelivery ?? false);
   const [loadingHelp, setLoadingHelp] = useState(receiver?.needsLoadingHelp ?? false);
+  const [floorTo, setFloorTo] = useState(state.options.movingFloorTo);
+  const [elevatorTo, setElevatorTo] = useState(state.options.movingElevatorTo);
+  const [packing, setPacking] = useState(state.options.movingPacking);
+  const [disassembly, setDisassembly] = useState(state.options.movingDisassembly);
+  const [bulkyItems, setBulkyItems] = useState<string[]>(state.options.movingBulkyItems);
   const [contacts, setContacts] = useState(false);
   const [zaloPaste, setZaloPaste] = useState(false);
+
+  const toggleBulkyItem = (id: string) => setBulkyItems((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const place = receiver?.place ?? null;
   const valid = !!place && (!isDelivery || (name.trim().length >= 2 && isValidPhoneVn(phone)));
@@ -75,6 +86,7 @@ export default function ReceiverScreen() {
       handDelivery: hand,
       needsLoadingHelp: loadingHelp,
     });
+    if (isRental) setOptions({ movingFloorTo: floorTo, movingElevatorTo: elevatorTo, movingPacking: packing, movingDisassembly: disassembly, movingBulkyItems: bulkyItems });
     if (router.canGoBack()) router.back();
     else router.replace('/booking');
   };
@@ -87,7 +99,62 @@ export default function ReceiverScreen() {
       footerPadded={false}
       footer={<FlatFooter title="Xác Nhận" disabled={!valid} onPress={confirm} />}
     >
-      {isDelivery ? (
+      {isRental ? (
+        <View style={styles.body}>
+          <AddressBlock address={place?.address} placeholder={labels.receiverPlaceholder} markerType="dropoff" onChange={openPicker} />
+
+          <Pressable onPress={() => setZaloPaste(true)} style={styles.zaloRow}>
+            <Icon name={Icons.paste} size={18} color={Colors.primary} style={{ marginRight: Spacing.sm }} />
+            <AppText size={14} weight="bold" color={Colors.primary}>
+              Dán từ Zalo/Messenger — tự điền tên, SĐT, địa chỉ
+            </AppText>
+          </Pressable>
+
+          <TextField
+            label="Họ và tên người liên hệ"
+            required
+            value={name}
+            onChangeText={setName}
+            placeholder="Họ và tên người liên hệ tại nhà mới"
+            autoCapitalize="words"
+            iconRight={Icons.contacts}
+            onIconRightPress={() => setContacts(true)}
+            containerStyle={styles.field}
+          />
+          <TextField
+            label="Số điện thoại"
+            required
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="Số điện thoại liên hệ"
+            keyboardType="phone-pad"
+            containerStyle={styles.field}
+          />
+
+          <FloorAccessPicker label="Nhà/căn hộ mới" floor={floorTo} elevator={elevatorTo} onFloorChange={setFloorTo} onElevatorChange={setElevatorTo} />
+
+          <View style={styles.divider} />
+          <SwitchRow icon={Icons.box} label="Cần đóng gói đồ đạc" sublabel={`đ${EXTRA_PRICES.movingPacking.toLocaleString('vi-VN')} · thùng carton, bọc đồ dễ vỡ`} value={packing} onValueChange={setPacking} />
+          <SwitchRow
+            icon={Icons.hardHat}
+            label="Cần tháo lắp nội thất"
+            sublabel={`đ${EXTRA_PRICES.movingDisassembly.toLocaleString('vi-VN')} · giường, tủ, máy lạnh...`}
+            value={disassembly}
+            onValueChange={setDisassembly}
+          />
+
+          <AppText weight="bold" size={14} style={{ marginTop: Spacing.lg, marginBottom: Spacing.sm }}>
+            Đồ đặc biệt cần lưu ý (nếu có)
+          </AppText>
+          <View style={styles.chipsWrap}>
+            {MOVING_BULKY_ITEMS.map((item) => (
+              <Chip key={item.id} label={item.label} active={bulkyItems.includes(item.id)} onPress={() => toggleBulkyItem(item.id)} style={styles.chip} />
+            ))}
+          </View>
+
+          <TextField label="Ghi chú thêm" value={note} onChangeText={setNote} placeholder="Vd: đồ dễ vỡ, cần đến sớm buổi sáng..." containerStyle={styles.field} />
+        </View>
+      ) : isDelivery ? (
         <View style={styles.body}>
           <AddressBlock address={place?.address} placeholder={labels.receiverPlaceholder} markerType="dropoff" onChange={openPicker} />
 
@@ -191,4 +258,6 @@ const styles = StyleSheet.create({
   radios: { marginTop: Spacing.lg },
   radio: { paddingVertical: Spacing.md },
   zaloRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.md },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap' },
+  chip: { marginRight: Spacing.sm, marginBottom: Spacing.sm },
 });

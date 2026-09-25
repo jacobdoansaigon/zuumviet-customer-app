@@ -28,7 +28,8 @@ export default function ConfirmScreen() {
   const [error, setError] = useState<string | null>(null);
   const group = SERVICE_GROUPS[state.service];
   const labels = group.labels;
-  const isDelivery = group.kind === 'delivery';
+  // Dọn nhà: "Quay lại điểm giao hàng"/"Gửi tận tay khách hàng" là khái niệm giao hàng nhỏ, không hợp
+  const isDelivery = group.kind === 'delivery' && state.service !== 'rental';
   const isIntercity = state.service === 'intercity';
   const stopsCount = group.maxStops === 0 ? 0 : Math.max(1, state.receivers.length);
   const providerLower = labels.provider.toLowerCase();

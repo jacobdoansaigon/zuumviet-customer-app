@@ -13,6 +13,7 @@ import {
   FAVORITE_DRIVERS,
   PACKAGE_SIZES,
   FREIGHT_WEIGHTS,
+  MOVING_BULKY_ITEMS,
   SAMPLE_PLACES,
   HCM_CENTER,
   type ServiceKey,
@@ -74,6 +75,17 @@ export interface BookingOptions {
   paymentMethod: PaymentMethod;
   /** Thuê nhân công: số block thời gian làm việc đã chọn cho hạng mục đang chọn (xem ServiceOptionDef.blockHours) */
   laborBlocks: number;
+  /** Dọn nhà: tầng của nhà/căn hộ CŨ (điểm đi) — 0 = tầng trệt; có thang máy hay không (đủ tầng thì miễn phí) */
+  movingFloorFrom: number;
+  movingElevatorFrom: boolean;
+  /** Dọn nhà: tầng của nhà/căn hộ MỚI (điểm đến) */
+  movingFloorTo: number;
+  movingElevatorTo: boolean;
+  /** Dọn nhà: cần đóng gói (thùng carton, bọc đồ dễ vỡ) / tháo lắp nội thất (giường, tủ, máy lạnh...) */
+  movingPacking: boolean;
+  movingDisassembly: boolean;
+  /** Dọn nhà: id các đồ đặc biệt cần báo trước cho đội bốc xếp (xem MOVING_BULKY_ITEMS) */
+  movingBulkyItems: string[];
 }
 
 export type StopStatus = 'new' | 'picking' | 'picked' | 'delivering' | 'completed' | 'failed' | 'returned';
@@ -157,6 +169,13 @@ const defaultOptions = (): BookingOptions => ({
   promo: null,
   paymentMethod: 'cash',
   laborBlocks: 1,
+  movingFloorFrom: 0,
+  movingElevatorFrom: false,
+  movingFloorTo: 0,
+  movingElevatorTo: false,
+  movingPacking: false,
+  movingDisassembly: false,
+  movingBulkyItems: [],
 });
 
 const emptyReceiver = (): Receiver => ({
@@ -394,6 +413,16 @@ export function computePrice(s: BookingState = state, optionId?: string): PriceS
   if (handDelivery) lines.push({ label: 'Giao hàng tận tay', amount: handDelivery });
   const loadingHelp = stops.filter((r) => r.needsLoadingHelp).length * EXTRA_PRICES.loadingHelp;
   if (loadingHelp) lines.push({ label: 'Nhân công bốc xếp', amount: loadingHelp });
+  // Dọn nhà: phụ phí tầng lầu (mỗi đầu tính riêng, tầng trệt/tầng 1 miễn phí, có thang máy thì luôn miễn phí)
+  // + đóng gói + tháo lắp nội thất — không áp cho Giao hàng/Vận tải/dịch vụ khác.
+  if (s.service === 'rental') {
+    const extraFloorsFrom = s.options.movingElevatorFrom ? 0 : Math.max(0, s.options.movingFloorFrom - 1);
+    const extraFloorsTo = s.options.movingElevatorTo ? 0 : Math.max(0, s.options.movingFloorTo - 1);
+    const floorFee = (extraFloorsFrom + extraFloorsTo) * EXTRA_PRICES.movingFloorFee;
+    if (floorFee) lines.push({ label: 'Phụ phí tầng lầu (không thang máy)', amount: floorFee });
+    if (s.options.movingPacking) lines.push({ label: 'Đóng gói đồ đạc', amount: EXTRA_PRICES.movingPacking });
+    if (s.options.movingDisassembly) lines.push({ label: 'Tháo lắp nội thất', amount: EXTRA_PRICES.movingDisassembly });
+  }
   if (s.options.returnToPickup) lines.push({ label: 'Quay lại điểm giao hàng', amount: EXTRA_PRICES.returnToPickup });
   if (s.options.handToCustomer) lines.push({ label: 'Gửi tận tay khách hàng', amount: s.options.handToCustomer * EXTRA_PRICES.handToCustomer });
   if (s.options.tip) lines.push({ label: 'Tiền tip', amount: s.options.tip * EXTRA_PRICES.tip });
@@ -417,6 +446,23 @@ export function promoLabel(promo: PromoDef | null): string | null {
   return `Mã ${promo.code}`;
 }
 
+/** Dọn nhà: gộp tầng lầu/thang máy 2 đầu + đóng gói + tháo lắp + đồ đặc biệt thành 1 dòng ghi chú cho đơn */
+function movingNote(s: BookingState): string {
+  const o = s.options;
+  const floorText = (label: string, floor: number, elevator: boolean) =>
+    floor > 0 ? `${label}: tầng ${floor}${elevator ? ' (có thang máy)' : ' (không thang máy)'}` : '';
+  const items = o.movingBulkyItems.map((id) => MOVING_BULKY_ITEMS.find((i) => i.id === id)?.label).filter(Boolean);
+  return [
+    floorText('Nhà cũ', o.movingFloorFrom, o.movingElevatorFrom),
+    floorText('Nhà mới', o.movingFloorTo, o.movingElevatorTo),
+    o.movingPacking ? 'Cần đóng gói đồ đạc' : '',
+    o.movingDisassembly ? 'Cần tháo lắp nội thất' : '',
+    items.length ? `Đồ đặc biệt: ${items.join(', ')}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 // ---------------------------------------------------------------- Payload BE
 /** Body cho POST /site/deliveryorders & /drymode (theo DeliveryOrders::add / addValidate) */
 export function buildOrderPayload(s: BookingState = state): Record<string, unknown> {
@@ -425,6 +471,8 @@ export function buildOrderPayload(s: BookingState = state): Record<string, unkno
   const pickup = s.sender.place;
   // Vận tải dùng thang tải trọng riêng (FREIGHT_WEIGHTS) — không tra theo PACKAGE_SIZES của giao hàng nhỏ
   const isTransport = s.service === 'transport';
+  // Dọn nhà: không có khái niệm "kích cỡ gói hàng" — cả cuộc dọn nhà tính theo gói xe (đã chọn ở optionId)
+  const isRental = s.service === 'rental';
   const sizeList = isTransport ? FREIGHT_WEIGHTS : PACKAGE_SIZES;
   let stops = s.receivers.filter(isReceiverComplete);
   // Dịch vụ tận nơi (gọi thợ): BE bắt buộc có details → dùng chính địa điểm của khách làm điểm đến duy nhất
@@ -449,20 +497,23 @@ export function buildOrderPayload(s: BookingState = state): Record<string, unkno
     allow_driver_id_list: s.options.assignedDrivers,
     coupon_code: s.options.promo?.code ?? '',
     price_tip: s.options.tip * EXTRA_PRICES.tip,
-    // Thuê nhân công: BE chưa có field thời gian làm việc/số block riêng → ghi vào note đơn để tài
-    // xế/nhân công biết trước. TODO: chuyển sang field thật khi BE bổ sung.
+    // Thuê nhân công / Dọn nhà: BE chưa có field riêng cho thời gian làm việc theo block hay tầng
+    // lầu/đóng gói/tháo lắp/đồ đặc biệt → ghi vào note đơn để tài xế/đội chuyển nhà biết trước.
+    // TODO: chuyển sang field thật khi BE bổ sung.
     note: [
       s.options.note,
       s.service === 'labor' && s.options.laborBlocks > 1 && opt.blockHours
         ? `Thời gian làm việc: ${s.options.laborBlocks} block (${s.options.laborBlocks * opt.blockHours} giờ)`
         : '',
+      isRental ? movingNote(s) : '',
     ]
       .filter(Boolean)
       .join(' · '),
     api_metric_place: 1,
     api_metric_distance_matrix_drymode: 1,
     details: stops.map((r) => ({
-      weight_id: sizeList.find((p) => p.id === r.packageSize)?.weightId ?? 0,
+      // Dọn nhà: không có "kích cỡ gói hàng" (cả cuộc dọn nhà tính theo gói xe, không theo từng món đồ)
+      weight_id: isRental ? 0 : (sizeList.find((p) => p.id === r.packageSize)?.weightId ?? 0),
       fullname: r.name,
       phone: r.phone,
       saved_location_id: r.place?.savedLocationId ?? 0,
@@ -472,9 +523,9 @@ export function buildOrderPayload(s: BookingState = state): Record<string, unkno
       wayout_long: r.place?.lng ?? 0,
       wayout_map_place_id: r.place?.placeId ?? '',
       cod: r.cod,
-      // Vận tải: không có tuỳ chọn xem hàng (hàng lớn/nặng) → không chèn VIEW_NOTE, chỉ giữ ghi chú khách nhập
+      // Vận tải/Dọn nhà: không có tuỳ chọn "xem hàng" (hàng lớn/cả nhà) → không chèn VIEW_NOTE
       note:
-        group.kind === 'delivery' && !isTransport
+        group.kind === 'delivery' && !isTransport && !isRental
           ? [r.note, VIEW_NOTE[r.viewOption]].filter(Boolean).join(' · ')
           : isTransport && r.needsLoadingHelp
             ? [r.note, 'Cần nhân công bốc xếp'].filter(Boolean).join(' · ')
