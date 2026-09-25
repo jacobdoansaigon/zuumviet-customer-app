@@ -3,13 +3,25 @@
 // Chưa đủ điểm đón + điểm đến (maxStops > 0) → CHƯA hiện danh sách dịch vụ, chỉ hiện lộ trình để nhập.
 // Đủ lộ trình rồi mới hiện dịch vụ kèm giá thật. Xe máy / Xe hơi: danh sách luôn hiện đủ các gói của dịch vụ
 // đang chọn (không thu gọn về 1 dòng); tab đổi dịch vụ ngay trong màn; "Tất cả dịch vụ" gộp thêm gói dịch vụ kia.
+// Xe đường dài: điểm đến khớp 1 tỉnh/thành đang có tuyến → chỉ hiện chuyến ghép của tỉnh đó (+ vẫn có xe riêng
+// bên dưới); không khớp → gợi ý tỉnh/bến xe gần nhất đang phục vụ để khách đổi điểm đến hoặc đặt xe riêng.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AppText, Chip, Icon, Icons, ServiceOption } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { SERVICE_GROUPS, URBAN_RIDE_KEYS, toServiceKey, type ServiceKey, type ServiceOptionDef } from '@/constants/mockBooking';
+import {
+  SERVICE_GROUPS,
+  URBAN_RIDE_KEYS,
+  toServiceKey,
+  matchIntercityCity,
+  suggestNearestCity,
+  tripsForCity,
+  type IntercityCity,
+  type ServiceKey,
+  type ServiceOptionDef,
+} from '@/constants/mockBooking';
 import {
   useBooking,
   startBooking,
@@ -18,6 +30,7 @@ import {
   switchRideOption,
   addReceiver,
   removeReceiver,
+  setReceiverPlace,
   pruneIncompleteReceivers,
   isReceiverComplete,
   computePrice,
@@ -72,11 +85,29 @@ export default function BookingScreen() {
   // Xe máy ⇄ Xe hơi: tab đổi dịch vụ ngay trong màn, giữ nguyên điểm đón/điểm đến (xem URBAN_RIDE_KEYS)
   const tabKeys = URBAN_RIDE_KEYS.includes(state.service) ? URBAN_RIDE_KEYS : null;
   // Mặc định: hiện đủ các gói của dịch vụ đang chọn. "Tất cả dịch vụ": gộp thêm gói của dịch vụ liên quan (nếu có tab).
-  const options: RowOption[] =
+  const baseOptions: RowOption[] =
     expanded && tabKeys
       ? tabKeys.flatMap((k) => SERVICE_GROUPS[k].options.map((o) => ({ ...o, groupKey: k })))
       : group.options.map((o) => ({ ...o, groupKey: state.service }));
+
+  // Xe đường dài: điểm đến khớp tỉnh/thành nào thì chỉ hiện chuyến ghép của tỉnh đó (id "ghep-*"); không khớp → ẩn hết.
+  const isIntercity = state.service === 'intercity';
+  const destPlace = complete[0]?.place ?? null;
+  const matchedCity = isIntercity && destPlace ? matchIntercityCity(`${destPlace.title} ${destPlace.address}`) : null;
+  const allowedTripIds = useMemo(() => new Set((matchedCity ? tripsForCity(matchedCity.id) : []).map((t) => t.id)), [matchedCity]);
+  const options: RowOption[] = isIntercity ? baseOptions.filter((o) => !o.id.startsWith('ghep-') || allowedTripIds.has(o.id)) : baseOptions;
   const selected = options.find((o) => o.id === state.optionId) ?? options[0]!;
+  const nearestCity = isIntercity && hasDestination && !matchedCity ? suggestNearestCity() : null;
+
+  // Điểm đến đổi khiến chuyến ghép đang chọn không còn hợp lệ → tự chuyển về gói đầu danh sách hiện tại
+  const optionIds = options.map((o) => o.id).join('|');
+  useEffect(() => {
+    if (!isIntercity || !hasDestination) return;
+    if (!options.some((o) => o.id === state.optionId)) {
+      switchRideOption(state.service, options[0]!.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isIntercity, hasDestination, optionIds, state.service]);
 
   const stops = useMemo<MapStop[]>(() => {
     const list: MapStop[] = [];
@@ -104,6 +135,21 @@ export default function BookingScreen() {
     switchRideOption(o.groupKey, o.id);
     setExpanded(false);
   };
+  const useSuggestedCity = (city: IntercityCity) => {
+    setReceiverPlace(0, { title: city.name, address: `${city.station.name}, ${city.station.address}`, lat: city.station.lat, lng: city.station.lng, placeId: city.id, source: 'search' });
+  };
+  const renderOption = (o: RowOption) => (
+    <ServiceOption
+      key={o.id}
+      name={o.name}
+      description={o.description}
+      price={formatVnd(computePrice(state, o.id).total)}
+      icon={o.icon}
+      selected={o.id === selected.id}
+      onPress={() => onOptionPress(o)}
+      onInfoPress={() => setInfo(o)}
+    />
+  );
 
   return (
     <View style={styles.root}>
@@ -143,20 +189,43 @@ export default function BookingScreen() {
         <ScrollView style={{ maxHeight: height * 0.58 }} contentContainerStyle={{ paddingBottom: Spacing.sm }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {hasDestination ? (
             <>
-              <View style={styles.options}>
-                {options.map((o) => (
-                  <ServiceOption
-                    key={o.id}
-                    name={o.name}
-                    description={o.description}
-                    price={formatVnd(computePrice(state, o.id).total)}
-                    icon={o.icon}
-                    selected={o.id === selected.id}
-                    onPress={() => onOptionPress(o)}
-                    onInfoPress={() => setInfo(o)}
-                  />
-                ))}
-              </View>
+              {nearestCity ? (
+                <View style={styles.suggestCard}>
+                  <Icon name={Icons.infoOutline} size={18} color={Colors.primary} style={{ marginTop: 1 }} />
+                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                    <AppText size={13} weight="bold" color={Colors.text}>
+                      Chưa có xe ghép tới địa điểm này
+                    </AppText>
+                    <AppText size={12} color={Colors.textSecondary} style={{ marginTop: 2 }}>
+                      Gợi ý: {nearestCity.name} ({nearestCity.region}) · cách khoảng {nearestCity.distanceKm}km · {nearestCity.station.name}
+                    </AppText>
+                    <Pressable onPress={() => useSuggestedCity(nearestCity)} hitSlop={6} style={{ marginTop: 6 }}>
+                      <AppText size={13} weight="bold" color={Colors.primary}>
+                        Đổi điểm đến sang {nearestCity.name}
+                      </AppText>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
+
+              {isIntercity && matchedCity ? (
+                <>
+                  <View style={styles.sectionLabel}>
+                    <AppText size={12} weight="semiBold" color={Colors.textSecondary}>
+                      Xe ghép tới {matchedCity.name}
+                    </AppText>
+                  </View>
+                  <View style={styles.options}>{options.filter((o) => o.id.startsWith('ghep-')).map(renderOption)}</View>
+                  <View style={styles.sectionLabel}>
+                    <AppText size={12} weight="semiBold" color={Colors.textSecondary}>
+                      Đặt xe riêng, không ghép
+                    </AppText>
+                  </View>
+                  <View style={styles.options}>{options.filter((o) => !o.id.startsWith('ghep-')).map(renderOption)}</View>
+                </>
+              ) : (
+                <View style={styles.options}>{options.map(renderOption)}</View>
+              )}
               <View style={styles.divider} />
             </>
           ) : null}
@@ -207,4 +276,14 @@ const styles = StyleSheet.create({
   tab: { flex: 1, justifyContent: 'center' },
   options: { paddingHorizontal: Spacing.screen, gap: 4 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginHorizontal: Spacing.screen, marginVertical: Spacing.xs },
+  sectionLabel: { paddingHorizontal: Spacing.screen, paddingTop: Spacing.sm, paddingBottom: 2 },
+  suggestCard: {
+    flexDirection: 'row',
+    marginHorizontal: Spacing.screen,
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.primaryBg,
+  },
 });
