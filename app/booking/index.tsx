@@ -1,14 +1,14 @@
 // app/booking/index.tsx — GH 1.1 / VT 1.1: bản đồ toàn màn + bottom sheet chọn dịch vụ (Siêu tốc / Siêu rẻ / Đồng giá 25k)
 // + lộ trình (người gửi → các điểm giao) → "Xác nhận". Param: service=delivery|transport|rental
-// Xe máy / Xe hơi: có thêm tab đổi dịch vụ ngay trong màn (giữ nguyên điểm đón/điểm đến), danh sách gói
-// bên dưới luôn hiển thị đủ các gói của dịch vụ đang chọn (vd Xe hơi: 4 chỗ / 6 chỗ / Xe cao cấp).
+// Xe máy / Xe hơi: danh sách luôn hiện đủ các gói của dịch vụ đang chọn (không thu gọn về 1 dòng);
+// tab đổi dịch vụ ngay trong màn (giữ nguyên điểm đón/điểm đến); "Tất cả dịch vụ" gộp thêm gói của dịch vụ kia.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AppText, Chip, Icon, Icons, ServiceOption } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { SERVICE_GROUPS, URBAN_RIDE_KEYS, toServiceKey, type ServiceOptionDef } from '@/constants/mockBooking';
+import { SERVICE_GROUPS, URBAN_RIDE_KEYS, toServiceKey, type ServiceKey, type ServiceOptionDef } from '@/constants/mockBooking';
 import {
   useBooking,
   startBooking,
@@ -25,6 +25,9 @@ import {
 } from '@/services/bookingStore';
 import { BookingMap, RoundIconButton, StopList, ServiceInfoDialog, FlatFooter, useCurrentLocation, type MapStop } from '@/components/booking';
 
+/** Option kèm nhóm dịch vụ gốc — cần khi "Tất cả dịch vụ" gộp thêm gói của dịch vụ liên quan (vd Xe máy ⇄ Xe hơi) */
+type RowOption = ServiceOptionDef & { groupKey: ServiceKey };
+
 export default function BookingScreen() {
   const { service, from, to } = useLocalSearchParams<{ service?: string; from?: string; to?: string }>();
   const serviceKey = toServiceKey(service);
@@ -33,7 +36,7 @@ export default function BookingScreen() {
   const { height } = useWindowDimensions();
   const location = useCurrentLocation();
   const [expanded, setExpanded] = useState(false);
-  const [info, setInfo] = useState<ServiceOptionDef | null>(null);
+  const [info, setInfo] = useState<RowOption | null>(null);
   const [sheetH, setSheetH] = useState(0);
 
   useEffect(() => {
@@ -59,14 +62,18 @@ export default function BookingScreen() {
 
   const group = SERVICE_GROUPS[state.service];
   const labels = group.labels;
-  const options = group.options;
-  const selected = options.find((o) => o.id === state.optionId) ?? options[0]!;
   const complete = state.receivers.filter(isReceiverComplete);
   const senderReady = !!state.sender.place && !!state.sender.name && !!state.sender.phone;
   const canConfirm = senderReady && (group.maxStops === 0 || complete.length > 0);
 
   // Xe máy ⇄ Xe hơi: tab đổi dịch vụ ngay trong màn, giữ nguyên điểm đón/điểm đến (xem URBAN_RIDE_KEYS)
   const tabKeys = URBAN_RIDE_KEYS.includes(state.service) ? URBAN_RIDE_KEYS : null;
+  // Mặc định: hiện đủ các gói của dịch vụ đang chọn. "Tất cả dịch vụ": gộp thêm gói của dịch vụ liên quan (nếu có tab).
+  const options: RowOption[] =
+    expanded && tabKeys
+      ? tabKeys.flatMap((k) => SERVICE_GROUPS[k].options.map((o) => ({ ...o, groupKey: k })))
+      : group.options.map((o) => ({ ...o, groupKey: state.service }));
+  const selected = options.find((o) => o.id === state.optionId) ?? options[0]!;
 
   const stops = useMemo<MapStop[]>(() => {
     const list: MapStop[] = [];
@@ -86,16 +93,12 @@ export default function BookingScreen() {
     router.push({ pathname: '/booking/location', params: { target: 'receiver', index: String(index) } });
   };
   const onTabPress = (key: (typeof URBAN_RIDE_KEYS)[number]) => {
+    setExpanded(false);
     if (key === state.service) return;
     switchRideOption(key, SERVICE_GROUPS[key].options[0]!.id);
-    setExpanded(false);
   };
-  const onOptionPress = (o: ServiceOptionDef) => {
-    if (!expanded) {
-      setExpanded(true);
-      return;
-    }
-    switchRideOption(state.service, o.id);
+  const onOptionPress = (o: RowOption) => {
+    switchRideOption(o.groupKey, o.id);
     setExpanded(false);
   };
 
@@ -122,7 +125,7 @@ export default function BookingScreen() {
 
         <ScrollView style={{ maxHeight: height * 0.58 }} contentContainerStyle={{ paddingBottom: Spacing.sm }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.options}>
-            {(expanded ? options : [selected]).map((o) => (
+            {options.map((o) => (
               <ServiceOption
                 key={o.id}
                 name={o.name}
@@ -155,7 +158,7 @@ export default function BookingScreen() {
         option={info}
         onClose={() => setInfo(null)}
         onSelect={(o) => {
-          switchRideOption(state.service, o.id);
+          switchRideOption((o as RowOption).groupKey, o.id);
           setInfo(null);
           setExpanded(false);
         }}
