@@ -5,7 +5,7 @@
 import React from 'react';
 import { View, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
-import { AppText, Chip } from '@/components/ui';
+import { AppText, Chip, Icons, SwitchRow } from '@/components/ui';
 import { DEPART_TIME_CHOICES, type DateOption, type TripScheduleValue } from '@/constants/mockIntercity';
 
 interface Props {
@@ -67,6 +67,19 @@ export const TripSchedulePicker: React.FC<Props> = ({ value, onChange, dateOptio
           </AppText>
           <DateStrip options={returnOptions} value={value.returnDateKey} cellWidth={dateCellWidth} onChange={(k) => onChange({ returnDateKey: k })} />
           <TimeChips choices={timeChoices} value={value.returnTime} onChange={(t) => onChange({ returnTime: t })} />
+
+          <SwitchRow
+            icon={Icons.steering}
+            label="Phục vụ suốt hành trình"
+            sublabel={
+              value.waitForReturn
+                ? 'Có — xe & tài xế ở lại đón bạn cho chuyến về'
+                : 'Không — xe không cần ở lại, chỉ đưa bạn đi chiều đi'
+            }
+            value={value.waitForReturn}
+            onValueChange={(v) => onChange({ waitForReturn: v })}
+            style={styles.waitRow}
+          />
         </>
       ) : null}
     </View>
@@ -120,6 +133,7 @@ const styles = StyleSheet.create({
   dateCellActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   timeStrip: { gap: Spacing.sm, paddingBottom: Spacing.sm },
   timeChip: { marginRight: 0, marginBottom: 0 },
+  waitRow: { marginTop: Spacing.sm },
 });
 
 export default TripSchedulePicker;

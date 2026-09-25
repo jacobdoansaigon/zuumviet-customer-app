@@ -111,6 +111,8 @@ export interface TripScheduleValue {
   departTime: string;
   returnDateKey: string;
   returnTime: string;
+  /** Chỉ áp dụng khi khứ hồi: có (xe/tài xế ở lại đón khách cho chuyến về) hay không (xe không cần ở lại) */
+  waitForReturn: boolean;
 }
 
 /** Giờ khởi hành thường gặp cho tuyến liên tỉnh */
@@ -134,10 +136,10 @@ export function nextAvailableDateKey(dateOptions: DateOption[], time: string): s
   return dateOptions[dateOptions.length - 1]?.key ?? dateOptions[0]!.key;
 }
 
-/** Mặc định: chỉ chiều đi, khởi hành 6:00 sáng (ngày gần nhất chưa qua giờ này) */
+/** Mặc định: chỉ chiều đi, khởi hành 6:00 sáng (ngày gần nhất chưa qua giờ này), nếu chuyển khứ hồi thì mặc định xe ở lại phục vụ suốt hành trình */
 export function defaultTripSchedule(dateOptions: DateOption[]): TripScheduleValue {
   const departDateKey = nextAvailableDateKey(dateOptions, DEFAULT_DEPART_TIME);
-  return { tripType: 'oneway', departDateKey, departTime: DEFAULT_DEPART_TIME, returnDateKey: departDateKey, returnTime: DEFAULT_RETURN_TIME };
+  return { tripType: 'oneway', departDateKey, departTime: DEFAULT_DEPART_TIME, returnDateKey: departDateKey, returnTime: DEFAULT_RETURN_TIME, waitForReturn: true };
 }
 
 export function formatDateOptionLabel(dateOptions: DateOption[], key: string): string {

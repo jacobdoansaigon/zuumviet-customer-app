@@ -103,7 +103,7 @@ export const TrackingSheet: React.FC<Props> = ({ order, expanded, onToggle, onMo
               </AppText>
               {order.returnAt ? (
                 <AppText size={12} color={Colors.textSecondary} style={{ marginTop: 2 }}>
-                  Khứ hồi · về lúc {formatScheduleLabel(order.returnAt)}
+                  Khứ hồi · về lúc {formatScheduleLabel(order.returnAt)} · {order.waitForReturn ? 'xe ở lại phục vụ' : 'xe không ở lại'}
                 </AppText>
               ) : null}
             </View>
@@ -205,7 +205,7 @@ export const TrackingSheet: React.FC<Props> = ({ order, expanded, onToggle, onMo
           <RouteStops stops={stops} titleSize={14} />
           {order.returnAt ? (
             <AppText weight="semiBold" size={13} color={Colors.primary} style={{ marginTop: Spacing.sm }}>
-              Khứ hồi · về lúc {formatScheduleLabel(order.returnAt)}
+              Khứ hồi · về lúc {formatScheduleLabel(order.returnAt)} · {order.waitForReturn ? 'Xe ở lại phục vụ suốt hành trình' : 'Xe không ở lại chờ'}
             </AppText>
           ) : null}
           <AppText weight="bold" size={14} style={{ marginTop: Spacing.md }}>

@@ -138,6 +138,9 @@ export default function ConfirmScreen() {
         onPress={isIntercity ? undefined : () => setTimeSheet(true)}
       />
       {isIntercity && opt.returnAt ? <OptionRow icon={Icons.calendar} label="Ngày giờ về" value={formatScheduleLabel(opt.returnAt)} /> : null}
+      {isIntercity && opt.returnAt ? (
+        <OptionRow icon={Icons.steering} label="Phục vụ suốt hành trình" value={opt.waitForReturn ? 'Có, xe ở lại' : 'Không'} />
+      ) : null}
       <OptionRow
         icon="mci:account-outline"
         label={`${labels.provider} chỉ định`}

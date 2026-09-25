@@ -26,11 +26,12 @@ export default function CharterScreen() {
   const [schedule, setSchedule] = useState<TripScheduleValue>(() => defaultTripSchedule(DATE_OPTIONS));
   const destLabel = state.receivers.filter(isReceiverComplete)[0]?.place?.title ?? '';
 
-  // Đồng bộ lịch trình đã chọn vào đơn (dùng chung field scheduledAt/returnAt sẵn có của bookingStore)
+  // Đồng bộ lịch trình đã chọn vào đơn (dùng chung field scheduledAt/returnAt/waitForReturn sẵn có của bookingStore)
   useEffect(() => {
     setOptions({
       scheduledAt: dateTimeToTs(schedule.departDateKey, schedule.departTime),
       returnAt: schedule.tripType === 'roundtrip' ? dateTimeToTs(schedule.returnDateKey, schedule.returnTime) : null,
+      waitForReturn: schedule.waitForReturn,
     });
   }, [schedule]);
 
