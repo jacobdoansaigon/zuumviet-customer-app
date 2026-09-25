@@ -11,7 +11,10 @@ import { buildDateOptions, suggestNearestCity } from '@/constants/mockIntercity'
 import { TripSchedulePicker } from '@/components/booking';
 import { useCarpoolDraft, setSeatCount, setCarpoolSchedule, setCarpoolCargo, setDropoffPref, submitCarpoolRequest } from '@/services/carpoolRequestStore';
 
-const DATE_OPTIONS = buildDateOptions();
+// Ngày đi: 3 ô hiện sẵn + cuộn ngang cho 10 ngày còn lại (13 ngày). Ngày về: 3 ô hiện sẵn + cuộn ngang cho
+// 20 ngày còn lại (23 ngày) — dài hơn vì chuyến về có thể chọn xa hơn chuyến đi.
+const DATE_OPTIONS = buildDateOptions(13);
+const RETURN_DATE_OPTIONS = buildDateOptions(23);
 
 export default function CarpoolRequestScreen() {
   const { cityId, cityName, destinationLabel } = useLocalSearchParams<{ cityId?: string; cityName?: string; destinationLabel?: string }>();
@@ -71,7 +74,7 @@ export default function CarpoolRequestScreen() {
         </View>
 
         <View style={styles.scheduleWrap}>
-          <TripSchedulePicker value={draft.schedule} onChange={setCarpoolSchedule} dateOptions={DATE_OPTIONS} />
+          <TripSchedulePicker value={draft.schedule} onChange={setCarpoolSchedule} dateOptions={DATE_OPTIONS} returnDateOptions={RETURN_DATE_OPTIONS} />
         </View>
 
         <AppText size={15} weight="bold" style={styles.sectionTitle}>

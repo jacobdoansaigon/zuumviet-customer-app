@@ -1,8 +1,9 @@
 // components/booking/TripSchedulePicker.tsx — "Lịch trình" dùng chung cho Thuê cả xe & Xe ghép: chọn
 // một chiều (mặc định) hoặc khứ hồi (đi & về), ngày + giờ đi (mặc định 6:00 sáng), và nếu khứ hồi thì
-// thêm ngày + giờ về.
+// thêm ngày + giờ về. Mỗi dòng (ngày đi / giờ đi / ngày về / giờ về) là 1 dải cuộn ngang riêng: ngày hiện
+// 3 ô rồi cuộn tiếp, giờ hiện ~5 mốc rồi cuộn tiếp.
 import React from 'react';
-import { View, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppText, Chip } from '@/components/ui';
 import { DEPART_TIME_CHOICES, type DateOption, type TripScheduleValue } from '@/constants/mockIntercity';
@@ -10,12 +11,18 @@ import { DEPART_TIME_CHOICES, type DateOption, type TripScheduleValue } from '@/
 interface Props {
   value: TripScheduleValue;
   onChange: (patch: Partial<TripScheduleValue>) => void;
+  /** danh sách ngày cho chiều đi */
   dateOptions: DateOption[];
+  /** danh sách ngày cho chiều về (phạm vi có thể xa hơn chiều đi); mặc định dùng chung dateOptions nếu không truyền */
+  returnDateOptions?: DateOption[];
   timeChoices?: string[];
 }
 
-export const TripSchedulePicker: React.FC<Props> = ({ value, onChange, dateOptions, timeChoices = DEPART_TIME_CHOICES }) => {
-  const returnDateOptions = dateOptions.filter((d) => d.key >= value.departDateKey);
+export const TripSchedulePicker: React.FC<Props> = ({ value, onChange, dateOptions, returnDateOptions, timeChoices = DEPART_TIME_CHOICES }) => {
+  const returnOptions = (returnDateOptions ?? dateOptions).filter((d) => d.key >= value.departDateKey);
+  // Hiện đúng 3 ô ngày/màn hình rồi cuộn ngang cho các ngày còn lại
+  const { width: winWidth } = useWindowDimensions();
+  const dateCellWidth = Math.max(88, Math.floor((winWidth - Spacing.screen * 2 - Spacing.sm * 2) / 3));
 
   return (
     <View>
@@ -45,7 +52,12 @@ export const TripSchedulePicker: React.FC<Props> = ({ value, onChange, dateOptio
       <AppText size={13} weight="semiBold" color={Colors.textSecondary} style={styles.subLabel}>
         Ngày giờ đi
       </AppText>
-      <DateStrip options={dateOptions} value={value.departDateKey} onChange={(k) => onChange({ departDateKey: k, returnDateKey: value.returnDateKey < k ? k : value.returnDateKey })} />
+      <DateStrip
+        options={dateOptions}
+        value={value.departDateKey}
+        cellWidth={dateCellWidth}
+        onChange={(k) => onChange({ departDateKey: k, returnDateKey: value.returnDateKey < k ? k : value.returnDateKey })}
+      />
       <TimeChips choices={timeChoices} value={value.departTime} onChange={(t) => onChange({ departTime: t })} />
 
       {value.tripType === 'roundtrip' ? (
@@ -53,7 +65,7 @@ export const TripSchedulePicker: React.FC<Props> = ({ value, onChange, dateOptio
           <AppText size={13} weight="semiBold" color={Colors.textSecondary} style={styles.subLabel}>
             Ngày giờ về
           </AppText>
-          <DateStrip options={returnDateOptions} value={value.returnDateKey} onChange={(k) => onChange({ returnDateKey: k })} />
+          <DateStrip options={returnOptions} value={value.returnDateKey} cellWidth={dateCellWidth} onChange={(k) => onChange({ returnDateKey: k })} />
           <TimeChips choices={timeChoices} value={value.returnTime} onChange={(t) => onChange({ returnTime: t })} />
         </>
       ) : null}
@@ -61,10 +73,10 @@ export const TripSchedulePicker: React.FC<Props> = ({ value, onChange, dateOptio
   );
 };
 
-const DateStrip: React.FC<{ options: DateOption[]; value: string; onChange: (key: string) => void }> = ({ options, value, onChange }) => (
+const DateStrip: React.FC<{ options: DateOption[]; value: string; cellWidth: number; onChange: (key: string) => void }> = ({ options, value, cellWidth, onChange }) => (
   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateStrip}>
     {options.map((d) => (
-      <Pressable key={d.key} onPress={() => onChange(d.key)} style={[styles.dateCell, d.key === value && styles.dateCellActive]}>
+      <Pressable key={d.key} onPress={() => onChange(d.key)} style={[styles.dateCell, { width: cellWidth }, d.key === value && styles.dateCellActive]}>
         <AppText size={13} weight={d.key === value ? 'bold' : 'medium'} color={d.key === value ? Colors.white : Colors.text}>
           {d.label}
         </AppText>
@@ -77,11 +89,11 @@ const DateStrip: React.FC<{ options: DateOption[]; value: string; onChange: (key
 );
 
 const TimeChips: React.FC<{ choices: string[]; value: string; onChange: (t: string) => void }> = ({ choices, value, onChange }) => (
-  <View style={styles.timeWrap}>
+  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeStrip}>
     {choices.map((t) => (
       <Chip key={t} label={t} active={t === value} size="sm" onPress={() => onChange(t)} style={styles.timeChip} />
     ))}
-  </View>
+  </ScrollView>
 );
 
 const styles = StyleSheet.create({
@@ -99,7 +111,6 @@ const styles = StyleSheet.create({
   subLabel: { marginTop: Spacing.sm, marginBottom: 6 },
   dateStrip: { gap: Spacing.sm, paddingBottom: Spacing.sm },
   dateCell: {
-    width: 64,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
@@ -107,7 +118,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dateCellActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  timeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  timeStrip: { gap: Spacing.sm, paddingBottom: Spacing.sm },
   timeChip: { marginRight: 0, marginBottom: 0 },
 });
 

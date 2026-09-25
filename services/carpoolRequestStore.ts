@@ -40,7 +40,8 @@ interface DraftState {
   dropoffPref: DropoffPref;
 }
 
-const DATE_OPTIONS = buildDateOptions();
+// Phủ hết phạm vi ngày mà TripSchedulePicker cho chọn (chiều về xa nhất 23 ngày) để formatDateOptionLabel luôn tìm được nhãn.
+const DATE_OPTIONS = buildDateOptions(23);
 
 function defaultDraft(): DraftState {
   return { seatCount: 1, schedule: defaultTripSchedule(DATE_OPTIONS), hasCargo: false, cargoNote: '', dropoffPref: 'station' };

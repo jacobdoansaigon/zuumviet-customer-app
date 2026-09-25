@@ -12,7 +12,10 @@ import { useBooking, isReceiverComplete, switchRideOption, setOptions, computePr
 import { ServiceInfoDialog, TripSchedulePicker } from '@/components/booking';
 import { buildDateOptions, defaultTripSchedule, dateTimeToTs, type TripScheduleValue } from '@/constants/mockIntercity';
 
-const DATE_OPTIONS = buildDateOptions();
+// Ngày đi: 3 ô hiện sẵn + cuộn ngang cho 10 ngày còn lại (13 ngày). Ngày về: 3 ô hiện sẵn + cuộn ngang cho
+// 20 ngày còn lại (23 ngày) — dài hơn vì chuyến về có thể chọn xa hơn chuyến đi.
+const DATE_OPTIONS = buildDateOptions(13);
+const RETURN_DATE_OPTIONS = buildDateOptions(23);
 
 export default function CharterScreen() {
   const state = useBooking();
@@ -49,7 +52,12 @@ export default function CharterScreen() {
           </AppText>
         </View>
 
-        <TripSchedulePicker value={schedule} onChange={(patch) => setSchedule((s) => ({ ...s, ...patch }))} dateOptions={DATE_OPTIONS} />
+        <TripSchedulePicker
+          value={schedule}
+          onChange={(patch) => setSchedule((s) => ({ ...s, ...patch }))}
+          dateOptions={DATE_OPTIONS}
+          returnDateOptions={RETURN_DATE_OPTIONS}
+        />
 
         <AppText size={15} weight="bold" style={styles.sectionTitle}>
           Chọn hạng xe
