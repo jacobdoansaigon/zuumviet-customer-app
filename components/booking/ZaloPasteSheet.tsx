@@ -80,10 +80,10 @@ export const ZaloPasteSheet: React.FC<ZaloPasteSheetProps> = ({ visible, onClose
   };
 
   return (
-    <BottomSheet visible={visible} onClose={close} title="Dán từ Zalo" showClose scroll contentStyle={styles.content}>
+    <BottomSheet visible={visible} onClose={close} title="Dán từ Zalo/Messenger" showClose scroll contentStyle={styles.content}>
       <View style={{ gap: Spacing.sm }}>
         <AppText size={13} color={Colors.textSecondary}>
-          Dán nguyên đoạn tin nhắn khách gửi qua Zalo (tên, số điện thoại, địa chỉ...), hệ thống sẽ tự tách ra.
+          Dán nguyên đoạn tin nhắn khách gửi qua Zalo/Messenger (tên, số điện thoại, địa chỉ...), hệ thống sẽ tự tách ra.
         </AppText>
 
         <TextField value={text} onChangeText={setText} placeholder={PLACEHOLDER} multiline numberOfLines={5} inputStyle={styles.textArea} />

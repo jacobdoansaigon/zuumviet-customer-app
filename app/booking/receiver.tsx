@@ -94,7 +94,7 @@ export default function ReceiverScreen() {
           <Pressable onPress={() => setZaloPaste(true)} style={styles.zaloRow}>
             <Icon name={Icons.paste} size={18} color={Colors.primary} style={{ marginRight: Spacing.sm }} />
             <AppText size={14} weight="bold" color={Colors.primary}>
-              Dán từ Zalo — tự điền tên, SĐT, địa chỉ
+              Dán từ Zalo/Messenger — tự điền tên, SĐT, địa chỉ
             </AppText>
           </Pressable>
 

@@ -126,7 +126,7 @@ export default function LocationScreen() {
         <Pressable onPress={() => setZaloPaste(true)} style={styles.zaloRow}>
           <Icon name={Icons.paste} size={20} color={Colors.primary} style={{ marginRight: Spacing.sm }} />
           <AppText size={15} weight="bold" color={Colors.primary} style={{ flex: 1 }}>
-            Dán từ Zalo
+            Dán từ Zalo/Messenger
           </AppText>
           <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
         </Pressable>
