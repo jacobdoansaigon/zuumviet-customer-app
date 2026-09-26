@@ -1,12 +1,23 @@
-// WhyZuumCarousel — "Tại sao chọn ZuumViet?": 1 thẻ / màn (gradient tím), cuộn ngang qua 4 khác biệt, có chấm chỉ trang
+// WhyZuumCarousel — "Tại sao chọn ZuumViet?": 1 thẻ / màn, cuộn ngang qua 4 khác biệt, có chấm chỉ trang.
+// Mỗi thẻ 1 gradient riêng (thay vì tím lặp lại cả 4 — dễ chìm giữa header/nút cũng tím) — chọn theo
+// đúng ý nghĩa nội dung: vàng (thưởng/thu nhập), teal (giá/tiền bạc, trùng màu "thành công" sẵn có),
+// xanh dương (an toàn/xác minh), tím thương hiệu dành riêng cho thẻ nói về chính ứng dụng ZuumViet.
 import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet, useWindowDimensions, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
+import { Colors, Palette, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { AppText, Icon, type IconName } from '@/components/ui';
 import { WHY_ZUUM, type WhyZuumItem } from '@/constants/mock';
 
 const GAP = Spacing.md;
+
+/** [đậm, nhạt] theo id trong WHY_ZUUM (constants/mock.ts) — lặp vòng nếu sau này thêm thẻ mới */
+const CARD_GRADIENTS: [string, string][] = [
+  [Palette.warning[700], Colors.warning], // w1 Cộng đồng chia sẻ thu nhập
+  [Palette.success[700], Colors.success], // w2 Giá rõ ràng, không phụ phí ẩn
+  [Colors.infoDark, Colors.info], // w3 Tài xế được xác minh
+  [Colors.primary, Colors.primaryLight], // w4 Một ứng dụng, mọi nhu cầu (giữ tím thương hiệu)
+];
 
 interface WhyZuumCarouselProps {
   items?: WhyZuumItem[];
@@ -40,7 +51,7 @@ export const WhyZuumCarousel: React.FC<WhyZuumCarouselProps> = ({ items = WHY_ZU
         {items.map((it, idx) => (
           <LinearGradient
             key={it.id}
-            colors={[Colors.primary, Colors.primaryLight]}
+            colors={CARD_GRADIENTS[idx % CARD_GRADIENTS.length]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[styles.card, { width: cardWidth }]}
@@ -65,7 +76,10 @@ export const WhyZuumCarousel: React.FC<WhyZuumCarouselProps> = ({ items = WHY_ZU
 
       <View style={styles.dots}>
         {items.map((it, i) => (
-          <View key={it.id} style={[styles.dot, i === active && styles.dotActive]} />
+          <View
+            key={it.id}
+            style={[styles.dot, i === active && [styles.dotActive, { backgroundColor: CARD_GRADIENTS[i % CARD_GRADIENTS.length][1] }]]}
+          />
         ))}
       </View>
     </View>
@@ -95,7 +109,7 @@ const styles = StyleSheet.create({
   desc: { marginTop: 4, lineHeight: 18 },
   dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: Spacing.sm },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.gray300 },
-  dotActive: { width: 18, backgroundColor: Colors.primary },
+  dotActive: { width: 18 },
 });
 
 export default WhyZuumCarousel;

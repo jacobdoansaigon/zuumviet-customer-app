@@ -87,6 +87,7 @@ export const Colors = {
   error: '#D24847',
   errorBg: Palette.danger[50],
   info: '#2196F3',
+  infoDark: '#1565C0', // xanh dương đậm — ghép cặp gradient với `info` (banner/thẻ "Tài xế xác minh")
   green: '#2EBD59', // trạng thái giao dịch thành công
 
   white: '#FFFFFF',
