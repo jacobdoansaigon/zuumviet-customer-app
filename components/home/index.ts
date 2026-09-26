@@ -3,6 +3,7 @@ export * from './ServiceCard';
 export * from './WalletCard';
 export * from './NewsCard';
 export * from './PromoCard';
+export * from './promoVisual';
 export * from './PromoGrid';
 export * from './WhyZuumCarousel';
 export * from './PartnerBanner';

@@ -1,9 +1,12 @@
-// Chi tiết khuyến mãi: ảnh hero + nhãn ưu đãi, tiêu đề, mã (khung gạch đứt), HSD, điều kiện, nút "Đặt ngay"
-import React, { useState } from 'react';
-import { View, StyleSheet, Image } from 'react-native';
+// Chi tiết khuyến mãi: khối hero icon+gradient theo đúng dịch vụ (promoVisual) + nhãn ưu đãi, tiêu đề,
+// mã (khung gạch đứt), HSD, điều kiện, nút "Đặt ngay"
+import React from 'react';
+import { View, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppHeader, AppText, Button, EmptyState, Icon, Icons, Screen } from '@/components/ui';
+import { promoVisual } from '@/components/home';
 import { MOCK_PROMOS } from '@/constants/mock';
 import { SERVICE_GROUPS, toServiceKey } from '@/constants/mockBooking';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
@@ -11,7 +14,6 @@ import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 export default function PromotionDetailScreen() {
   useStatusBarStyle('dark');
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [imgFailed, setImgFailed] = useState(false);
   const item = MOCK_PROMOS.find((p) => p.id === id);
 
   if (!item) {
@@ -24,6 +26,7 @@ export default function PromotionDetailScreen() {
 
   const serviceKey = toServiceKey(item.service);
   const serviceTitle = SERVICE_GROUPS[serviceKey].title;
+  const { icon, colors } = promoVisual(item);
 
   return (
     <Screen
@@ -32,13 +35,11 @@ export default function PromotionDetailScreen() {
       footer={<Button title={`Đặt ${serviceTitle} ngay`} onPress={() => router.push({ pathname: '/booking', params: { service: serviceKey } })} />}
     >
       <View style={styles.heroWrap}>
-        {!imgFailed ? (
-          <Image source={{ uri: item.image }} style={styles.hero} resizeMode="cover" onError={() => setImgFailed(true)} />
-        ) : (
-          <View style={[styles.hero, styles.heroFallback]}>
-            <Icon name={Icons.ticket} size={48} color={Colors.primarySoft} />
+        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+          <View style={styles.heroIconWrap}>
+            <Icon name={icon} size={48} color={Colors.white} />
           </View>
-        )}
+        </LinearGradient>
         <View style={styles.badge}>
           <AppText size={14} weight="extraBold" color={Colors.dark}>
             {item.discount}
@@ -95,8 +96,15 @@ export default function PromotionDetailScreen() {
 
 const styles = StyleSheet.create({
   heroWrap: { backgroundColor: Colors.primaryBg },
-  hero: { width: '100%', aspectRatio: 16 / 9 },
-  heroFallback: { alignItems: 'center', justifyContent: 'center' },
+  hero: { width: '100%', aspectRatio: 16 / 9, alignItems: 'center', justifyContent: 'center' },
+  heroIconWrap: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   badge: {
     position: 'absolute',
     left: Spacing.screen,

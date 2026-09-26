@@ -359,13 +359,12 @@ export type PromoItem = {
   title: string;
   /** Nhóm dịch vụ áp dụng, hiển thị dạng tag nhỏ */
   tag: string;
-  /** Nhãn ưu đãi nổi bật trên ảnh: "-20%", "-30K", "0Đ"... */
+  /** Nhãn ưu đãi nổi bật trên khối minh hoạ: "-20%", "-30K", "0Đ"... */
   discount: string;
   code: string;
   /** dd/mm/yyyy */
   expiry: string;
-  image: string;
-  /** ServiceKey mở màn đặt khi bấm "Đặt ngay" */
+  /** ServiceKey mở màn đặt khi bấm "Đặt ngay" — cũng dùng để suy ra icon/màu minh hoạ, xem promoVisual() */
   service: string;
   summary: string;
   conditions: string[];
@@ -379,7 +378,6 @@ export const MOCK_PROMOS: PromoItem[] = [
     discount: '-20%',
     code: 'MUAXUAN2020',
     expiry: '31/10/2026',
-    image: 'https://picsum.photos/seed/zuum-promo-1/600/380',
     service: 'delivery',
     summary: 'Nhập mã khi xác nhận đơn để giảm 20%, tối đa 30.000đ cho đơn Giao hàng đầu tiên.',
     conditions: ['Áp dụng cho khách hàng chưa có đơn hoàn thành', 'Đơn tối thiểu 30.000đ, giảm tối đa 30.000đ', 'Mỗi tài khoản dùng 1 lần', 'Không áp dụng cùng ưu đãi khác'],
@@ -391,7 +389,6 @@ export const MOCK_PROMOS: PromoItem[] = [
     discount: '10K',
     code: 'XEMAY10K',
     expiry: '15/10/2026',
-    image: 'https://picsum.photos/seed/zuum-promo-2/600/380',
     service: 'bike',
     summary: 'Chuyến Xe máy dưới 5km trong nội thành TP.HCM đồng giá 10.000đ, áp dụng khung 9h–16h.',
     conditions: ['Quãng đường tối đa 5km', 'Khung giờ 9:00 – 16:00 các ngày trong tuần', 'Tối đa 2 chuyến/ngày/tài khoản'],
@@ -403,7 +400,6 @@ export const MOCK_PROMOS: PromoItem[] = [
     discount: '-30K',
     code: 'XEHOI30',
     expiry: '31/10/2026',
-    image: 'https://picsum.photos/seed/zuum-promo-3/600/380',
     service: 'car',
     summary: 'Trải nghiệm Xe 4 chỗ với ưu đãi giảm ngay 30.000đ cho chuyến đầu tiên.',
     conditions: ['Áp dụng cho Xe 4 chỗ và Xe 4 chỗ Plus', 'Cước chuyến tối thiểu 50.000đ', 'Mỗi tài khoản dùng 1 lần'],
@@ -415,7 +411,6 @@ export const MOCK_PROMOS: PromoItem[] = [
     discount: '-15%',
     code: 'SANBAY15',
     expiry: '30/11/2026',
-    image: 'https://picsum.photos/seed/zuum-promo-4/600/380',
     service: 'car6',
     summary: 'Giảm 15% gói Xe 6 chỗ sân bay, tối đa 60.000đ, cả chiều đi và chiều về.',
     conditions: ['Áp dụng gói "Xe 6 chỗ sân bay"', 'Giảm tối đa 60.000đ/chuyến', 'Đặt trước tối thiểu 2 giờ'],
@@ -427,7 +422,6 @@ export const MOCK_PROMOS: PromoItem[] = [
     discount: '-10%',
     code: 'DUONGDAI10',
     expiry: '31/12/2026',
-    image: 'https://picsum.photos/seed/zuum-promo-5/600/380',
     service: 'intercity',
     summary: 'Giảm 10% cho chuyến Xe đường dài từ TP.HCM đi Vũng Tàu, Đà Lạt, Cần Thơ, tối đa 100.000đ.',
     conditions: ['Áp dụng Xe 4 chỗ và Xe 7 chỗ đường dài', 'Quãng đường tối thiểu 80km', 'Giảm tối đa 100.000đ/chuyến', 'Đặt trước tối thiểu 4 giờ'],
@@ -439,7 +433,6 @@ export const MOCK_PROMOS: PromoItem[] = [
     discount: '-200K',
     code: 'CHUYENNHA200',
     expiry: '31/12/2026',
-    image: 'https://picsum.photos/seed/zuum-promo-6/600/380',
     service: 'rental',
     summary: 'Giảm 200.000đ cho Gói căn hộ hoặc Gói nhà phố đặt chuyển vào thứ 7, chủ nhật.',
     conditions: ['Áp dụng Gói căn hộ và Gói nhà phố / văn phòng', 'Ngày chuyển rơi vào thứ 7 hoặc chủ nhật', 'Đặt trước tối thiểu 2 ngày'],
@@ -451,7 +444,6 @@ export const MOCK_PROMOS: PromoItem[] = [
     discount: '-20K',
     code: 'LAITHAY20',
     expiry: '30/11/2026',
-    image: 'https://picsum.photos/seed/zuum-promo-7/600/380',
     service: 'driver',
     summary: 'Giảm 20.000đ cho mỗi chuyến Tài xế lái thay Xe hơi, không giới hạn số lần.',
     conditions: ['Áp dụng gói "Xe hơi"', 'Không áp dụng gói "Xe máy"', 'Đặt trước tối thiểu 1 giờ'],
@@ -463,7 +455,6 @@ export const MOCK_PROMOS: PromoItem[] = [
     discount: '+20K',
     code: 'MOIBAN20',
     expiry: '31/12/2026',
-    image: 'https://picsum.photos/seed/zuum-promo-8/600/380',
     service: 'delivery',
     summary: 'Mỗi người bạn đăng ký bằng mã giới thiệu của bạn và hoàn thành 1 đơn, bạn nhận 20.000đ vào Tài khoản thưởng.',
     conditions: ['Người được mời phải là tài khoản mới', 'Thưởng ghi nhận sau khi đơn đầu tiên hoàn thành', 'Không giới hạn số người mời'],

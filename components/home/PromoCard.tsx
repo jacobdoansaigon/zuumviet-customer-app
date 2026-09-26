@@ -1,9 +1,13 @@
-// PromoCard — thẻ khuyến mãi nhỏ (2 thẻ / hàng): ảnh 16:10 bo góc + nhãn ưu đãi vàng, tag dịch vụ, tiêu đề 2 dòng, HSD
-import React, { useState } from 'react';
-import { View, StyleSheet, Pressable, Image, type StyleProp, type ViewStyle } from 'react-native';
+// PromoCard — thẻ khuyến mãi nhỏ (2 thẻ / hàng): khối icon+gradient 16:10 theo đúng dịch vụ (promoVisual)
+// + nhãn ưu đãi vàng, tag dịch vụ, tiêu đề 2 dòng, HSD. Trước đây dùng ảnh chụp ngẫu nhiên (picsum) không
+// liên quan gì tới nội dung — đổi sang icon để LUÔN đúng, không phụ thuộc tải ảnh ngoài mạng.
+import React from 'react';
+import { View, StyleSheet, Pressable, type StyleProp, type ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { AppText, Icon, Icons } from '@/components/ui';
+import { AppText, Icon } from '@/components/ui';
 import type { PromoItem } from '@/constants/mock';
+import { promoVisual } from './promoVisual';
 
 interface PromoCardProps {
   item: PromoItem;
@@ -13,17 +17,15 @@ interface PromoCardProps {
 }
 
 export const PromoCard: React.FC<PromoCardProps> = ({ item, width, onPress, style }) => {
-  const [failed, setFailed] = useState(false);
+  const { icon, colors } = promoVisual(item);
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, { width }, pressed && { opacity: 0.92 }, style]} accessibilityRole="button" accessibilityLabel={item.title}>
       <View style={styles.imageWrap}>
-        {!failed ? (
-          <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" onError={() => setFailed(true)} />
-        ) : (
-          <View style={[styles.image, styles.fallback]}>
-            <Icon name={Icons.ticket} size={30} color={Colors.primarySoft} />
+        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.image}>
+          <View style={styles.iconWrap}>
+            <Icon name={icon} size={30} color={Colors.white} />
           </View>
-        )}
+        </LinearGradient>
         <View style={styles.badge}>
           <AppText size={12} weight="extraBold" color={Colors.dark}>
             {item.discount}
@@ -55,8 +57,15 @@ const styles = StyleSheet.create({
     ...Shadow.sm,
   },
   imageWrap: { backgroundColor: Colors.primaryBg },
-  image: { width: '100%', aspectRatio: 16 / 10 },
-  fallback: { alignItems: 'center', justifyContent: 'center' },
+  image: { width: '100%', aspectRatio: 16 / 10, alignItems: 'center', justifyContent: 'center' },
+  iconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   badge: {
     position: 'absolute',
     left: Spacing.sm,
