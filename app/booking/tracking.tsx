@@ -1,14 +1,15 @@
 // app/booking/tracking.tsx — 1.5: bản đồ + bottom sheet theo trạng thái đơn
 // (đang tìm tài xế / lên lịch / không tìm thấy / tìm thấy / đang giao / hoàn thành / đã huỷ).
-// orderId thật → poll orderApi.getOrderDetail mỗi 5s (BE lỗi 2 lần → chuyển mô phỏng); orderId mock / không có → mô phỏng tiến trình.
-// QA: ?demo=notfound | ?demo=scheduled
+// orderId thật → poll orderApi.getOrderDetail mỗi 5s + đợt tìm tài xế (syncSearchState); push deliveryorder_accept/update
+// (hooks/useNotifications) chỉ làm poll sớm hơn. BE lỗi → báo toast, KHÔNG chuyển sang mô phỏng.
+// orderId mock / không có → mô phỏng tiến trình. QA: ?demo=notfound | ?demo=scheduled
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, Linking, ActivityIndicator, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppText, BottomSheet, Icons, ListRow, Toast } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { orderApi, ORDER_STATUS } from '@/services/api';
+import { orderApi, ORDER_STATUS, getErrorMessage } from '@/services/api';
 import { SERVICE_GROUPS } from '@/constants/mockBooking';
 import {
   useBooking,
@@ -21,7 +22,11 @@ import {
   rememberOrder,
   updateStoredOrder,
   getTrackingPhase,
+  retrySearch,
+  syncSearchState,
 } from '@/services/bookingStore';
+import { ensureServiceCatalog } from '@/services/serviceCatalog';
+import { useOrderPushRefresh } from '@/hooks/useNotifications';
 import { BookingMap, RoundIconButton, TrackingSheet, type MapStop } from '@/components/booking';
 import { buildTrackingLink, shareTrackingLink } from '@/services/shareLink';
 
@@ -35,8 +40,10 @@ export default function TrackingScreen() {
   const orderId = orderIdParam && orderIdParam.length > 0 ? orderIdParam : DEMO_ID;
   const state = useBooking();
   const order = state.orders[orderId] ?? null;
-  const [usingMock, setUsingMock] = useState(isMockOrderId(orderId));
+  const usingMock = isMockOrderId(orderId);
   const [retried, setRetried] = useState(false);
+  // push deliveryorder_accept/update về đúng đơn này → tăng pushTick để poll ngay
+  const pushTick = useOrderPushRefresh(usingMock ? null : orderId);
   const [runKey, setRunKey] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -78,7 +85,7 @@ export default function TrackingScreen() {
     };
   }, [usingMock, orderId, demo, retried, runKey]);
 
-  // Đơn thật: poll BE
+  // Đơn thật: poll BE (đơn + đợt tìm tài xế). Lỗi mạng → toast sau 2 lần, vẫn poll tiếp.
   useEffect(() => {
     if (usingMock) return;
     let cancelled = false;
@@ -86,19 +93,19 @@ export default function TrackingScreen() {
     let timer: ReturnType<typeof setInterval> | null = null;
     const load = async () => {
       try {
+        await ensureServiceCatalog().catch(() => null);
         const data = await orderApi.getOrderDetail(orderId);
         if (cancelled) return;
         failures = 0;
         const next = rememberOrder(normalizeApiOrder(data, getStoredOrder(orderId)));
-        if (isTerminalStatus(next.status) && timer) clearInterval(timer);
-      } catch {
-        failures += 1;
-        if (failures >= 2 && !cancelled) {
-          // BE không phản hồi → mô phỏng để UI vẫn demo được (đánh dấu isMock)
-          if (!getStoredOrder(orderId)) createDemoOrder(orderId, demo);
-          else updateStoredOrder(orderId, { isMock: true });
-          setUsingMock(true);
+        if (isTerminalStatus(next.status)) {
+          if (timer) clearInterval(timer);
+          return;
         }
+        await syncSearchState(orderId);
+      } catch (e) {
+        failures += 1;
+        if (failures === 2 && !cancelled) setToast(`Không cập nhật được đơn: ${getErrorMessage(e)}`);
       }
     };
     void load();
@@ -107,7 +114,7 @@ export default function TrackingScreen() {
       cancelled = true;
       if (timer) clearInterval(timer);
     };
-  }, [usingMock, orderId, demo]);
+  }, [usingMock, orderId, pushTick]);
 
   const stops = useMemo<MapStop[]>(() => {
     if (!order) return [];
@@ -138,12 +145,21 @@ export default function TrackingScreen() {
     if (from === 'booking' || !router.canGoBack()) goHome();
     else router.back();
   };
-  const retry = () => {
-    updateStoredOrder(orderId, { status: ORDER_STATUS.ASSIGNING, driver: null });
-    setRetried(true);
-    setUsingMock(true);
-    setRunKey((k) => k + 1);
-    setToast('Đang tìm lại tài xế gần bạn...');
+  const retry = async () => {
+    if (usingMock) {
+      updateStoredOrder(orderId, { status: ORDER_STATUS.ASSIGNING, driver: null });
+      setRetried(true);
+      setRunKey((k) => k + 1);
+      setToast('Đang tìm lại tài xế gần bạn...');
+      return;
+    }
+    try {
+      await retrySearch(orderId);
+      updateStoredOrder(orderId, { searchExpired: false });
+      setToast('Đang tìm lại tài xế gần bạn...');
+    } catch (e) {
+      setToast(getErrorMessage(e, 'Không bắt đầu lại được việc tìm tài xế'));
+    }
   };
   const call = (phone?: string) => {
     if (!phone) return;

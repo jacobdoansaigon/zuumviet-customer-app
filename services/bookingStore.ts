@@ -1,9 +1,13 @@
 // services/bookingStore.ts — store nhỏ trong bộ nhớ cho luồng đặt hàng (module state + useSyncExternalStore).
 // Giữ bản nháp đơn giữa các bước: chọn dịch vụ → người gửi → người nhận → xác nhận → theo dõi.
-// - buildOrderPayload(): dựng body cho orderApi.createOrder theo Controller\Site\DeliveryOrders::add (zv-delivery)
-// - submitBooking(): drymode → createOrder; BE từ chối → tạo đơn MOCK để màn theo dõi vẫn demo được.
+// - buildOrderPayload(): dựng body cho orderApi.createOrder theo Controller\Site\DeliveryOrders::add (zv-delivery);
+//   service_id lấy từ catalog thật (services/serviceCatalog.ts), không dùng id tạm trong mockBooking.
+// - refreshQuote(): POST /drymode để lấy giá + km BE tính (giá hiển thị ở màn xác nhận là giá BE, giá app chỉ là ước tính).
+// - submitBooking(): createOrder → startDriverSearch (BE chỉ tìm tài xế khi có process). Lỗi → ném ra cho màn hình
+//   báo, KHÔNG còn âm thầm tạo đơn mock (đơn mock chỉ dùng cho demo/QA qua createDemoOrder).
 import { useSyncExternalStore } from 'react';
-import { orderApi, ORDER_STATUS, getStoredCustomer, type DeliveryOrder } from '@/services/api';
+import { orderApi, ORDER_STATUS, PROCESS_STATUS, getStoredCustomer, type DeliveryOrder } from '@/services/api';
+import { ensureServiceCatalog, findOptionByServiceId, resolveServiceId, serviceNameById } from '@/services/serviceCatalog';
 import {
   SERVICE_GROUPS,
   SERVICE_KEYS,
@@ -131,6 +135,23 @@ export interface TrackedOrder {
   etaMinutes: number;
   createdAt: number;
   isMock: boolean;
+  /**
+   * Đơn thật: đợt tìm tài xế gần nhất đã hết hạn mà chưa ai nhận (process COMPLETED/CANCELLED + quá date_expired,
+   * đơn vẫn ASSIGNING). BE không tự chuyển FAIL với điều phối thủ công nên app phải tự suy ra để hiện "Không tìm thấy".
+   */
+  searchExpired?: boolean;
+}
+
+/** Giá BE tính qua POST /site/deliveryorders/drymode cho bản nháp hiện tại */
+export interface ServerQuote {
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  total: number;
+  /** giá dịch vụ trước giảm giá (price_final_detail.price_service) */
+  original: number;
+  distanceKm: number;
+  error: string | null;
+  /** chữ ký bản nháp lúc báo giá — khác với hiện tại nghĩa là giá đã cũ */
+  key: string;
 }
 
 export interface BookingState {
@@ -141,6 +162,7 @@ export interface BookingState {
   options: BookingOptions;
   /** đơn mock + snapshot đơn thật vừa tạo (key = orderId) */
   orders: Record<string, TrackedOrder>;
+  quote: ServerQuote;
 }
 
 export interface PriceLine {
@@ -205,6 +227,8 @@ const emptyReceiver = (): Receiver => ({
 
 const firstOptionId = (service: ServiceKey) => SERVICE_GROUPS[service].options[0]!.id;
 
+const idleQuote = (): ServerQuote => ({ status: 'idle', total: 0, original: 0, distanceKm: 0, error: null, key: '' });
+
 function createInitialState(service: ServiceKey): BookingState {
   return {
     service,
@@ -213,6 +237,7 @@ function createInitialState(service: ServiceKey): BookingState {
     receivers: [],
     options: defaultOptions(),
     orders: {},
+    quote: idleQuote(),
   };
 }
 
@@ -368,7 +393,7 @@ export function setOptions(patch: Partial<BookingOptions>) {
 
 /** Xoá bản nháp sau khi tạo đơn (giữ người gửi & dịch vụ) */
 export function resetDraft() {
-  update({ receivers: [], options: defaultOptions() });
+  update({ receivers: [], options: defaultOptions(), quote: idleQuote() });
 }
 
 // ---------------------------------------------------------------- Giá & khoảng cách
@@ -508,8 +533,27 @@ function handymanNote(s: BookingState): string {
 }
 
 // ---------------------------------------------------------------- Payload BE
+/** Bản nháp đã có đủ dữ liệu để gửi lên BE chưa (có điểm đón + ít nhất 1 điểm đến/điểm tận nơi) */
+export function isDraftReady(s: BookingState = state): boolean {
+  const group = SERVICE_GROUPS[s.service];
+  if (!s.sender.place) return false;
+  if (group.kind === 'onsite') return true;
+  return s.receivers.some(isReceiverComplete);
+}
+
+/**
+ * id dịch vụ thật trên BE cho option đang chọn. Ném lỗi rõ ràng khi chưa tải catalog hoặc BE chưa mở dịch vụ
+ * (thay vì gửi id tạm trong mockBooking rồi nhận 422 "service not found" khó hiểu).
+ */
+export function requireServiceId(s: BookingState = state): number {
+  const opt = getOption(s);
+  const id = resolveServiceId(s.service, opt);
+  if (!id) throw new Error(`Dịch vụ "${opt.name}" chưa được mở trên hệ thống. Vui lòng chọn dịch vụ khác.`);
+  return id;
+}
+
 /** Body cho POST /site/deliveryorders & /drymode (theo DeliveryOrders::add / addValidate) */
-export function buildOrderPayload(s: BookingState = state): Record<string, unknown> {
+export function buildOrderPayload(s: BookingState = state, serviceId: number = requireServiceId(s)): Record<string, unknown> {
   const opt = getOption(s);
   const group = SERVICE_GROUPS[s.service];
   const pickup = s.sender.place;
@@ -523,13 +567,17 @@ export function buildOrderPayload(s: BookingState = state): Record<string, unkno
   if (group.kind === 'onsite' && stops.length === 0 && pickup) {
     stops = [{ ...emptyReceiver(), name: s.sender.name, phone: s.sender.phone, place: pickup, viewOption: 'no_view' }];
   }
+  const pickupDate = s.options.scheduledAt ? Math.floor(s.options.scheduledAt / 1000) : 0;
+  // Đơn hẹn giờ: BE bắt mỗi điểm giao có giờ giao > giờ lấy - 60' và cách điểm trước ≥ 30'
+  // (DeliveryOrderDetail::MAX_MINUTE / GAP_MINUTE_EACH_ITEM) → đặt giờ giao dự kiến tăng dần sau giờ lấy.
+  const wayoutDate = (i: number) => (pickupDate > 0 ? pickupDate + 3600 + i * 1800 : 0);
   return {
-    service_id: opt.serviceId,
+    service_id: serviceId,
     need_return_pickup: s.options.returnToPickup ? 1 : 0,
     customer_address: pickup?.address ?? '',
     customer_lat: pickup?.lat ?? 0,
     customer_long: pickup?.lng ?? 0,
-    pickup_date: s.options.scheduledAt ? Math.floor(s.options.scheduledAt / 1000) : 0,
+    pickup_date: pickupDate,
     pickup_location_id: pickup?.savedLocationId ?? 0,
     pickup_fullname: s.sender.name,
     pickup_address: pickup?.address ?? '',
@@ -557,13 +605,14 @@ export function buildOrderPayload(s: BookingState = state): Record<string, unkno
       .join(' · '),
     api_metric_place: 1,
     api_metric_distance_matrix_drymode: 1,
-    details: stops.map((r) => ({
+    details: stops.map((r, i) => ({
       // Dọn nhà: không có "kích cỡ gói hàng" (cả cuộc dọn nhà tính theo gói xe, không theo từng món đồ)
       weight_id: isRental ? 0 : (sizeList.find((p) => p.id === r.packageSize)?.weightId ?? 0),
-      fullname: r.name,
-      phone: r.phone,
+      // BE bắt buộc tên + SĐT ở mọi điểm đến (kể cả chở khách/thợ, nơi app không hỏi) → lấy của người đặt
+      fullname: r.name.trim() || s.sender.name,
+      phone: r.phone.replace(/\D/g, '') || s.sender.phone.replace(/\D/g, ''),
       saved_location_id: r.place?.savedLocationId ?? 0,
-      wayout_date_delivered: 0,
+      wayout_date_delivered: wayoutDate(i),
       wayout_address: r.place?.address ?? '',
       wayout_lat: r.place?.lat ?? 0,
       wayout_long: r.place?.lng ?? 0,
@@ -588,6 +637,69 @@ const VIEW_NOTE: Record<ViewOptionId, string> = {
   view_check: 'Được xem và kiểm hàng',
   no_view: 'Không được xem hàng',
 };
+
+// ---------------------------------------------------------------- Báo giá BE (drymode)
+/** Chữ ký các trường ảnh hưởng tới giá — đổi là phải báo giá lại */
+function quoteKey(s: BookingState): string {
+  const o = s.options;
+  return JSON.stringify([
+    s.service,
+    s.optionId,
+    s.sender.place?.lat,
+    s.sender.place?.lng,
+    s.receivers.filter(isReceiverComplete).map((r) => [r.place?.lat, r.place?.lng, r.cod, r.handDelivery, r.needsLoadingHelp, r.packageSize, r.place?.address]),
+    o.returnToPickup,
+    o.tip,
+    o.promo?.code,
+    o.scheduledAt,
+    o.paymentMethod,
+  ]);
+}
+
+let quoteSeq = 0;
+
+/**
+ * Gọi POST /site/deliveryorders/drymode để lấy giá BE tính (có km Google Distance Matrix khi server có key).
+ * Idempotent theo quoteKey: bản nháp chưa đổi thì không gọi lại. Lỗi được ghi vào quote.error (màn xác nhận hiện).
+ */
+export async function refreshQuote(force = false): Promise<ServerQuote> {
+  const s = state;
+  const key = quoteKey(s);
+  if (!force && s.quote.key === key && (s.quote.status === 'ready' || s.quote.status === 'loading')) return s.quote;
+  if (!isDraftReady(s)) {
+    const q = { ...idleQuote(), key };
+    update({ quote: q });
+    return q;
+  }
+  const seq = ++quoteSeq;
+  update((cur) => ({ quote: { ...cur.quote, status: 'loading', error: null, key } }));
+  try {
+    await ensureServiceCatalog();
+    const res = await orderApi.dryMode(buildOrderPayload(s));
+    if (seq !== quoteSeq) return state.quote; // đã có yêu cầu mới hơn
+    const detail = (res.price_final_detail ?? {}) as Record<string, unknown>;
+    const debug = (res.__debug ?? {}) as Record<string, unknown>;
+    const total = num(res.price_final);
+    const original = num(detail.price_service) || total;
+    const q: ServerQuote = { status: 'ready', total, original: Math.max(original, total), distanceKm: num(debug.p_S), error: null, key };
+    update({ quote: q });
+    return q;
+  } catch (e) {
+    if (seq !== quoteSeq) return state.quote;
+    const q: ServerQuote = { ...idleQuote(), status: 'error', error: e instanceof Error ? e.message : String(e), key };
+    update({ quote: q });
+    return q;
+  }
+}
+
+/** Giá đang có hiệu lực cho bản nháp: giá BE nếu đã báo đúng bản nháp hiện tại, ngược lại ước tính của app */
+export function effectivePrice(s: BookingState = state): { total: number; original: number; distanceKm: number; fromServer: boolean } {
+  const local = computePrice(s);
+  if (s.quote.status === 'ready' && s.quote.key === quoteKey(s)) {
+    return { total: s.quote.total, original: s.quote.original, distanceKm: s.quote.distanceKm || local.distanceKm, fromServer: true };
+  }
+  return { total: local.total, original: local.subtotal, distanceKm: local.distanceKm, fromServer: false };
+}
 
 // ---------------------------------------------------------------- Đơn theo dõi (mock + snapshot)
 export const isMockOrderId = (id: string) => id.startsWith('mock-');
@@ -722,9 +834,27 @@ export function getTrackingPhase(o: TrackedOrder): TrackingPhase {
   if (s === S.FAIL) return 'notfound';
   if (s >= S.CUSTOMER_CANCELLED) return 'cancelled';
   if (s >= S.PICKED) return 'delivering';
-  if (s >= S.ACCEPTED) return 'accepted';
+  if (s >= S.ACCEPTED || o.driver) return 'accepted';
   if (s === 2 || (o.scheduledAt && s < S.ASSIGNING)) return 'scheduled';
+  if (o.searchExpired) return 'notfound';
   return 'searching';
+}
+
+/** Đồng bộ trạng thái đợt tìm tài xế của đơn thật từ GET /site/deliveryorderprocesses/last */
+export async function syncSearchState(orderId: string): Promise<void> {
+  const cur = state.orders[orderId];
+  if (!cur || cur.driver || cur.status !== ORDER_STATUS.ASSIGNING) return;
+  try {
+    const res = await orderApi.getLastProcess(orderId);
+    const last = res.items?.[0];
+    if (!last) return;
+    const now = Math.floor(Date.now() / 1000);
+    const finished = Number(last.status) === PROCESS_STATUS.COMPLETED || Number(last.status) === PROCESS_STATUS.CANCELLED;
+    const expired = finished && Number(last.date_expired) > 0 && Number(last.date_expired) < now;
+    if (expired !== !!cur.searchExpired) updateStoredOrder(orderId, { searchExpired: expired });
+  } catch {
+    /* giữ trạng thái cũ */
+  }
 }
 
 // ---------------------------------------------------------------- Chuẩn hoá đơn từ API
@@ -741,18 +871,38 @@ function detailStatus(detail: number, orderStatus: number): StopStatus {
   return 'new';
 }
 
-/** Gộp dữ liệu API (getJsonDataForApp) lên snapshot đã có để đủ tên/địa chỉ hiển thị */
+/** Tài xế từ JSON đơn (enrichOrderData: driver{full_name, phone, avatar_url, rating} + driver_account_id) */
+function driverFromApi(o: DeliveryOrder, base?: TrackedOrder | null): DriverDef | null {
+  const driverId = num(o.driver_account_id);
+  if (driverId <= 0) return null;
+  const d = (o.driver ?? {}) as Record<string, unknown>;
+  const name = str(d.full_name).trim();
+  const keepBase = base?.driver && base.driver.id === driverId ? base.driver : null;
+  return {
+    id: driverId,
+    name: name || keepBase?.name || 'Tài xế ZuumViet',
+    phone: str(d.phone) || keepBase?.phone || '',
+    avatar: str(d.avatar_url) || keepBase?.avatar || undefined,
+    rating: num(d.rating) || keepBase?.rating || 0,
+    reviews: keepBase?.reviews ?? 0,
+    plate: keepBase?.plate ?? '',
+    vehicle: keepBase?.vehicle ?? '',
+  };
+}
+
+/** Gộp dữ liệu API (getJsonDataForApp + enrichOrderData) lên snapshot đã có để đủ tên/địa chỉ hiển thị */
 export function normalizeApiOrder(o: DeliveryOrder, base?: TrackedOrder | null): TrackedOrder {
   const id = String(o.id);
   const status = num(o.status) || base?.status || ORDER_STATUS.ASSIGNING;
   const pickupDate = num(o.pickup_date);
+  // total_distance BE lưu bằng mét
   const rawDistance = num(o.total_distance);
   const distanceKm = rawDistance > 500 ? Math.round(rawDistance / 100) / 10 : rawDistance;
   const details = Array.isArray(o.details) ? (o.details as Record<string, unknown>[]) : null;
   const stops: TrackedStop[] =
     details && details.length
       ? details.map((d, i) => ({
-          name: str(d.fullname) || base?.stops[i]?.name || `Điểm giao ${i + 1}`,
+          name: str(d.full_name) || base?.stops[i]?.name || `Điểm giao ${i + 1}`,
           phone: str(d.phone) || base?.stops[i]?.phone || '',
           address: str(d.wayout_address) || base?.stops[i]?.address || '',
           lat: num(d.wayout_lat) || base?.stops[i]?.lat || HCM_CENTER.lat,
@@ -762,21 +912,24 @@ export function normalizeApiOrder(o: DeliveryOrder, base?: TrackedOrder | null):
       : (base?.stops ?? []).map((st) => ({ ...st, status: detailStatus(0, status) === 'new' ? st.status : detailStatus(0, status) }));
   const coupon = str(o.coupon_code);
   const discount = num(o.coupon_discount_value);
-  const active = status >= ORDER_STATUS.ACCEPTED && status < ORDER_STATUS.FAIL;
   const total = num(o.price_final) || base?.total || 0;
+  // Nhóm/option từ service_id thật (catalog đã tải) — không có thì giữ snapshot, cuối cùng mới mặc định Giao hàng
+  const mapped = findOptionByServiceId(num(o.service_id));
+  const serviceName = mapped?.option.name ?? base?.serviceName ?? serviceNameById(num(o.service_id)) ?? 'Giao hàng';
   return {
     id,
-    code: `#${str(o.invoiceid) || id}`,
+    code: `#${id}`,
     status,
-    service: base?.service ?? 'delivery',
-    optionId: base?.optionId ?? '',
-    serviceName: base?.serviceName ?? 'Giao hàng',
-    serviceDescription: base?.serviceDescription ?? '',
+    service: mapped?.service ?? base?.service ?? 'delivery',
+    optionId: mapped?.option.id ?? base?.optionId ?? '',
+    serviceName,
+    serviceDescription: mapped?.option.description ?? base?.serviceDescription ?? '',
     scheduledAt: pickupDate > 0 ? pickupDate * 1000 : null,
     returnAt: base?.returnAt ?? null,
     waitForReturn: base?.waitForReturn ?? true,
     distanceKm: distanceKm || base?.distanceKm || 0,
     promoLabel: coupon ? (discount > 0 && discount <= 100 ? `Giảm ${discount}%` : `Mã ${coupon}`) : (base?.promoLabel ?? null),
+    // PAYMENT_METHOD_WALLET = 1, CASH = 3
     paymentMethod: num(o.payment_method) === 1 ? 'wallet' : 'cash',
     note: str(o.note) || base?.note || '',
     pickup: {
@@ -788,8 +941,7 @@ export function normalizeApiOrder(o: DeliveryOrder, base?: TrackedOrder | null):
       status: status >= ORDER_STATUS.PICKED ? 'picked' : 'picking',
     },
     stops,
-    // BE chỉ trả driver_account_id → dùng tài xế mock để hiển thị (TODO: gọi API hồ sơ tài xế)
-    driver: active || status === ORDER_STATUS.COMPLETED ? (base?.driver ?? MOCK_DRIVER) : (base?.driver ?? null),
+    driver: driverFromApi(o, base),
     total,
     original: base?.original && base.original >= total ? base.original : total,
     etaMinutes: base?.etaMinutes ?? 10,
@@ -802,33 +954,45 @@ export function normalizeApiOrder(o: DeliveryOrder, base?: TrackedOrder | null):
 export interface SubmitResult {
   orderId: string;
   mock: boolean;
-  /** thông điệp lỗi API khi phải rơi về mock */
+  /** lỗi phụ (vd không khởi động được tìm tài xế) — đơn vẫn đã tạo */
   error: string | null;
 }
 
+/**
+ * Tạo đơn thật: POST /site/deliveryorders → POST /site/deliveryorderprocesses/{id} (bắt đầu tìm tài xế;
+ * đơn hẹn giờ thì cron của BE tự mở process khi tới giờ). Mọi lỗi tạo đơn được ném ra cho màn xác nhận hiển thị.
+ */
 export async function submitBooking(): Promise<SubmitResult> {
   const s = state;
+  await ensureServiceCatalog();
   const payload = buildOrderPayload(s);
   const price = computePrice(s);
-  let apiError: string | null = null;
-  try {
-    // Giữ bước drymode như màn map cũ (BE tính giá/khoảng cách); lỗi drymode không chặn luồng
-    await orderApi.dryMode(payload).catch(() => null);
-    const created = await orderApi.createOrder(payload);
-    if (created && typeof created.id === 'number' && created.id > 0) {
-      const id = String(created.id);
-      rememberOrder(normalizeApiOrder(created, trackedFromDraft(id, s, price, false)));
-      resetDraft();
-      return { orderId: id, mock: false, error: null };
-    }
+  const created = await orderApi.createOrder(payload);
+  if (!created || typeof created.id !== 'number' || created.id <= 0) {
     throw new Error('Phản hồi tạo đơn không hợp lệ');
-  } catch (e) {
-    apiError = e instanceof Error ? e.message : String(e);
   }
-  // Fallback: đơn MOCK để demo màn theo dõi
-  const mock = rememberOrder(trackedFromDraft(`mock-${uid()}`, s, price, true));
+  const id = String(created.id);
+  const snapshot = trackedFromDraft(id, s, price, false);
+  rememberOrder(normalizeApiOrder(created, snapshot));
   resetDraft();
-  return { orderId: mock.id, mock: true, error: apiError };
+
+  let error: string | null = null;
+  if (!s.options.scheduledAt) {
+    try {
+      await orderApi.startDriverSearch(id);
+      updateStoredOrder(id, { status: ORDER_STATUS.ASSIGNING });
+    } catch (e) {
+      // Đơn đã tạo nhưng chưa tìm được tài xế → màn theo dõi sẽ thử lại (retrySearch)
+      error = e instanceof Error ? e.message : String(e);
+    }
+  }
+  return { orderId: id, mock: false, error };
+}
+
+/** Tìm lại tài xế cho đơn thật (nút "Thử lại" ở màn theo dõi khi không tìm thấy tài xế) */
+export async function retrySearch(orderId: string): Promise<void> {
+  await orderApi.startDriverSearch(orderId);
+  updateStoredOrder(orderId, { status: ORDER_STATUS.ASSIGNING, driver: null });
 }
 
 /**

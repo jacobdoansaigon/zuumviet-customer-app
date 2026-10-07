@@ -15,7 +15,6 @@ import {
   saveSession,
   normalizePhoneVn,
   formatPhoneDisplay,
-  isDemoFallbackError,
   type OtpSessionData,
 } from '@/services/api';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
@@ -153,19 +152,32 @@ export default function SetPasscodeScreen() {
   };
 
   const submitReset = async (passcode: string) => {
+    // Quên passcode: đã đăng nhập bằng OTP ở màn trước → BE đặt mật khẩu mới theo phiên OTP đó
+    if (!session?.otp_id || !session?.otp_auth_code) {
+      setSheet({
+        title: 'Thiếu phiên OTP',
+        message: 'Vui lòng quay lại bước nhập số điện thoại và xác thực OTP.',
+        action: 'Đồng ý',
+        onAction: goLogin,
+      });
+      return;
+    }
     try {
-      await authApi.changePassword({ new_password: passcode });
+      await authApi.resetPassword({
+        phone: session.phone || phone,
+        otpId: Number(session.otp_id),
+        otpAuthCode: String(session.otp_auth_code),
+        otpGroup: session.otp_group || 'otp_general',
+        password: passcode,
+      });
     } catch (e) {
-      if (!isDemoFallbackError(e)) {
-        setSheet({
-          title: 'Cập nhật thất bại',
-          message: e instanceof ApiError ? e.message : 'Có lỗi xảy ra trong quá trình',
-          action: 'Thử lại',
-          onAction: resetToStart,
-        });
-        return;
-      }
-      // BE chưa có endpoint / chưa cấu hình API → chế độ demo: coi như thành công
+      setSheet({
+        title: 'Cập nhật thất bại',
+        message: e instanceof ApiError ? e.message : 'Có lỗi xảy ra trong quá trình',
+        action: 'Thử lại',
+        onAction: resetToStart,
+      });
+      return;
     }
     hardNavigate('/account?toast=passcode');
   };

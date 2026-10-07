@@ -2,6 +2,7 @@
 import { ORDER_STATUS, type DeliveryOrder } from '@/services/api';
 import { Colors } from '@/constants/theme';
 import { SERVICE_GROUPS } from '@/constants/mockBooking';
+import { findOptionByServiceId, serviceNameById } from '@/services/serviceCatalog';
 import { type IconName } from '@/components/ui';
 import type {
   ActivityDriver,
@@ -191,107 +192,110 @@ const toMs = (v: unknown): number | undefined => {
 const first = <T>(...vals: (T | undefined)[]) => vals.find((v) => v !== undefined);
 
 /**
- * BE chưa có field "loại dịch vụ" cố định (schema /site/deliveryorders vẫn đang thay đổi) → đoán qua
- * vài field hay gặp. Thứ tự khớp: từ khoá đặc trưng nhất trước để đỡ nhận nhầm (vd "thợ điện" phải
- * khớp handyman trước khi rơi xuống delivery mặc định). Không có cách nào chắc chắn 100% cho tới khi
- * BE trả về đúng service_key khớp ServiceKey của app — xem constants/mockBooking.ts.
+ * Nhóm dịch vụ của đơn: ưu tiên map service_id thật → catalog (services/serviceCatalog.ts, đã tải sau đăng nhập);
+ * chưa có catalog thì đoán theo tên dịch vụ BE trả kèm (nếu có) — thứ tự khớp từ khoá đặc trưng nhất trước.
  */
 function detectService(raw: Raw): ActivityService {
-  const hint = [raw.service_type, raw.service, raw.vehicle_type, raw.service_name, raw.type]
+  const mapped = findOptionByServiceId(num(raw.service_id) ?? 0);
+  // 'car6' (nhóm cũ giữ để tương thích link) hiển thị chung với Xe hơi
+  if (mapped) return mapped.service === 'car6' ? 'car' : mapped.service;
+  const hint = [serviceNameById(num(raw.service_id) ?? 0), raw.service_type, raw.service, raw.vehicle_type, raw.service_name, raw.type]
     .map((v) => (typeof v === 'string' ? v : obj(v) ? str(obj(v)!.name) : undefined))
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
   if (/(thợ|sửa chữa|handyman|electrician|plumber)/.test(hint)) return 'handyman';
-  if (/(nhân công|bốc xếp|phụ hồ|lao động|\blabor\b|\bmover)/.test(hint)) return 'labor';
-  if (/(dọn nhà|chuyển nhà|\brental\b|\bmoving\b)/.test(hint)) return 'rental';
+  if (/(nhân công|bốc xếp|phụ hồ|lao động|giúp việc|sự kiện|\blabor\b|\bmover)/.test(hint)) return 'labor';
+  if (/(dọn nhà|chuyển nhà|phòng trọ|căn hộ|nhà phố|\brental\b|\bmoving\b)/.test(hint)) return 'rental';
   if (/(lái thay|tài xế riêng|driver hire)/.test(hint)) return 'driver';
-  if (/(đường dài|liên tỉnh|intercity|limousine|xe ghép)/.test(hint)) return 'intercity';
-  if (/(tải|tai|truck|van|transport|cargo)/.test(hint)) return 'transport';
+  if (/(đường dài|liên tỉnh|intercity|limousine|xe ghép|16 chỗ|29 chỗ|45 chỗ)/.test(hint)) return 'intercity';
+  if (/(tải|truck|van|transport|cargo|bán tải)/.test(hint)) return 'transport';
   if (/(xe máy|scooter|motorbike|\bmoto\b)/.test(hint)) return 'bike';
-  if (/(xe hơi|xe 4 chỗ|sedan|taxi|\bcar\b)/.test(hint)) return 'car';
+  if (/(xe hơi|xe 4 chỗ|xe 6 chỗ|xe 7 chỗ|cao cấp|sedan|taxi|\bcar\b)/.test(hint)) return 'car';
   return 'delivery';
 }
 
 function detectServiceName(raw: Raw, service: ActivityService) {
+  const mapped = findOptionByServiceId(num(raw.service_id) ?? 0);
+  if (mapped) return mapped.option.name;
   const svc = obj(raw.service);
-  const name = first(str(raw.service_name), svc ? str(svc.name) : undefined, str(raw.service_type), str(raw.vehicle_type));
+  const name = first(serviceNameById(num(raw.service_id) ?? 0) ?? undefined, str(raw.service_name), svc ? str(svc.name) : undefined);
   return name ?? SERVICE_GROUPS[service].title;
 }
 
-function stopStatusFrom(v: unknown): ActivityStopStatus | undefined {
+/** Trạng thái điểm giao theo DeliveryOrderDetail (NEW 1 · COMPLETED 3 · FAILED 5 · RETURNED 7) + trạng thái đơn */
+function stopStatusFrom(v: unknown, orderStatus: number): ActivityStopStatus | undefined {
   const s = num(v);
   if (s === undefined) return undefined;
-  if (s >= ORDER_STATUS.COMPLETED && s < ORDER_STATUS.FAIL) return 'done';
-  if (s === ORDER_STATUS.FAIL) return 'failed';
-  if (s >= ORDER_STATUS.DELIVERING) return 'delivering';
-  if (s >= ORDER_STATUS.PICKED) return 'picked';
+  if (s === 3 || s === 7) return 'done';
+  if (s === 5) return 'failed';
+  if (orderStatus >= ORDER_STATUS.COMPLETED && orderStatus < ORDER_STATUS.FAIL) return 'done';
+  if (orderStatus >= ORDER_STATUS.DELIVERING) return 'delivering';
+  if (orderStatus >= ORDER_STATUS.PICKED) return 'picked';
   return 'pending';
 }
 
-function mapStop(raw: Raw, fallbackTitle: string): ActivityStop {
-  const address = first(str(raw.address), str(raw.full_address), str(raw.formatted_address));
-  const title = first(str(raw.name), str(raw.title), str(raw.short_address), str(raw.receiver_name), address) ?? fallbackTitle;
+/** details[] của BE: {full_name, phone, wayout_address, status, ...} */
+function mapStop(raw: Raw, fallbackTitle: string, orderStatus: number): ActivityStop {
+  const address = first(str(raw.wayout_address), str(raw.address), str(raw.full_address));
+  const name = first(str(raw.full_name), str(raw.name), str(raw.receiver_name));
+  const phone = str(raw.phone);
+  const title = name ? `${name}${phone ? ` · ${phone}` : ''}` : (address ?? fallbackTitle);
   return {
     title,
     address: address && address !== title ? address : undefined,
-    status: stopStatusFrom(raw.status),
+    status: stopStatusFrom(raw.status, orderStatus),
   };
 }
 
+/** enrichOrderData: driver{full_name, phone, avatar_url, rating} + driver_account_id (chỉ có khi đơn đã gán tài xế) */
 function mapDriver(raw: Raw): ActivityDriver | undefined {
-  const d = obj(raw.driver) ?? obj(raw.driver_info);
-  const name = first(d ? str(d.fullname) ?? str(d.full_name) ?? str(d.name) : undefined, str(raw.driver_name));
-  if (!name) return undefined;
+  const driverId = num(raw.driver_account_id) ?? 0;
+  const d = obj(raw.driver);
+  const name = d ? str(d.full_name) ?? str(d.fullname) : undefined;
+  if (driverId <= 0 || !name) return undefined;
   const vehicle = d ? obj(d.vehicle) : undefined;
   return {
-    id: first(d ? str(d.id) : undefined, str(raw.driver_id)) ?? name,
+    id: String(driverId),
     name,
-    avatar: d ? str(d.avatar) ?? str(d.avatar_url) ?? null : null,
-    rating: first(d ? num(d.rating) ?? num(d.rate) : undefined, num(raw.driver_rating)) ?? 5,
-    reviews: first(d ? num(d.reviews) ?? num(d.total_rating) : undefined) ?? 0,
-    plate: first(d ? str(d.plate_number) ?? str(d.plate) ?? str(d.license_plate) : undefined, vehicle ? str(vehicle.plate_number) : undefined, str(raw.driver_plate)) ?? '',
-    vehicle: first(vehicle ? str(vehicle.name) ?? str(vehicle.model) : undefined, d ? str(d.vehicle_name) : undefined) ?? '',
+    avatar: d ? str(d.avatar_url) ?? null : null,
+    rating: (d ? num(d.rating) : undefined) || 5,
+    reviews: 0,
+    plate: first(vehicle ? str(vehicle.license_plates) : undefined, d ? str(d.license_plate) : undefined) ?? '',
+    vehicle: first(vehicle ? str(vehicle.name) : undefined, d ? str(d.vehicle_name) : undefined) ?? '',
   };
 }
 
-/** Chuyển DeliveryOrder từ /site/deliveryorders sang cấu trúc hiển thị. Đọc field phòng thủ vì schema BE chưa cố định. */
+/** Chuyển DeliveryOrder từ /site/deliveryorders (getJsonDataForApp + enrichOrderData) sang cấu trúc hiển thị. */
 export function mapDeliveryOrder(order: DeliveryOrder): ActivityOrder {
   const raw = order as Raw;
   const service = detectService(raw);
-  const pickupRaw = obj(raw.pickup) ?? obj(raw.from) ?? obj(raw.sender);
-  const pickupAddress = first(str(raw.pickup_address), str(raw.from_address), str(raw.sender_address));
-  const pickup: ActivityStop = pickupRaw
-    ? mapStop(pickupRaw, 'Điểm lấy hàng')
-    : { title: pickupAddress ?? 'Điểm lấy hàng' };
-
-  const stopsRaw = first(
-    arr(raw.stops).length ? arr(raw.stops) : undefined,
-    arr(raw.destinations).length ? arr(raw.destinations) : undefined,
-    arr(raw.delivery_points).length ? arr(raw.delivery_points) : undefined,
-    arr(raw.receivers).length ? arr(raw.receivers) : undefined
-  );
-  const dropoffAddress = first(str(raw.delivery_address), str(raw.to_address), str(raw.receiver_address));
-  const dropoffs: ActivityStop[] = stopsRaw
-    ? stopsRaw.map((s, i) => mapStop(s, `Điểm giao ${i + 1}`))
-    : [{ title: dropoffAddress ?? 'Điểm giao hàng' }];
-
-  const total = first(num(raw.total_fee), num(raw.total), num(raw.shipping_fee), num(raw.fee)) ?? 0;
-  const tip = first(num(raw.tip), num(raw.tip_fee), num(raw.driver_tip)) ?? 0;
-  const paymentHint = String(first(str(raw.payment_method), str(raw.payment_type)) ?? '').toLowerCase();
-  const wallet = /(wallet|account|ví|tài khoản|momo)/.test(paymentHint);
-
-  const ratingStars = first(num(raw.rating), num(raw.rate), num(raw.customer_rating));
   const status = Number(order.status) || ORDER_STATUS.NEW;
+  const pickupName = str(raw.pickup_fullname);
+  const pickupAddress = str(raw.pickup_address);
+  const pickup: ActivityStop = {
+    title: pickupName ? `${pickupName}${str(raw.pickup_phone) ? ` · ${str(raw.pickup_phone)}` : ''}` : (pickupAddress ?? 'Điểm lấy hàng'),
+    address: pickupName ? pickupAddress : undefined,
+    status: status >= ORDER_STATUS.PICKED ? 'picked' : 'pending',
+  };
+
+  const details = arr(raw.details);
+  const dropoffs: ActivityStop[] = details.length ? details.map((s, i) => mapStop(s, `Điểm giao ${i + 1}`, status)) : [{ title: 'Điểm giao hàng' }];
+
+  const total = num(raw.price_final) ?? 0;
+  const tip = num(raw.price_tip) ?? 0;
+  // PAYMENT_METHOD_WALLET = 1, CASH = 3
+  const wallet = num(raw.payment_method) === 1;
+  const pickupDate = num(raw.pickup_date) ?? 0;
 
   return {
     id: String(order.id),
-    code: first(str(raw.code), str(raw.order_code), str(raw.tracking_code)) ?? `#${order.id}`,
+    code: `#${order.id}`,
     service,
     serviceName: detectServiceName(raw, service),
     status,
-    createdAt: first(toMs(raw.date_created), toMs(raw.created_at), toMs(raw.createdAt)) ?? Date.now(),
-    scheduledAt: first(toMs(raw.schedule_time), toMs(raw.scheduled_at), toMs(raw.pickup_time)),
+    createdAt: toMs(raw.date_created) ?? Date.now(),
+    scheduledAt: pickupDate > 0 ? pickupDate * 1000 : undefined,
     pickup,
     dropoffs,
     driver: mapDriver(raw),
@@ -301,15 +305,8 @@ export function mapDeliveryOrder(order: DeliveryOrder): ActivityOrder {
       tip,
       total,
     },
-    note: first(str(raw.note), str(raw.notes), str(raw.customer_note)),
-    rating:
-      ratingStars && ratingStars > 0
-        ? {
-            stars: ratingStars,
-            tags: Array.isArray(raw.rating_tags) ? (raw.rating_tags as unknown[]).map(String) : [],
-            favorite: Boolean(raw.is_favorite_driver),
-            blocked: Boolean(raw.is_blocked_driver),
-          }
-        : undefined,
+    note: str(raw.note),
+    // Đánh giá của khách cho đơn này nằm ở zv-driver (driverreviews) — chưa gộp vào JSON đơn → ratingStore giữ cục bộ
+    rating: undefined,
   };
 }

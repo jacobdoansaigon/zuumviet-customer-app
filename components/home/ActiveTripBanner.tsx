@@ -5,6 +5,7 @@ import { View, StyleSheet, Pressable } from 'react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { AppText, Icon, Icons } from '@/components/ui';
 import { ORDER_STATUS, type DeliveryOrder } from '@/services/api';
+import { findOptionByServiceId, serviceNameById } from '@/services/serviceCatalog';
 import { formatTime12h } from '@/constants/mock';
 
 export type ActiveTripInfo = {
@@ -42,7 +43,9 @@ export function describeActiveOrder(o: DeliveryOrder): ActiveTripInfo {
 
   const address =
     pickString(o, ['pickup_address', 'from_address', 'sender_address', 'address', 'pickup', 'from']) || `Đơn hàng #${o.id}`;
-  const service = pickString(o, ['service_name', 'service', 'vehicle_type_name', 'vehicle_name']) || 'Giao hàng';
+  // service_id thật → tên option trong catalog (đã tải sau đăng nhập); chưa có thì tên BE, cuối cùng mới 'Giao hàng'
+  const serviceId = Number(o.service_id) || 0;
+  const service = findOptionByServiceId(serviceId)?.option.name || serviceNameById(serviceId) || pickString(o, ['service_name']) || 'Giao hàng';
 
   const created = Number(o.date_created ?? o.created_at ?? 0);
   const date = created > 0 ? new Date(created > 1e12 ? created : created * 1000) : new Date();

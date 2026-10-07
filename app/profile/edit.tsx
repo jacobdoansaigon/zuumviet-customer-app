@@ -11,7 +11,7 @@ import {
   customerApi,
   getStoredCustomer,
   updateStoredCustomer,
-  isDemoFallbackError,
+  getErrorMessage,
   getDisplayName,
   formatPhoneDisplay,
   type CustomerProfile,
@@ -59,16 +59,11 @@ export default function EditProfileScreen() {
     }
     setSaving(true);
     try {
-      try {
-        await customerApi.updateProfile(customer.id, { full_name: name, email: emailTrim });
-      } catch (e) {
-        // BE chưa có endpoint / chưa cấu hình API → vẫn lưu cục bộ (demo)
-        if (!isDemoFallbackError(e)) throw e;
-      }
+      await customerApi.updateProfile(customer.id, { full_name: name, email: emailTrim });
       await updateStoredCustomer({ full_name: name, fullname: name, email: emailTrim });
       router.replace({ pathname: '/account', params: { toast: 'profile' } });
-    } catch {
-      setToast({ msg: 'Có lỗi xảy ra trong quá trình', tone: 'error' });
+    } catch (e) {
+      setToast({ msg: getErrorMessage(e, 'Có lỗi xảy ra trong quá trình'), tone: 'error' });
     } finally {
       setSaving(false);
     }

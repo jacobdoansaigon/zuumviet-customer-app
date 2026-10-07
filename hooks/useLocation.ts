@@ -14,6 +14,31 @@ type UseLocationResult = {
   requestPermission: () => Promise<boolean>;
 };
 
+/**
+ * Vị trí hiện tại 1 lần, không ném lỗi (null khi bị từ chối quyền / web không hỗ trợ / timeout).
+ * Dùng cho các API BE bắt buộc lat/long (huỷ đơn, cập nhật trạng thái) — vẫn gửi 0/0 nếu không lấy được.
+ */
+export async function getCurrentPositionSafe(timeoutMs = 4000): Promise<LatLng | null> {
+  try {
+    const { status } = await Location.getForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      const req = await Location.requestForegroundPermissionsAsync();
+      if (req.status !== 'granted') return null;
+    }
+    const pos = await Promise.race([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+    ]);
+    if (!pos) {
+      const last = await Location.getLastKnownPositionAsync();
+      return last ? { latitude: last.coords.latitude, longitude: last.coords.longitude } : null;
+    }
+    return { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+  } catch {
+    return null;
+  }
+}
+
 export function useLocation(watch = false): UseLocationResult {
   const [location, setLocation] = useState<LatLng | null>(null);
   const [error, setError] = useState<string | null>(null);

@@ -1,6 +1,8 @@
-// Wallet (Tài khoản) — MOCK API. Chưa có backend ví, mô phỏng số dư / lịch sử / nạp / rút
-// với độ trễ nhỏ để UI có trạng thái loading. Dữ liệu giữ trong bộ nhớ (reset khi reload app).
+// Wallet (Tài khoản) — số dư lấy từ zv-wallet (GET /site/transactions/balance, ví chính 1 / ví thưởng 3);
+// lịch sử / nạp / rút vẫn MOCK (BE chưa có cổng nạp tiền; giao dịch thật phát sinh từ đơn hoàn thành).
+// Số dư mock chỉ dùng khi app chưa cấu hình API (demo offline).
 import { MOCK_BALANCES, MOCK_TRANSACTIONS } from '@/constants/mockWallet';
+import { ApiError, walletRemoteApi, WALLET } from '@/services/api';
 
 export type WalletTransactionType = 'topup' | 'withdraw' | 'trip' | 'reward_transfer' | 'reward';
 export type WalletTransactionStatus = 'success' | 'failed' | 'pending';
@@ -97,8 +99,16 @@ const DEST_LABEL: Record<WithdrawDestination, string> = {
 
 export const walletApi = {
   async getBalances(): Promise<WalletBalances> {
-    await sleep(250);
-    return { ...state.balances };
+    try {
+      const [main, reward] = await Promise.all([walletRemoteApi.balance(WALLET.MAIN), walletRemoteApi.balance(WALLET.BONUS)]);
+      const next = { main: Number(main?.balance_amount) || 0, reward: Number(reward?.balance_amount) || 0 };
+      state.balances = next;
+      return { ...next };
+    } catch (e) {
+      // Chưa cấu hình API → số dư mock để demo; BE lỗi thật → giữ số dư đã biết (không bịa số mới)
+      if (e instanceof ApiError && e.status === 0) return { ...state.balances };
+      throw e;
+    }
   },
 
   async getTransactions(): Promise<WalletTransaction[]> {

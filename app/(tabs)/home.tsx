@@ -32,6 +32,7 @@ import {
 } from '@/services/api';
 import { MOCK_PROMOS, MOCK_COMMUNITY, getGreeting } from '@/constants/mock';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
+import { ensureServiceCatalog } from '@/services/serviceCatalog';
 import { localAvatarStore } from '@/services/profileStore';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
@@ -48,6 +49,7 @@ export default function HomeScreen() {
 
   const loadOrders = useCallback(async () => {
     try {
+      await ensureServiceCatalog().catch(() => null);
       const res = await orderApi.getOrders();
       const items = res?.items ?? [];
       const active = items.find(isActiveOrder);

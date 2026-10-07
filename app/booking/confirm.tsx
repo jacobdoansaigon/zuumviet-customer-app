@@ -1,12 +1,13 @@
 // app/booking/confirm.tsx — GH 1.6 / VT 1.6 "Xác nhận giao hàng": tuỳ chọn (quay lại điểm giao, gửi tận tay, tip),
-// thời gian, tài xế chỉ định, ghi chú; footer Mã giảm giá | Tiền mặt, giá, "Xác nhận" → tạo đơn → theo dõi
-import React, { useState } from 'react';
-import { View, TextInput, Pressable, StyleSheet } from 'react-native';
+// thời gian, tài xế chỉ định, ghi chú; footer Mã giảm giá | Tiền mặt, giá, "Xác nhận" → tạo đơn → theo dõi.
+// Giá ở footer là giá BE báo qua drymode (refreshQuote) — app chỉ ước tính trong lúc chờ/khi BE lỗi.
+import React, { useEffect, useState } from 'react';
+import { View, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { AppHeader, AppText, BottomSheet, Checkbox, ErrorSheet, Icon, Icons, Screen, Stepper, fontStyle } from '@/components/ui';
 import { Colors, Spacing, NO_WEB_OUTLINE } from '@/constants/theme';
 import { EXTRA_PRICES, SERVICE_GROUPS } from '@/constants/mockBooking';
-import { useBooking, setOptions, computePrice, formatVnd, formatScheduleLabel, submitBooking, promoLabel } from '@/services/bookingStore';
+import { useBooking, setOptions, effectivePrice, refreshQuote, formatVnd, formatScheduleLabel, submitBooking, promoLabel } from '@/services/bookingStore';
 import { DriverPickerSheet, FlatFooter, OptionRow, PaymentSheet } from '@/components/booking';
 
 const SCHEDULE_CHOICES: { label: string; minutes?: number; tomorrowAt?: number }[] = [
@@ -20,8 +21,17 @@ const SCHEDULE_CHOICES: { label: string; minutes?: number; tomorrowAt?: number }
 export default function ConfirmScreen() {
   const state = useBooking();
   const opt = state.options;
-  const price = computePrice(state);
+  const price = effectivePrice(state);
+  const quote = state.quote;
   const [timeSheet, setTimeSheet] = useState(false);
+
+  // Báo giá lại mỗi khi bản nháp đổi (refreshQuote tự bỏ qua nếu chữ ký giá không đổi), chờ 400ms gom thao tác
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void refreshQuote();
+    }, 400);
+    return () => clearTimeout(t);
+  }, [state.options, state.receivers, state.optionId, state.service, state.sender.place]);
   const [driverSheet, setDriverSheet] = useState(false);
   const [paySheet, setPaySheet] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -94,19 +104,27 @@ export default function ConfirmScreen() {
       </View>
       <View style={styles.priceRow}>
         <View>
-          {price.discount > 0 ? (
+          {price.original > price.total ? (
             <AppText size={14} color={Colors.textSecondary} style={{ textDecorationLine: 'line-through' }}>
-              {formatVnd(price.subtotal, { space: true })}
+              {formatVnd(price.original, { space: true })}
             </AppText>
           ) : null}
-          <AppText weight="bold" size={28} color={Colors.primary}>
-            {formatVnd(price.total, { space: true })}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <AppText weight="bold" size={28} color={Colors.primary}>
+              {formatVnd(price.total, { space: true })}
+            </AppText>
+            {quote.status === 'loading' ? <ActivityIndicator size="small" color={Colors.primary} style={{ marginLeft: Spacing.sm }} /> : null}
+          </View>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <AppText size={12} color={Colors.textSecondary}>
+            {price.distanceKm ? `${price.distanceKm.toFixed(1)}km · ` : ''}
+            {stopsCount === 0 ? `${labels.provider} đến tận nơi` : `${stopsCount} ${labels.stopUnit}`}
+          </AppText>
+          <AppText size={11} color={quote.status === 'error' ? Colors.error : Colors.textMuted} numberOfLines={2} style={{ maxWidth: 200, textAlign: 'right' }}>
+            {quote.status === 'error' ? `Chưa lấy được giá: ${quote.error}` : price.fromServer ? 'Giá ZuumViet báo' : 'Giá ước tính'}
           </AppText>
         </View>
-        <AppText size={12} color={Colors.textSecondary}>
-          {price.distanceKm ? `${price.distanceKm.toFixed(1)}km · ` : ''}
-          {stopsCount === 0 ? `${labels.provider} đến tận nơi` : `${stopsCount} ${labels.stopUnit}`}
-        </AppText>
       </View>
       <FlatFooter title="Xác nhận" loading={submitting} onPress={onConfirm} />
     </View>
