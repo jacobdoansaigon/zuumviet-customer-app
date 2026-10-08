@@ -6,7 +6,7 @@
 // Passcode kiểm cùng luật với server (6 số, không 6 số giống nhau, không dãy liên tiếp) trước khi gửi.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, AppHeader, Button, CodeInput, Screen, ErrorSheet, Dialog, Icon, Icons } from '@/components/ui';
 import { clearAuthFlow, getAuthFlow, hasValidVerification, type AuthFlow } from '@/services/authFlow';
@@ -14,22 +14,11 @@ import { completeLogin, formatPhone } from '@/services/session';
 import { PASSCODE_LENGTH, passcodeWeakness } from '@/services/passcode';
 import { api, errorMessage, getDeviceId, isApiError } from '@/services/zuum';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
+import { enterApp } from '@/services/authNav';
 
 function paramStr(v: string | string[] | undefined): string {
   if (Array.isArray(v)) return String(v[0] ?? '');
   return v != null ? String(v) : '';
-}
-
-function hardNavigate(path: string) {
-  try {
-    if (typeof window !== 'undefined' && typeof window.location?.assign === 'function') {
-      window.location.assign(path);
-      return;
-    }
-  } catch {
-    /* fall through */
-  }
-  router.replace(path as never);
 }
 
 type SheetState = { title: string; message: string; action: string; onAction?: () => void } | null;
@@ -55,6 +44,13 @@ export default function SetPasscodeScreen() {
   useEffect(() => {
     void getAuthFlow().then(setFlow);
   }, []);
+
+  // quên passcode: rời màn (bỏ dở) → huỷ verificationToken đã lưu. Đăng ký: màn đăng ký bên dưới còn dùng phiên.
+  const navigation = useNavigation();
+  useEffect(() => {
+    if (!isReset) return;
+    return navigation.addListener('beforeRemove', () => void clearAuthFlow());
+  }, [navigation, isReset]);
 
   const goLogin = () => router.replace('/(auth)/login');
 
@@ -119,7 +115,7 @@ export default function SetPasscodeScreen() {
         /* không chặn vào app */
       }
     }
-    hardNavigate('/home');
+    enterApp('/home');
   };
 
   const submitReset = async (passcode: string) => {
@@ -143,7 +139,7 @@ export default function SetPasscodeScreen() {
         body: { phone: current.phone, passcode, deviceId: await getDeviceId() },
       });
       await completeLogin(tokens);
-      hardNavigate('/account?toast=passcode');
+      enterApp('/account?toast=passcode');
     } catch {
       setSheet({
         title: 'Đã đổi passcode',
@@ -285,7 +281,7 @@ export default function SetPasscodeScreen() {
         dismissable={false}
         title="Đăng ký thành công"
         message={`Mã giới thiệu ${referralCode} không hợp lệ hoặc người giới thiệu đã đủ thành viên. Bạn có thể nhập mã khác trong mục Cộng đồng.`}
-        actions={[{ label: 'Đồng ý', onPress: () => hardNavigate('/home') }]}
+        actions={[{ label: 'Đồng ý', onPress: () => enterApp('/home') }]}
       />
     </Screen>
   );

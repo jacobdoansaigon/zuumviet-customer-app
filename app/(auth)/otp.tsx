@@ -1,12 +1,12 @@
 // Nhập mã OTP — Figma OTP 1.3/1.4/1.5 + lỗi 1.6/1.7/1.8:
 //   "Nhập mã OTP" / "Nhập 6 mã số được gửi tới:" + SĐT đậm / 6 ô số tím / "Gửi lại mã OTP sau 00:30"
 //   Sai mã: icon đỏ + lý do server trả (còn mấy lần thử) + link "Gửi lại mã OTP"
-//   ErrorSheet "Lỗi đăng nhập": không nhận được OTP (Yêu cầu gọi hỗ trợ) / nhập sai quá số lần
+//   ErrorSheet "Lỗi đăng nhập": không nhận được OTP (gọi tổng đài) / nhập sai quá số lần
 // Luồng: xác minh → verificationToken →
 //   intent login: POST /auth/login/otp → token (→ /me → /home) | needRegister (→ /register, dùng lại token)
 //   intent reset (quên passcode): → /set-passcode?mode=reset (đặt passcode mới bằng token, KHÔNG đăng nhập trước)
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Pressable, ActivityIndicator, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, AppHeader, CodeInput, Screen, ErrorSheet, Toast, Icon, Icons } from '@/components/ui';
@@ -14,10 +14,12 @@ import { clearAuthFlow, getAuthFlow, requestOtp, secondsUntilResend, verifyOtp, 
 import { completeLogin, formatPhone } from '@/services/session';
 import { api, errorMessage, getDeviceId, isApiError } from '@/services/zuum';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
+import { enterApp } from '@/services/authNav';
+import { SUPPORT_HOTLINE, SUPPORT_HOTLINE_LABEL } from '@/constants/content';
 
 const OTP_LENGTH = 6;
 
-const MSG_NO_OTP = 'Bạn không nhận được mã OTP. Bạn có muốn được Tư vấn viên gọi hỗ trợ?';
+const MSG_NO_OTP = `Bạn không nhận được mã OTP? Gọi tổng đài ZuumViet ${SUPPORT_HOTLINE_LABEL} để được hỗ trợ.`;
 
 type SheetState = { kind: 'support' | 'locked' | 'missing' | 'generic'; message: string } | null;
 
@@ -25,19 +27,6 @@ function formatCountdown(s: number) {
   const m = Math.floor(s / 60);
   const r = s % 60;
   return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
-}
-
-/** web: location.assign để reset router state (tránh conflict welcome app/index) */
-function hardNavigate(path: string) {
-  try {
-    if (typeof window !== 'undefined' && typeof window.location?.assign === 'function') {
-      window.location.assign(path);
-      return;
-    }
-  } catch {
-    /* fall through */
-  }
-  router.replace(path as never);
 }
 
 export default function OtpScreen() {
@@ -122,7 +111,7 @@ export default function OtpScreen() {
         }
         await completeLogin(res);
         await clearAuthFlow();
-        hardNavigate('/home');
+        enterApp('/home');
       } catch (e) {
         setOtp('');
         if (isApiError(e, 'otp.invalid')) {
@@ -157,13 +146,13 @@ export default function OtpScreen() {
     const k = sheet?.kind;
     setSheet(null);
     if (k === 'support') {
-      setToast('Đã gửi yêu cầu. Tư vấn viên sẽ gọi hỗ trợ bạn trong ít phút.');
+      Linking.openURL(`tel:${SUPPORT_HOTLINE}`).catch(() => setToast(`Không gọi được trên thiết bị này — tổng đài ${SUPPORT_HOTLINE_LABEL}`));
       return;
     }
     if (k === 'missing') router.replace('/(auth)/login');
   };
 
-  const sheetAction = sheet?.kind === 'support' ? 'Yêu cầu gọi hỗ trợ' : sheet?.kind === 'generic' ? 'Thử lại' : 'Đồng ý';
+  const sheetAction = sheet?.kind === 'support' ? 'Gọi tổng đài' : sheet?.kind === 'generic' ? 'Thử lại' : 'Đồng ý';
 
   return (
     <Screen header={<AppHeader title={isReset ? 'Quên mã passcode' : 'Đăng nhập'} variant="light" left="back" />}>
@@ -238,7 +227,7 @@ export default function OtpScreen() {
         onClose={closeSheet}
         onAction={onSheetAction}
       />
-      <Toast visible={!!toast} message={toast ?? ''} tone="success" onHide={hideToast} />
+      <Toast visible={!!toast} message={toast ?? ''} tone="info" onHide={hideToast} />
     </Screen>
   );
 }

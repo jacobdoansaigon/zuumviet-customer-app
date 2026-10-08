@@ -1,13 +1,15 @@
-// Đăng ký tài khoản mới — Figma register 1.2.3 (0-7465…): "Họ và tên" (*) + "Email" + "Mã giới thiệu" (tuỳ chọn),
+// Đăng ký tài khoản mới — Figma register 1.2.3 (0-7465…): "Họ và tên" (*) + "Email" + "Mã giới thiệu" (tuỳ chọn, kiểm
+// bằng GET /v1/public/affiliate/referral-check trước khi đi tiếp — hiện tên người giới thiệu đã che bớt),
 // nút flat "Hoàn thành hồ sơ" → /set-passcode (đặt passcode 6 số rồi mới gọi POST /auth/register).
 // Chỉ tới được màn này sau OTP khi server báo SĐT chưa có tài khoản (needRegister) — dùng lại verificationToken.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import { Spacing, Colors } from '@/constants/theme';
 import { AppText, AppHeader, Button, TextField, Screen, ErrorSheet } from '@/components/ui';
-import { getAuthFlow, hasValidVerification } from '@/services/authFlow';
+import { clearAuthFlow, getAuthFlow, hasValidVerification } from '@/services/authFlow';
 import { formatPhone } from '@/services/session';
+import { api, errorMessage } from '@/services/zuum';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -25,8 +27,15 @@ export default function RegisterScreen() {
   const [emailError, setEmailError] = useState('');
   const [referral, setReferral] = useState('');
   const [referralError, setReferralError] = useState('');
+  /** mã đã kiểm (GET /v1/public/affiliate/referral-check) → tên người giới thiệu (đã che bớt) */
+  const [referralOkFor, setReferralOkFor] = useState<{ code: string; name: string } | null>(null);
+  const [continuing, setContinuing] = useState(false);
+  /** lần kiểm mã đang chạy (blur và bấm "Hoàn thành" dùng chung) + mã đang có trong ô (bỏ kết quả của mã cũ) */
+  const inflight = useRef<{ code: string; result: Promise<boolean> } | null>(null);
+  const latestCode = useRef('');
   const [sheet, setSheet] = useState<SheetState>(null);
 
+  const navigation = useNavigation();
   const goLogin = () => router.replace('/(auth)/login');
 
   useEffect(() => {
@@ -45,6 +54,9 @@ export default function RegisterScreen() {
     });
   }, []);
 
+  // rời màn đăng ký (quay lại / bỏ dở) → huỷ verificationToken đã lưu
+  useEffect(() => navigation.addListener('beforeRemove', () => void clearAuthFlow()), [navigation]);
+
   const name = fullName.trim();
   const emailTrim = email.trim();
   const referralCode = referral.trim().toUpperCase();
@@ -52,7 +64,38 @@ export default function RegisterScreen() {
   const referralOk = referralCode.length === 0 || REFERRAL_RE.test(referralCode);
   const canContinue = sessionReady && name.length >= 2 && emailOk && referralOk;
 
-  const handleContinue = () => {
+  latestCode.current = referralCode;
+
+  /** Kiểm mã giới thiệu trước khi đăng ký: không tồn tại / người giới thiệu đã đủ thành viên → báo ngay */
+  const checkReferral = (code: string): Promise<boolean> => {
+    if (!code || referralOkFor?.code === code) return Promise.resolve(true);
+    if (inflight.current?.code === code) return inflight.current.result;
+    const result = (async () => {
+      try {
+        const r = await api('GET /v1/public/affiliate/referral-check', { query: { tree: 'customer', code } });
+        const current = latestCode.current === code;
+        if (!r.valid) {
+          if (current) setReferralError('Mã giới thiệu không tồn tại — kiểm tra lại hoặc bỏ trống');
+          return false;
+        }
+        if (r.full) {
+          if (current) setReferralError(`${r.displayName} đã đủ thành viên — vui lòng dùng mã khác hoặc bỏ trống`);
+          return false;
+        }
+        if (current) setReferralOkFor({ code, name: r.displayName });
+        return true;
+      } catch (e) {
+        if (latestCode.current === code) setReferralError(errorMessage(e, 'Không kiểm tra được mã giới thiệu'));
+        return false;
+      } finally {
+        if (inflight.current?.code === code) inflight.current = null;
+      }
+    })();
+    inflight.current = { code, result };
+    return result;
+  };
+
+  const handleContinue = async () => {
     if (emailTrim && !EMAIL_RE.test(emailTrim)) {
       setEmailError('Email không hợp lệ');
       return;
@@ -61,7 +104,15 @@ export default function RegisterScreen() {
       setReferralError('Mã giới thiệu gồm chữ và số, vd KH000123');
       return;
     }
-    if (!canContinue) return;
+    if (!canContinue || continuing) return;
+    setContinuing(true);
+    let ok = false;
+    try {
+      ok = await checkReferral(referralCode);
+    } finally {
+      setContinuing(false);
+    }
+    if (!ok) return;
     router.push({
       pathname: '/(auth)/set-passcode',
       params: { mode: 'register', name, email: emailTrim, referralCode },
@@ -71,7 +122,7 @@ export default function RegisterScreen() {
   return (
     <Screen
       header={<AppHeader title="Đăng ký tài khoản mới" variant="light" left="back" />}
-      footer={<Button title="Hoàn thành hồ sơ" flat onPress={handleContinue} disabled={!canContinue} />}
+      footer={<Button title="Hoàn thành hồ sơ" flat onPress={() => void handleContinue()} disabled={!canContinue} loading={continuing} />}
       footerPadded={false}
       scroll
     >
@@ -122,14 +173,24 @@ export default function RegisterScreen() {
           onChangeText={(t) => {
             setReferral(t.replace(/\s/g, '').toUpperCase());
             if (referralError) setReferralError('');
+            setReferralOkFor(null);
           }}
           error={referralError || undefined}
-          helper={referralError ? undefined : 'Không bắt buộc — mã tài khoản của người giới thiệu bạn (vd KH000123)'}
+          onBlur={() => {
+            if (referralCode && REFERRAL_RE.test(referralCode)) void checkReferral(referralCode);
+          }}
+          helper={
+            referralError
+              ? undefined
+              : referralOkFor && referralOkFor.code === referralCode
+                ? `Người giới thiệu: ${referralOkFor.name}`
+                : 'Không bắt buộc — mã tài khoản của người giới thiệu bạn (vd KH000123)'
+          }
           placeholder="KH000123"
           autoCapitalize="characters"
           autoCorrect={false}
           returnKeyType="done"
-          onSubmitEditing={handleContinue}
+          onSubmitEditing={() => void handleContinue()}
           containerStyle={styles.field}
         />
       </View>

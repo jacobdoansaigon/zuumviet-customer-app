@@ -103,18 +103,37 @@ async function loadTokens(): Promise<AuthTokens | null> {
   return tokensLoading;
 }
 
-/** Lưu cặp token mới (đăng nhập / đăng ký / làm mới) — ghi xong bộ nhớ máy rồi mới dùng */
+/**
+ * "Thế hệ" phiên: tăng mỗi lần đăng nhập / đăng xuất / hết phiên. Kết quả làm mới token của thế hệ cũ (vd đăng xuất
+ * xong mà request làm mới chậm mới về) bị bỏ, không ghi đè lại phiên đã xoá.
+ */
+let generation = 0;
+
+/** Lưu cặp token của một lần đăng nhập / đăng ký (mở thế hệ phiên mới) — ghi xong bộ nhớ máy rồi mới dùng */
 export async function saveTokens(next: AuthTokens): Promise<void> {
+  generation += 1;
   await tokenStorage.set(JSON.stringify(next));
   tokens = next;
 }
 
 export async function clearTokens(): Promise<void> {
+  generation += 1;
   tokens = null;
   try {
     await tokenStorage.remove();
   } catch {
     /* ignore */
+  }
+}
+
+/** Web: đọc thẳng localStorage (tab khác có thể vừa làm mới / đăng xuất) */
+function readWebTokens(): AuthTokens | null {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(TOKENS_KEY) : null;
+    const value: unknown = raw ? JSON.parse(raw) : null;
+    return isTokens(value) ? value : null;
+  } catch {
+    return null;
   }
 }
 
@@ -189,21 +208,46 @@ let refreshing: Promise<boolean> | null = null;
 let lastRefreshAt = 0;
 
 async function doRefresh(): Promise<boolean> {
-  const current = await loadTokens();
+  const gen = generation;
+  let current = await loadTokens();
+  if (Platform.OS === 'web') {
+    const stored = readWebTokens();
+    if (stored?.refreshToken !== current?.refreshToken) {
+      // tab khác đã đăng xuất → phiên này cũng hết; tab khác đã làm mới → dùng cặp token của tab đó
+      if (!stored) {
+        await expireSession(gen);
+        return false;
+      }
+      tokens = stored;
+      current = stored;
+      if (!expired(stored.accessTokenExpiresAt, 30_000)) {
+        lastRefreshAt = Date.now();
+        return true;
+      }
+    }
+  }
   if (!current || expired(current.refreshTokenExpiresAt)) {
-    await expireSession();
+    await expireSession(gen);
     return false;
   }
   try {
     const next = await client.call('POST /v1/public/auth/refresh', { body: { refreshToken: current.refreshToken } });
-    await saveTokens(next);
+    if (gen !== generation) return false; // đã đăng xuất / đăng nhập lại trong lúc chờ → bỏ kết quả
+    await tokenStorage.set(JSON.stringify(next));
+    if (gen !== generation) {
+      // đăng xuất đúng lúc đang ghi → trả bộ nhớ máy về trạng thái hiện tại
+      if (tokens) await tokenStorage.set(JSON.stringify(tokens));
+      else await tokenStorage.remove().catch(() => undefined);
+      return false;
+    }
+    tokens = next;
     lastRefreshAt = Date.now();
     return true;
   } catch (e) {
     const err = toZuumError(e);
-    // lỗi mạng / máy chủ: giữ phiên, báo lỗi cho request đang chờ; refresh token bị từ chối: hết phiên
+    // lỗi mạng / máy chủ: giữ phiên, báo lỗi cho request đang chờ; refresh token bị từ chối / tài khoản bị khoá: hết phiên
     if (err.status === 0 || err.status >= 500 || err.status === 429) throw err;
-    await expireSession();
+    await expireSession(gen, err.code === 'auth.account_blocked' ? err.message : null);
     return false;
   }
 }
@@ -221,9 +265,20 @@ export function refreshSession(): Promise<boolean> {
   return refreshing;
 }
 
-async function expireSession(): Promise<void> {
+let expiryMessage: string | null = null;
+
+/** Lý do hết phiên lần gần nhất (vd tài khoản bị khoá) — màn đăng nhập đọc 1 lần để hiện */
+export function takeExpiryMessage(): string | null {
+  const m = expiryMessage;
+  expiryMessage = null;
+  return m;
+}
+
+async function expireSession(gen: number, message: string | null = null): Promise<void> {
+  if (gen !== generation) return;
   const had = !!tokens;
   await clearTokens();
+  expiryMessage = message;
   if (had) emitSession('expired');
 }
 

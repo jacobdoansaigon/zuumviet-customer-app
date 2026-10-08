@@ -10,23 +10,11 @@ import { completeLogin, formatPhone } from '@/services/session';
 import { PASSCODE_LENGTH } from '@/services/passcode';
 import { api, errorMessage, getDeviceId, isApiError } from '@/services/zuum';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
+import { enterApp } from '@/services/authNav';
 
 function paramStr(v: string | string[] | undefined): string {
   if (Array.isArray(v)) return String(v[0] ?? '');
   return v != null ? String(v) : '';
-}
-
-/** /home — web dùng location.assign để reset router state (giống luồng OTP) */
-function goHomeAfterLogin() {
-  try {
-    if (typeof window !== 'undefined' && typeof window.location?.assign === 'function') {
-      window.location.assign('/home');
-      return;
-    }
-  } catch {
-    /* fall through */
-  }
-  router.replace('/home');
 }
 
 export default function PasscodeScreen() {
@@ -56,7 +44,7 @@ export default function PasscodeScreen() {
           body: { phone, passcode, deviceId: await getDeviceId() },
         });
         await completeLogin(tokens);
-        goHomeAfterLogin();
+        enterApp('/home');
       } catch (e) {
         setCode('');
         if (isApiError(e, 'auth.invalid_credentials')) setWrong(true);

@@ -1,8 +1,10 @@
 // services/authFlow.ts — trạng thái luồng OTP (đăng nhập / đăng ký / quên passcode) giữa các màn auth.
-// Lưu AsyncStorage để web tải lại trang (mất query) vẫn đi tiếp được. Không chứa token đăng nhập.
+// Có verificationToken (cho phép đăng ký / đặt lại passcode trong ~10 phút) → lưu SecureStore (native) / localStorage (web)
+// để web tải lại trang vẫn đi tiếp được; xoá khi xong luồng, khi bỏ dở (rời màn đăng ký / đặt lại) hoặc bắt đầu lại.
 //   gửi OTP → { challengeId, resendAfter, debugCode? } → xác minh → verificationToken (dùng 1 lần, ~10 phút)
 //   → đăng nhập OTP | đăng ký (needRegister) | đặt lại passcode (purpose reset_passcode).
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { api } from '@/services/zuum';
 
 /** login: đăng nhập/đăng ký bằng OTP · reset: quên passcode */
@@ -21,13 +23,40 @@ export interface AuthFlow {
   verificationExpiresAt: string | null;
 }
 
-const KEY = '@zv/customer/authFlow';
+const KEY = 'zv.customer.authFlow'; // SecureStore chỉ nhận [A-Za-z0-9._-]
+
+const flowStorage = {
+  async get(): Promise<string | null> {
+    if (Platform.OS === 'web') {
+      try {
+        return typeof localStorage !== 'undefined' ? localStorage.getItem(KEY) : null;
+      } catch {
+        return null;
+      }
+    }
+    return SecureStore.getItemAsync(KEY);
+  },
+  async set(value: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(KEY, value);
+      return;
+    }
+    await SecureStore.setItemAsync(KEY, value);
+  },
+  async remove(): Promise<void> {
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') localStorage.removeItem(KEY);
+      return;
+    }
+    await SecureStore.deleteItemAsync(KEY);
+  },
+};
 let cache: AuthFlow | null = null;
 
 export async function getAuthFlow(): Promise<AuthFlow | null> {
   if (cache) return cache;
   try {
-    const raw = await AsyncStorage.getItem(KEY);
+    const raw = await flowStorage.get();
     const v: unknown = raw ? JSON.parse(raw) : null;
     if (v && typeof v === 'object' && typeof (v as AuthFlow).challengeId === 'string' && typeof (v as AuthFlow).phone === 'string') {
       cache = v as AuthFlow;
@@ -41,7 +70,7 @@ export async function getAuthFlow(): Promise<AuthFlow | null> {
 async function saveAuthFlow(flow: AuthFlow): Promise<AuthFlow> {
   cache = flow;
   try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(flow));
+    await flowStorage.set(JSON.stringify(flow));
   } catch {
     /* ignore */
   }
@@ -51,7 +80,7 @@ async function saveAuthFlow(flow: AuthFlow): Promise<AuthFlow> {
 export async function clearAuthFlow(): Promise<void> {
   cache = null;
   try {
-    await AsyncStorage.removeItem(KEY);
+    await flowStorage.remove();
   } catch {
     /* ignore */
   }

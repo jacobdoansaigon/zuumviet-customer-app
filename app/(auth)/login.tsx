@@ -1,20 +1,22 @@
 // Đăng nhập — Figma "Login1/Login2" (0-6812 / 0-6887): header lavender "Đăng nhập", logo, label
 // "Số điện thoại của tôi là" (*), PhoneInput, link "Đăng nhập bằng mật khẩu", nút flat "Tiếp tục".
 // Luồng: gửi OTP (purpose login) → /(auth)/otp. SĐT chưa có tài khoản: sau OTP server trả needRegister → đăng ký.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, AppHeader, Button, PhoneInput, Logo, Screen, ErrorSheet } from '@/components/ui';
-import { requestOtp } from '@/services/authFlow';
+import { clearAuthFlow, requestOtp } from '@/services/authFlow';
 import { looksLikeVnPhone } from '@/services/passcode';
-import { errorMessage } from '@/services/zuum';
+import { errorMessage, takeExpiryMessage } from '@/services/zuum';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
 export default function LoginScreen() {
   useStatusBarStyle('dark');
   const { reason } = useLocalSearchParams<{ reason?: string }>();
   const sessionExpired = reason === 'expired';
+  // hết phiên vì tài khoản bị khoá → hiện đúng lý do server trả
+  const [expiredMessage] = useState(() => (sessionExpired ? takeExpiryMessage() : null));
 
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,6 +24,11 @@ export default function LoginScreen() {
   const [hint, setHint] = useState('');
 
   const isValid = looksLikeVnPhone(phone);
+
+  // bắt đầu lại từ đầu: bỏ phiên OTP / verificationToken của lần trước (nếu có)
+  useEffect(() => {
+    void clearAuthFlow();
+  }, []);
 
   const handleContinue = async () => {
     if (!isValid || loading) return;
@@ -58,7 +65,7 @@ export default function LoginScreen() {
 
         {sessionExpired ? (
           <AppText size={13} color={Colors.error} align="center" style={styles.expired}>
-            Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.
+            {expiredMessage ?? 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.'}
           </AppText>
         ) : null}
 
