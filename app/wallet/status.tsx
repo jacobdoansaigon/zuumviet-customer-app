@@ -1,6 +1,8 @@
 // Trạng thái giao dịch nạp tiền — Figma "Trạng thái GD": X header, biểu tượng theo trạng thái, số tiền tím 30, lời nhắn,
 // link, nút Đóng. Params: topupId, amount. Theo dõi GET /v1/customer/wallet/topups/:id (3 giây/lần khi đang chờ, khi quay
-// lại app từ trình duyệt, và khi có sự kiện realtime wallet.updated) tới khi thành công / thất bại / hết hạn.
+// lại app từ trình duyệt, và khi có sự kiện realtime wallet.updated) tới khi thành công / thất bại / hết hạn. Chỉ tin trạng
+// thái máy chủ (không tự coi là hết hạn theo đồng hồ máy): máy chủ chờ IPN đến trễ thêm 10 phút sau expiresAt; IPN tới
+// sau cả mốc đó vẫn cộng tiền → màn "hết hạn" vẫn nghe wallet.updated.
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator, AppState, Linking } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -36,7 +38,9 @@ export default function TransactionStatusScreen() {
   }, [topupId]);
 
   const status = topup?.status ?? 'pending';
-  const pending = status === 'pending' && (!topup || Date.parse(topup.expiresAt) > Date.now());
+  const pending = status === 'pending';
+  // quá giờ thanh toán nhưng máy chủ còn chờ cổng xác nhận → không mời mở lại trang thanh toán nữa
+  const awaitingGateway = pending && !!topup && Date.parse(topup.expiresAt) <= Date.now();
 
   useEffect(() => {
     void load();
@@ -54,17 +58,30 @@ export default function TransactionStatusScreen() {
     };
   }, [pending, load]);
 
-  useRealtime('wallet.updated', () => void load(), pending);
+  useRealtime('wallet.updated', () => void load(), status !== 'succeeded');
 
   const amount = topup?.amount ?? (Number(params.amount) || 0);
   const ok = status === 'succeeded';
   const failed = !pending && !ok;
-  const heading = ok ? 'Nạp tiền thành công' : pending ? 'Đang chờ thanh toán' : status === 'failed' ? 'Nạp tiền thất bại' : 'Giao dịch đã hết hạn';
+  const LATE_NOTE = 'Nếu bạn đã thanh toán, tiền sẽ được cộng vào ví khi cổng thanh toán xác nhận.';
+  const heading = ok
+    ? 'Nạp tiền thành công'
+    : awaitingGateway
+      ? 'Đang chờ cổng thanh toán xác nhận'
+      : pending
+        ? 'Đang chờ thanh toán'
+        : status === 'failed'
+          ? 'Nạp tiền thất bại'
+          : 'Giao dịch đã hết hạn';
   const message = ok
     ? 'Cám ơn bạn. Tiền đã được cộng vào ví ZuumViet. Chúc bạn có chuyến đi vui vẻ!'
-    : pending
-      ? `Hoàn tất thanh toán trên trang ${topup ? PROVIDER_LABEL[topup.provider] : 'cổng thanh toán'} rồi quay lại ứng dụng — trạng thái sẽ tự cập nhật.`
-      : 'Rất tiếc, giao dịch không thành công. Bạn chưa bị trừ tiền vào ví — vui lòng thử lại.';
+    : awaitingGateway
+      ? `Đã hết thời gian thanh toán. ${LATE_NOTE}`
+      : pending
+        ? `Hoàn tất thanh toán trên trang ${topup ? PROVIDER_LABEL[topup.provider] : 'cổng thanh toán'} rồi quay lại ứng dụng — trạng thái sẽ tự cập nhật.`
+        : status === 'failed'
+          ? 'Rất tiếc, cổng thanh toán báo giao dịch không thành công — vui lòng thử lại.'
+          : `Giao dịch đã hết thời gian thanh toán. ${LATE_NOTE}`;
   const payUrl = topupId ? paymentUrlOf(topupId) : null;
 
   const close = () => router.navigate('/wallet');
@@ -105,7 +122,7 @@ export default function TransactionStatusScreen() {
           ) : null}
 
           <DashedDivider style={styles.dash} />
-          {pending && payUrl ? <LinkRow label="Mở lại trang thanh toán" onPress={() => void Linking.openURL(payUrl).catch(() => undefined)} /> : null}
+          {pending && !awaitingGateway && payUrl ? <LinkRow label="Mở lại trang thanh toán" onPress={() => void Linking.openURL(payUrl).catch(() => undefined)} /> : null}
           <LinkRow label="Lịch sử giao dịch" onPress={() => router.push('/wallet/history')} />
           <LinkRow label="Yêu cầu hỗ trợ" onPress={() => setSupportVisible(true)} />
         </View>
