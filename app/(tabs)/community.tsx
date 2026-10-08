@@ -127,7 +127,7 @@ export default function CommunityScreen() {
         <View style={styles.stats}>
           <StatCard icon={Icons.network} value={String(totalMembers(aff))} label="thành viên" />
           <Pressable style={{ flex: 1 }} onPress={() => router.push('/community/rewards')}>
-            <StatCard icon={Icons.chart} value={formatVnd(aff.earnings.thisMonthPending)} label="Thưởng tháng này" />
+            <StatCard icon={Icons.chart} value={formatVnd(aff.earnings.thisMonthPending)} label="Thưởng tháng" />
           </Pressable>
         </View>
 

@@ -179,7 +179,9 @@ export const getBookingState = () => state;
 
 // đăng xuất / hết phiên: bỏ bản nháp (có tên/SĐT/địa chỉ của người trước)
 onSessionChange((event) => {
-  if (event !== 'login') state = createInitialState('delivery');
+  if (event === 'login') return;
+  state = createInitialState('delivery');
+  emit();
 });
 
 // ---------------------------------------------------------------- Actions: dịch vụ / người gửi

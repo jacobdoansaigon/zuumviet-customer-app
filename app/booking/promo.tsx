@@ -12,7 +12,8 @@ import { api, errorMessage, type ZuumResponse } from '@/services/zuum';
 type Coupon = ZuumResponse<'GET /v1/customer/coupons'>[number];
 
 function couponTitle(c: Coupon): string {
-  if (c.type === 'percent') return `Giảm ${c.value}%${c.maxDiscount ? ` tối đa ${formatVnd(c.maxDiscount)}` : ''}`;
+  // percent: value là basis point (3000 = 30%)
+  if (c.type === 'percent') return `Giảm ${Math.round(c.value) / 100}%${c.maxDiscount ? ` tối đa ${formatVnd(c.maxDiscount)}` : ''}`;
   return `Giảm ${formatVnd(c.value)}`;
 }
 
