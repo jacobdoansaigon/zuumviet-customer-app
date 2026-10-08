@@ -1,5 +1,5 @@
 // Hồ sơ — Figma HỒ SƠ tab (0-16311): header tím "Hồ sơ" + "..." ; dòng hồ sơ avatar 48 + tên bold 17
-// + "Chỉnh sửa hồ sơ"; menu: Tài khoản (số dư ví) / Vị trí đã lưu / Chính sách ZuumViet / Đổi mật khẩu / Đăng xuất.
+// + "Chỉnh sửa hồ sơ"; menu: Tài khoản (số dư ví) / Vé xe của tôi / Vị trí đã lưu / Chính sách ZuumViet / Đổi mật khẩu / Đăng xuất.
 // "Tài xế yêu thích" đã ẩn (API chưa có). Hồ sơ từ GET /v1/customer/me (cache + làm mới khi mở tab).
 // Toast teal "Cập nhật mật khẩu mới thành công".
 import React, { useCallback, useEffect, useState } from 'react';
@@ -79,6 +79,7 @@ export default function AccountScreen() {
 
         <View style={styles.menu}>
           <ListRow icon={Icons.wallet} label="Tài khoản" badgeLabel={formatMoney(walletBalance)} onPress={() => router.push('/wallet')} />
+          <ListRow icon={Icons.ticket} label="Vé xe của tôi" onPress={() => router.push('/booking/intercity/tickets')} />
           <ListRow icon={Icons.bookmark} label="Vị trí đã lưu" badgeCount={savedLocations?.length ?? 0} onPress={() => router.push('/profile/saved-locations')} />
           <ListRow icon={Icons.shield} label="Chính sách ZuumViet" onPress={() => router.push('/profile/policies')} />
           <ListRow icon={Icons.lock} label="Đổi mật khẩu" onPress={() => router.push('/profile/change-passcode')} />

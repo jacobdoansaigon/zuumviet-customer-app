@@ -1,10 +1,12 @@
-// SeatPicker — sơ đồ ghế dùng chung cho Xe ghép & Mua vé xe: chạm để chọn/bỏ chọn, tối đa `max` ghế,
-// 3 trạng thái (còn trống / đã chọn / đã có khách) + chú thích bên dưới.
+// SeatPicker — sơ đồ ghế dùng chung cho Xe ghép & Mua vé xe (seats của GET /v1/public/intercity/trips/:id):
+// chạm để chọn/bỏ chọn, tối đa `max` ghế, 3 trạng thái (còn trống / đã chọn / đã có người giữ-mua) + chú thích.
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppText, Icon, Icons } from '@/components/ui';
-import type { SeatDef } from '@/constants/mockIntercity';
+import type { IntercitySeat } from '@/services/intercity';
+
+type SeatDef = Pick<IntercitySeat, 'id' | 'row' | 'col' | 'taken'>;
 
 interface SeatPickerProps {
   seats: SeatDef[];
@@ -15,6 +17,7 @@ interface SeatPickerProps {
 
 export const SeatPicker: React.FC<SeatPickerProps> = ({ seats, selected, onToggle, max = 6 }) => {
   const rows = Array.from(new Set(seats.map((s) => s.row)));
+  const byCol = (a: SeatDef, b: SeatDef) => a.col - b.col;
   return (
     <View>
       <View style={styles.grid}>
@@ -22,6 +25,7 @@ export const SeatPicker: React.FC<SeatPickerProps> = ({ seats, selected, onToggl
           <View key={row} style={styles.row}>
             {seats
               .filter((s) => s.row === row)
+              .sort(byCol)
               .map((s) => {
                 const isSelected = selected.includes(s.id);
                 const disabled = s.taken || (!isSelected && selected.length >= max);

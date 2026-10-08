@@ -1,29 +1,76 @@
-// app/booking/intercity/[cityId].tsx — Mua vé xe đi {city}: chọn ngày đi + khung giờ, xem chuyến theo từng
-// nhà xe (1 nhà xe có thể chạy nhiều chuyến/ngày). Xe ghép giờ là màn riêng (carpool-request.tsx, mô hình
-// gửi yêu cầu → tài xế nhận cuốc), không còn ở màn kết quả này — vào từ 3 thẻ phương án ở app/booking/index.tsx.
-import React, { useMemo, useState } from 'react';
-import { View, ScrollView, Pressable, StyleSheet } from 'react-native';
+// app/booking/intercity/[cityId].tsx — Xe đường dài đi {tỉnh}: chọn ngày đi (giờ VN) + khung giờ, xem chuyến đang bán
+// GET /v1/public/intercity/trips?from=ho-chi-minh&to=<cityId>&date=YYYY-MM-DD&kind=bus|carpool.
+// kind=bus: "Mua vé xe" (nhà xe); kind=carpool: "Xe ghép" (tài xế cùng tuyến bán ghế trống) — cùng một luồng chọn ghế.
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, ScrollView, Pressable, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Chip, EmptyState, Icon, Icons, Screen } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { INTERCITY_CITIES, TIME_SLOTS, buildDateOptions, operatorsForCity, timeInSlot, type BusTrip } from '@/constants/mockIntercity';
+import {
+  TIME_SLOTS,
+  TRIP_KIND_LABEL,
+  buildDateOptions,
+  durationLabel,
+  ensureIntercityCities,
+  findCity,
+  searchTrips,
+  useIntercityCities,
+  vnHour,
+  vnTime,
+  type IntercityTrip,
+  type TripKind,
+} from '@/services/intercity';
+import { formatVnd } from '@/services/bookingStore';
+import { errorMessage } from '@/services/zuum';
 
-const DATE_OPTIONS = buildDateOptions();
+const DATE_OPTIONS = buildDateOptions(7);
 
-export default function IntercityResultsScreen() {
-  const { cityId } = useLocalSearchParams<{ cityId: string }>();
-  const city = INTERCITY_CITIES.find((c) => c.id === cityId);
+export default function IntercityTripsScreen() {
+  const { cityId, kind: kindParam } = useLocalSearchParams<{ cityId: string; kind?: string }>();
+  const cities = useIntercityCities();
+  const city = findCity(cityId, cities);
+  const [kind, setKind] = useState<TripKind>(kindParam === 'carpool' ? 'carpool' : 'bus');
   const [dateKey, setDateKey] = useState(DATE_OPTIONS[0]!.key);
   const [slotId, setSlotId] = useState<(typeof TIME_SLOTS)[number]['id']>('all');
+  const [trips, setTrips] = useState<IntercityTrip[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const slot = TIME_SLOTS.find((s) => s.id === slotId)!;
-  const dateLabel = DATE_OPTIONS.find((d) => d.key === dateKey);
+  const dateOption = DATE_OPTIONS.find((d) => d.key === dateKey);
 
-  const operatorGroups = useMemo(
-    () => (city ? operatorsForCity(city.id).map((g) => ({ ...g, trips: g.trips.filter((t) => timeInSlot(t.departTime, slot)) })).filter((g) => g.trips.length > 0) : []),
-    [city, slot],
-  );
+  useEffect(() => {
+    void ensureIntercityCities().catch((e) => setError(errorMessage(e)));
+  }, []);
 
-  if (!city) {
+  const load = useCallback(async () => {
+    if (!cityId) return;
+    setError(null);
+    try {
+      setTrips(await searchTrips({ to: cityId, date: dateKey, kind }));
+    } catch (e) {
+      setTrips([]);
+      setError(errorMessage(e, 'Không tải được danh sách chuyến'));
+    }
+  }, [cityId, dateKey, kind]);
+
+  useEffect(() => {
+    setTrips(null);
+    void load();
+  }, [load]);
+
+  // Nhóm theo nhà xe / tài xế, lọc khung giờ
+  const groups = useMemo(() => {
+    const list = (trips ?? []).filter((t) => slot.id === 'all' || (vnHour(t.departAt) >= slot.from && vnHour(t.departAt) < slot.to));
+    const map = new Map<string, { operator: IntercityTrip['operator']; trips: IntercityTrip[] }>();
+    for (const t of list.sort((a, b) => Date.parse(a.departAt) - Date.parse(b.departAt))) {
+      const g = map.get(t.operator.id) ?? { operator: t.operator, trips: [] };
+      g.trips.push(t);
+      map.set(t.operator.id, g);
+    }
+    return [...map.values()];
+  }, [trips, slot]);
+
+  if (cities && !city) {
     return (
       <Screen header={<AppHeader title="Xe đường dài" variant="light" left="back" />}>
         <EmptyState icon="mci:bus" title="Không tìm thấy tuyến này" actionLabel="Quay lại" onAction={() => router.back()} />
@@ -31,17 +78,48 @@ export default function IntercityResultsScreen() {
     );
   }
 
-  const openBusTrip = (t: BusTrip) =>
-    router.push({ pathname: '/booking/intercity/bus/[id]', params: { id: t.id, dateKey, dateLabel: dateLabel ? `${dateLabel.label} ${dateLabel.sub}` : '' } });
+  const openTrip = (t: IntercityTrip) => router.push({ pathname: '/booking/intercity/bus/[id]', params: { id: t.id } });
+  const count = groups.reduce((n, g) => n + g.trips.length, 0);
 
   return (
-    <Screen header={<AppHeader title={`Mua vé đi ${city.name}`} variant="dark" left="back" />} background={Colors.white}>
-      <ScrollView contentContainerStyle={{ paddingBottom: Spacing['2xl'] }} showsVerticalScrollIndicator={false}>
+    <Screen
+      header={
+        <AppHeader
+          title={`${kind === 'bus' ? 'Mua vé đi' : 'Xe ghép đi'} ${city?.name ?? ''}`}
+          variant="dark"
+          left="back"
+          right={{ icon: Icons.ticket, onPress: () => router.push('/booking/intercity/tickets'), label: 'Vé của tôi' }}
+        />
+      }
+      background={Colors.white}
+    >
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: Spacing['2xl'] }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await load();
+              setRefreshing(false);
+            }}
+            tintColor={Colors.primary}
+          />
+        }
+      >
         <View style={styles.routeRow}>
           <Icon name="mci:map-marker-distance" size={16} color={Colors.primary} />
-          <AppText size={13} color={Colors.textSecondary} style={{ marginLeft: 6 }}>
-            TP. Hồ Chí Minh → {city.name} · {city.durationLabel} · {city.station.name}
+          <AppText size={13} color={Colors.textSecondary} style={{ marginLeft: 6, flex: 1 }} numberOfLines={2}>
+            TP. Hồ Chí Minh → {city?.name ?? ''}
+            {city ? ` · ${city.stationName}` : ''}
           </AppText>
+        </View>
+
+        <View style={styles.kindRow}>
+          {(['bus', 'carpool'] as const).map((k) => (
+            <Chip key={k} label={TRIP_KIND_LABEL[k]} icon={k === 'bus' ? 'mci:bus' : 'mci:car-multiple'} active={kind === k} onPress={() => setKind(k)} style={styles.kindChip} />
+          ))}
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateStrip}>
@@ -63,61 +141,53 @@ export default function IntercityResultsScreen() {
           ))}
         </ScrollView>
 
-        <View style={styles.sectionLabelWrap}>
-          <AppText size={12} weight="semiBold" color={Colors.textSecondary}>
-            {operatorGroups.reduce((n, g) => n + g.trips.length, 0)} chuyến khả dụng
-          </AppText>
-        </View>
-
-        {operatorGroups.length ? (
-          <View style={styles.list}>
-            {operatorGroups.map((g) => (
-              <View key={g.operator.id} style={styles.operatorGroup}>
-                <View style={styles.operatorHead}>
-                  <View style={styles.operatorLogo}>
-                    <Icon name={g.operator.icon} size={20} color={Colors.white} />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
-                    <AppText size={15} weight="bold">
-                      {g.operator.name}
-                    </AppText>
-                    <AppText size={12} color={Colors.textSecondary} numberOfLines={2}>
-                      {g.operator.description}
-                    </AppText>
-                  </View>
-                  <View style={styles.ratingPill}>
-                    <Icon name={Icons.star} size={12} color={Colors.secondary} />
-                    <AppText size={12} weight="bold" color={Colors.text} style={{ marginLeft: 2 }}>
-                      {g.operator.rating.toFixed(1)}
-                    </AppText>
-                  </View>
-                </View>
-                {g.trips.map((t) => {
-                  const left = t.seats.filter((s) => !s.taken).length;
-                  return (
-                    <Pressable key={t.id} onPress={() => openBusTrip(t)} style={styles.tripRow}>
-                      <View style={{ flex: 1 }}>
-                        <AppText size={16} weight="bold">
-                          {t.departTime}
-                        </AppText>
-                        <AppText size={12} color={Colors.textSecondary} numberOfLines={1}>
-                          {t.vehicleType} · còn {left} chỗ
-                        </AppText>
-                      </View>
-                      <AppText size={15} weight="extraBold" color={Colors.primary}>
-                        {t.priceLabel}
-                      </AppText>
-                      <Icon name={Icons.chevronRight} size={18} color={Colors.gray400} style={{ marginLeft: Spacing.sm }} />
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ))}
-          </View>
+        {trips === null ? (
+          <ActivityIndicator color={Colors.primary} style={{ marginTop: Spacing['2xl'] }} />
         ) : (
-          <View style={{ marginTop: Spacing['2xl'] }}>
-            <EmptyState icon="mci:bus" title="Không có chuyến trong khung giờ này" />
-          </View>
+          <>
+            <View style={styles.sectionLabelWrap}>
+              <AppText size={12} weight="semiBold" color={error ? Colors.error : Colors.textSecondary}>
+                {error ?? `${count} chuyến còn chỗ · ${dateOption ? `${dateOption.label} ${dateOption.sub}` : ''}`}
+              </AppText>
+            </View>
+
+            {groups.length ? (
+              <View style={styles.list}>
+                {groups.map((g) => (
+                  <View key={g.operator.id} style={styles.operatorGroup}>
+                    <View style={styles.operatorHead}>
+                      <View style={styles.operatorLogo}>
+                        <Icon name={kind === 'bus' ? 'mci:bus' : 'mci:car-side'} size={20} color={Colors.white} />
+                      </View>
+                      <AppText size={15} weight="bold" style={{ flex: 1, marginLeft: Spacing.sm }} numberOfLines={1}>
+                        {g.operator.name}
+                      </AppText>
+                    </View>
+                    {g.trips.map((t) => (
+                      <Pressable key={t.id} onPress={() => openTrip(t)} style={styles.tripRow}>
+                        <View style={{ flex: 1 }}>
+                          <AppText size={16} weight="bold">
+                            {vnTime(t.departAt)} → {vnTime(t.arriveAt)}
+                          </AppText>
+                          <AppText size={12} color={Colors.textSecondary} numberOfLines={1}>
+                            {[t.vehicle.name, durationLabel(t.departAt, t.arriveAt), `còn ${t.seatsAvailable} chỗ`].filter(Boolean).join(' · ')}
+                          </AppText>
+                        </View>
+                        <AppText size={15} weight="extraBold" color={Colors.primary}>
+                          {formatVnd(t.pricePerSeat)}
+                        </AppText>
+                        <Icon name={Icons.chevronRight} size={18} color={Colors.gray400} style={{ marginLeft: Spacing.sm }} />
+                      </Pressable>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={{ marginTop: Spacing['2xl'] }}>
+                <EmptyState icon={kind === 'bus' ? 'mci:bus' : 'mci:car-multiple'} title={slot.id === 'all' ? 'Chưa có chuyến nào ngày này' : 'Không có chuyến trong khung giờ này'} />
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </Screen>
@@ -126,6 +196,8 @@ export default function IntercityResultsScreen() {
 
 const styles = StyleSheet.create({
   routeRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.screen, paddingTop: Spacing.base },
+  kindRow: { flexDirection: 'row', gap: Spacing.sm, paddingHorizontal: Spacing.screen, paddingTop: Spacing.md },
+  kindChip: { flex: 1, justifyContent: 'center' },
   dateStrip: { paddingHorizontal: Spacing.screen, paddingVertical: Spacing.md, gap: Spacing.sm },
   dateCell: {
     width: 68,
@@ -140,7 +212,6 @@ const styles = StyleSheet.create({
   slotChip: { marginRight: 0 },
   sectionLabelWrap: { paddingHorizontal: Spacing.screen, paddingTop: Spacing.sm, paddingBottom: 2 },
   list: { padding: Spacing.screen, gap: Spacing.md },
-  ratingPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surfaceAlt, borderRadius: BorderRadius.sm, paddingHorizontal: 8, paddingVertical: 3 },
   operatorGroup: { borderRadius: BorderRadius.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.border, overflow: 'hidden', ...Shadow.sm },
   operatorHead: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, backgroundColor: Colors.primaryBg },
   operatorLogo: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
