@@ -1,104 +1,132 @@
-// app/booking/confirm.tsx — GH 1.6 / VT 1.6 "Xác nhận giao hàng": tuỳ chọn (quay lại điểm giao, gửi tận tay, tip),
-// thời gian, tài xế chỉ định, ghi chú; footer Mã giảm giá | Tiền mặt, giá, "Xác nhận" → tạo đơn → theo dõi.
-// Giá ở footer là giá BE báo qua drymode (refreshQuote) — app chỉ ước tính trong lúc chờ/khi BE lỗi.
+// app/booking/confirm.tsx — GH 1.6 / VT 1.6 "Xác nhận giao hàng": tuỳ chọn theo luật của dịch vụ (catalog):
+// quay về điểm đón (allowReturnToPickup), dịch vụ cộng thêm (addons), tiền tip, hẹn giờ (allowScheduling, tối thiểu
+// minScheduleLeadMinutes, tối đa maxScheduleDays), ghi chú; footer Mã giảm giá | Tiền mặt/Ví, giá, "Xác nhận" → tạo đơn.
+// Giá ở footer là giá server báo (POST /v1/customer/quotes) — trong lúc chờ chỉ hiện ước tính "~".
 import React, { useEffect, useState } from 'react';
 import { View, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { AppHeader, AppText, BottomSheet, Checkbox, ErrorSheet, Icon, Icons, Screen, Stepper, fontStyle } from '@/components/ui';
 import { Colors, Spacing, NO_WEB_OUTLINE } from '@/constants/theme';
-import { EXTRA_PRICES, SERVICE_GROUPS } from '@/constants/mockBooking';
-import { useBooking, setOptions, effectivePrice, refreshQuote, formatVnd, formatScheduleLabel, submitBooking, promoLabel } from '@/services/bookingStore';
-import { DriverPickerSheet, FlatFooter, OptionRow, PaymentSheet } from '@/components/booking';
+import { SERVICE_GROUPS, TIP_STEP } from '@/constants/booking';
+import {
+  useBooking,
+  setOptions,
+  effectivePrice,
+  refreshQuote,
+  removeCoupon,
+  formatVnd,
+  formatScheduleLabel,
+  submitBooking,
+  getSelectedService,
+  maxStopsOf,
+  completeReceivers,
+} from '@/services/bookingStore';
+import { errorMessage } from '@/services/zuum';
+import { FlatFooter, OptionRow, PaymentSheet } from '@/components/booking';
 
-const SCHEDULE_CHOICES: { label: string; minutes?: number; tomorrowAt?: number }[] = [
+type ScheduleChoice = { label: string; minutes?: number; tomorrowAt?: number };
+
+const SCHEDULE_CHOICES: ScheduleChoice[] = [
   { label: 'Bây giờ' },
   { label: 'Sau 30 phút', minutes: 30 },
   { label: 'Sau 1 giờ', minutes: 60 },
   { label: 'Sau 2 giờ', minutes: 120 },
+  { label: 'Sau 4 giờ', minutes: 240 },
   { label: 'Ngày mai, 08h00', tomorrowAt: 8 },
+  { label: 'Ngày mai, 14h00', tomorrowAt: 14 },
 ];
+
+/** Thời điểm hẹn của 1 lựa chọn (cộng 2 phút để còn đủ "báo trước tối thiểu" lúc server báo giá) */
+function choiceTs(c: ScheduleChoice): number | null {
+  if (c.minutes) return Date.now() + (c.minutes + 2) * 60_000;
+  if (c.tomorrowAt != null) {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(c.tomorrowAt, 0, 0, 0);
+    return d.getTime();
+  }
+  return null;
+}
+
+const COUPON_ERROR = /^coupon\./;
 
 export default function ConfirmScreen() {
   const state = useBooking();
   const opt = state.options;
+  const svc = getSelectedService(state);
   const price = effectivePrice(state);
   const quote = state.quote;
   const [timeSheet, setTimeSheet] = useState(false);
+  const [paySheet, setPaySheet] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Báo giá lại mỗi khi bản nháp đổi (refreshQuote tự bỏ qua nếu chữ ký giá không đổi), chờ 400ms gom thao tác
+  // Báo giá lại mỗi khi bản nháp đổi (refreshQuote tự bỏ qua nếu đã có giá còn hạn cho đúng bản nháp), chờ 400ms gom thao tác
   useEffect(() => {
     const t = setTimeout(() => {
       void refreshQuote();
     }, 400);
     return () => clearTimeout(t);
   }, [state.options, state.receivers, state.optionId, state.service, state.sender.place]);
-  const [driverSheet, setDriverSheet] = useState(false);
-  const [paySheet, setPaySheet] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
   const group = SERVICE_GROUPS[state.service];
   const labels = group.labels;
-  // Dọn nhà: "Quay lại điểm giao hàng"/"Gửi tận tay khách hàng" là khái niệm giao hàng nhỏ, không hợp
-  const isDelivery = group.kind === 'delivery' && state.service !== 'rental';
   const isIntercity = state.service === 'intercity';
-  const stopsCount = group.maxStops === 0 ? 0 : Math.max(1, state.receivers.length);
-  const providerLower = labels.provider.toLowerCase();
+  const maxStops = maxStopsOf(state);
+  const stopsCount = maxStops === 0 ? 0 : Math.max(1, completeReceivers(state).length);
+  const rules = svc?.rules;
+  const lead = rules?.minScheduleLeadMinutes ?? 0;
+  const maxDays = rules?.maxScheduleDays ?? 0;
+  const choices = SCHEDULE_CHOICES.filter((c) => {
+    if (!c.minutes && c.tomorrowAt == null) return true;
+    const ts = choiceTs(c)!;
+    const minutes = (ts - Date.now()) / 60_000;
+    return minutes >= lead && minutes <= maxDays * 24 * 60;
+  });
+  const quoteData = price.quote;
+  const couponError = quote.status === 'error' && !!quote.errorCode && COUPON_ERROR.test(quote.errorCode);
 
-  const pickTime = (c: (typeof SCHEDULE_CHOICES)[number]) => {
-    let ts: number | null = null;
-    if (c.minutes) ts = Date.now() + c.minutes * 60_000;
-    else if (c.tomorrowAt) {
-      const d = new Date();
-      d.setDate(d.getDate() + 1);
-      d.setHours(c.tomorrowAt, 0, 0, 0);
-      ts = d.getTime();
-    }
-    setOptions({ scheduledAt: ts });
+  const pickTime = (c: ScheduleChoice) => {
+    setOptions({ scheduledAt: choiceTs(c) });
     setTimeSheet(false);
   };
+
+  const toggleAddon = (id: string) =>
+    setOptions({ addonIds: opt.addonIds.includes(id) ? opt.addonIds.filter((x) => x !== id) : [...opt.addonIds, id] });
 
   const onConfirm = async () => {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const res = await submitBooking();
-      router.replace({ pathname: '/booking/tracking', params: { orderId: res.orderId, from: 'booking' } });
+      const order = await submitBooking();
+      router.replace({ pathname: '/booking/tracking', params: { orderId: order.id, from: 'booking' } });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không tạo được đơn hàng. Vui lòng thử lại.');
+      setError(errorMessage(e, 'Không tạo được đơn hàng. Vui lòng thử lại.'));
     } finally {
       setSubmitting(false);
     }
   };
 
+  const couponLabel = quoteData?.coupon
+    ? `${quoteData.coupon.code} · -${formatVnd(quoteData.coupon.discount)}`
+    : opt.couponCode
+      ? `Mã ${opt.couponCode}`
+      : 'Mã giảm giá';
+
   const footer = (
     <View style={styles.footer}>
-      <Pressable style={styles.directRow} onPress={() => router.push('/booking/scan-driver')} accessibilityRole="button">
-        <View style={styles.directIcon}>
-          <Icon name="mci:qrcode-scan" size={20} color={Colors.white} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <AppText size={14} weight="bold" color={Colors.text}>
-            Chọn {providerLower} trực tiếp
-          </AppText>
-          <AppText size={12} color={Colors.textSecondary}>
-            Quét mã QR {providerLower} đưa để đặt chuyến ngay
-          </AppText>
-        </View>
-        <Icon name={Icons.chevronRight} size={18} color={Colors.gray400} />
-      </Pressable>
-      <View style={styles.directDivider} />
       <View style={styles.payRow}>
         <Pressable style={styles.payHalf} onPress={() => router.push('/booking/promo')}>
           <Icon name={Icons.ticket} size={22} color={Colors.primary} />
-          <AppText size={14} weight="medium" color={opt.promo ? Colors.primary : Colors.text} style={{ marginLeft: Spacing.sm }}>
-            {promoLabel(opt.promo) ?? 'Mã giảm giá'}
+          <AppText size={14} weight="medium" color={opt.couponCode ? Colors.primary : Colors.text} style={{ marginLeft: Spacing.sm }} numberOfLines={1}>
+            {couponLabel}
           </AppText>
         </Pressable>
         <View style={styles.vDivider} />
         <Pressable style={styles.payHalf} onPress={() => setPaySheet(true)}>
           <Icon name={opt.paymentMethod === 'wallet' ? Icons.wallet : Icons.cash} size={22} color={Colors.primary} />
           <AppText size={14} weight="medium" style={{ marginLeft: Spacing.sm }}>
-            {opt.paymentMethod === 'wallet' ? 'Tài khoản' : 'Tiền mặt'}
+            {opt.paymentMethod === 'wallet' ? 'Ví ZuumViet' : 'Tiền mặt'}
           </AppText>
         </Pressable>
       </View>
@@ -111,6 +139,7 @@ export default function ConfirmScreen() {
           ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <AppText weight="bold" size={28} color={Colors.primary}>
+              {price.fromServer ? '' : '~'}
               {formatVnd(price.total, { space: true })}
             </AppText>
             {quote.status === 'loading' ? <ActivityIndicator size="small" color={Colors.primary} style={{ marginLeft: Spacing.sm }} /> : null}
@@ -121,53 +150,63 @@ export default function ConfirmScreen() {
             {price.distanceKm ? `${price.distanceKm.toFixed(1)}km · ` : ''}
             {stopsCount === 0 ? `${labels.provider} đến tận nơi` : `${stopsCount} ${labels.stopUnit}`}
           </AppText>
-          <AppText size={11} color={quote.status === 'error' ? Colors.error : Colors.textMuted} numberOfLines={2} style={{ maxWidth: 200, textAlign: 'right' }}>
-            {quote.status === 'error' ? `Chưa lấy được giá: ${quote.error}` : price.fromServer ? 'Giá ZuumViet báo' : 'Giá ước tính'}
+          <AppText size={11} color={quote.status === 'error' ? Colors.error : Colors.textMuted} numberOfLines={3} style={{ maxWidth: 220, textAlign: 'right' }}>
+            {quote.status === 'error' ? quote.error : price.fromServer ? 'Giá ZuumViet báo' : 'Giá ước tính'}
           </AppText>
+          {couponError ? (
+            <Pressable onPress={removeCoupon} hitSlop={6}>
+              <AppText size={12} weight="semiBold" color={Colors.primary}>
+                Bỏ mã giảm giá
+              </AppText>
+            </Pressable>
+          ) : null}
         </View>
       </View>
-      <FlatFooter title="Xác nhận" loading={submitting} onPress={onConfirm} />
+      <FlatFooter title="Xác nhận" loading={submitting} disabled={!svc || quote.status === 'loading'} onPress={onConfirm} />
     </View>
   );
 
   return (
     <Screen header={<AppHeader variant="dark" title={labels.confirmTitle} left="arrow" />} scroll edges={['left', 'right']} footer={footer} footerPadded={false}>
-      {isDelivery ? (
-        <>
-          <OptionRow
-            icon={Icons.refresh}
-            label="Quay lại điểm giao hàng"
-            sub={formatVnd(EXTRA_PRICES.returnToPickup)}
-            right={<Checkbox checked={opt.returnToPickup} onPress={() => setOptions({ returnToPickup: !opt.returnToPickup })} />}
-          />
-          <OptionRow
-            icon={Icons.handHold}
-            label="Gửi tận tay khách hàng"
-            sub="đ35.000 / lần"
-            right={<Stepper value={opt.handToCustomer} onChange={(v) => setOptions({ handToCustomer: v })} max={stopsCount} />}
-          />
-        </>
+      {rules?.allowReturnToPickup ? (
+        <OptionRow
+          icon={Icons.refresh}
+          label={group.kind === 'delivery' ? 'Quay lại điểm lấy hàng' : 'Khứ hồi (quay về điểm đón)'}
+          sub="Cước chiều về tính vào giá báo"
+          right={<Checkbox checked={opt.returnToPickup} onPress={() => setOptions({ returnToPickup: !opt.returnToPickup })} />}
+        />
       ) : null}
-      <OptionRow icon={Icons.cash} label="Tiền tip" sub="đ 5,000 / lần" right={<Stepper value={opt.tip} onChange={(v) => setOptions({ tip: v })} max={20} />} />
+      {svc?.addons.map((a) => (
+        <OptionRow
+          key={a.id}
+          icon={Icons.plusCircle}
+          label={a.name}
+          sub={[`+${formatVnd(a.price)}`, a.description ?? ''].filter(Boolean).join(' · ')}
+          right={<Checkbox checked={opt.addonIds.includes(a.id)} onPress={() => toggleAddon(a.id)} />}
+        />
+      ))}
       <OptionRow
-        icon={Icons.calendar}
-        label={isIntercity ? 'Ngày giờ đi' : 'Thời gian lựa chọn'}
-        value={formatScheduleLabel(opt.scheduledAt)}
-        chevron={!isIntercity}
-        onPress={isIntercity ? undefined : () => setTimeSheet(true)}
+        icon={Icons.cash}
+        label="Tiền tip"
+        sub={`${formatVnd(TIP_STEP)} / lần${opt.tip ? ` · ${formatVnd(opt.tip * TIP_STEP)}` : ''}`}
+        right={<Stepper value={opt.tip} onChange={(v) => setOptions({ tip: v })} max={20} />}
       />
-      {isIntercity && opt.returnAt ? <OptionRow icon={Icons.calendar} label="Ngày giờ về" value={formatScheduleLabel(opt.returnAt)} /> : null}
-      {isIntercity && opt.returnAt ? (
-        <OptionRow icon={Icons.steering} label="Phục vụ suốt hành trình" value={opt.waitForReturn ? 'Có, xe ở lại' : 'Không'} />
+      {rules?.allowScheduling ? (
+        <OptionRow
+          icon={Icons.calendar}
+          label={isIntercity ? 'Ngày giờ đi' : 'Thời gian lựa chọn'}
+          value={formatScheduleLabel(opt.scheduledAt)}
+          chevron={!isIntercity}
+          onPress={isIntercity ? undefined : () => setTimeSheet(true)}
+        />
       ) : null}
-      <OptionRow
-        icon="mci:account-outline"
-        label={`${labels.provider} chỉ định`}
-        sub={opt.assignedDrivers.length ? `${opt.assignedDrivers.length} ${providerLower}` : undefined}
-        value="Lựa chọn"
-        chevron
-        onPress={() => setDriverSheet(true)}
-      />
+      {svc?.pricing.basis === 'time_block' ? (
+        <OptionRow
+          icon={Icons.clock}
+          label="Thời gian làm việc"
+          value={`${opt.laborBlocks} block × ${Math.round(svc.pricing.blockMinutes / 6) / 10} giờ`}
+        />
+      ) : null}
       <View style={styles.noteRow}>
         <View style={{ width: 34 }}>
           <Icon name={Icons.note} size={22} color={Colors.primary} />
@@ -179,11 +218,30 @@ export default function ConfirmScreen() {
           placeholderTextColor={Colors.placeholder}
           style={[styles.noteInput, fontStyle('medium')]}
           multiline
+          maxLength={500}
         />
       </View>
 
+      {quoteData ? (
+        <View style={styles.breakdown}>
+          <AppText weight="bold" size={14} style={{ marginBottom: Spacing.xs }}>
+            Chi tiết giá
+          </AppText>
+          {quoteData.price.lines.map((l, i) => (
+            <View key={`${l.code}-${i}`} style={styles.lineRow}>
+              <AppText size={13} color={Colors.textSecondary} style={{ flex: 1 }}>
+                {l.label}
+              </AppText>
+              <AppText size={13} color={l.amount < 0 ? Colors.success : Colors.text}>
+                {formatVnd(l.amount)}
+              </AppText>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       <BottomSheet visible={timeSheet} onClose={() => setTimeSheet(false)} title="Thời gian lựa chọn" showClose showHandle={false} contentStyle={{ paddingHorizontal: 0 }}>
-        {SCHEDULE_CHOICES.map((c) => {
+        {choices.map((c) => {
           const on = c.label === 'Bây giờ' ? !opt.scheduledAt : false;
           return (
             <Pressable key={c.label} onPress={() => pickTime(c)} style={[styles.timeRow, on && { backgroundColor: Colors.primaryBg }]}>
@@ -195,19 +253,21 @@ export default function ConfirmScreen() {
             </Pressable>
           );
         })}
+        {lead > 0 ? (
+          <AppText size={12} color={Colors.textMuted} style={{ paddingHorizontal: Spacing.screen, paddingVertical: Spacing.sm }}>
+            Hẹn giờ trước tối thiểu {lead} phút, tối đa {maxDays} ngày
+          </AppText>
+        ) : null}
       </BottomSheet>
 
-      <DriverPickerSheet
-        visible={driverSheet}
-        selected={opt.assignedDrivers}
-        onClose={() => setDriverSheet(false)}
-        onConfirm={(ids) => {
-          setOptions({ assignedDrivers: ids });
-          setDriverSheet(false);
-        }}
+      <PaymentSheet
+        visible={paySheet}
+        value={opt.paymentMethod}
+        amount={price.total}
+        onClose={() => setPaySheet(false)}
+        onSelect={(m) => setOptions({ paymentMethod: m })}
       />
-      <PaymentSheet visible={paySheet} value={opt.paymentMethod} onClose={() => setPaySheet(false)} onSelect={(m) => setOptions({ paymentMethod: m })} />
-      <ErrorSheet visible={!!error} title="Không tạo được đơn" message={error ?? ''} actionLabel="Thử lại" onAction={() => setError(null)} onClose={() => setError(null)} />
+      <ErrorSheet visible={!!error} title="Không tạo được đơn" message={error ?? ''} actionLabel="Đóng" onAction={() => setError(null)} onClose={() => setError(null)} />
     </Screen>
   );
 }
@@ -215,20 +275,11 @@ export default function ConfirmScreen() {
 const styles = StyleSheet.create({
   noteRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: Spacing.screen, paddingVertical: Spacing.md },
   noteInput: { flex: 1, fontSize: 15, color: Colors.text, paddingVertical: 0, minHeight: 44, textAlignVertical: 'top', ...NO_WEB_OUTLINE },
+  breakdown: { paddingHorizontal: Spacing.screen, paddingVertical: Spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border },
+  lineRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 3 },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border, backgroundColor: Colors.white },
-  directRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.screen, paddingVertical: Spacing.md },
-  directIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
-  },
-  directDivider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginHorizontal: Spacing.screen },
   payRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.md },
-  payHalf: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  payHalf: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.sm },
   vDivider: { width: StyleSheet.hairlineWidth, height: 24, backgroundColor: Colors.gray300 },
   priceRow: {
     flexDirection: 'row',

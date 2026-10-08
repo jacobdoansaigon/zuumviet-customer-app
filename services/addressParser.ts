@@ -1,15 +1,13 @@
-// services/addressParser.ts — "Dán từ Zalo": tách tên/SĐT/địa chỉ/ghi chú từ đoạn văn khách dán vào (thường
-// copy nguyên tin nhắn Zalo/Messenger, lẫn lộn cả 3-4 thứ trong cùng đoạn). Ưu tiên gọi LLM qua BE
-// (addressParseApi — chính xác hơn nhiều với văn phong tự do, viết tắt, không dấu); nếu BE chưa có endpoint
-// (404), chưa cấu hình LLM (503), hay mạng lỗi thì tự tách bằng heuristic (regex tiếng Việt) để tính năng vẫn
-// dùng được ngay, không chặn người dùng — kết quả offline luôn được đánh dấu rõ để khách tự kiểm tra lại.
-import { addressParseApi, type ParsedAddress } from './api';
+// services/addressParser.ts — "Dán từ Zalo": tách tên/SĐT/địa chỉ/ghi chú từ đoạn văn khách dán vào (thường copy
+// nguyên tin nhắn Zalo/Messenger, lẫn lộn cả 3-4 thứ trong cùng đoạn) bằng heuristic tiếng Việt, chạy ngay trên máy.
+// API chưa có dịch vụ tách địa chỉ — kết quả luôn cho khách xem & sửa, địa chỉ tách được chỉ dùng để TÌM địa điểm thật
+// (places autocomplete), không dùng thẳng làm toạ độ.
 
-export type ParseSource = 'llm' | 'local';
-
-export interface ParseAddressResult {
-  result: ParsedAddress;
-  source: ParseSource;
+export interface ParsedAddress {
+  name: string;
+  phone: string;
+  address: string;
+  note: string;
 }
 
 const ADDRESS_KEYWORDS = [
@@ -71,8 +69,8 @@ function extractName(lines: string[], usedIndexes: Set<number>, phoneRaw: string
   return null;
 }
 
-/** Tách offline (không cần mạng) — dùng khi chưa gọi được BE/LLM. Kết quả chỉ mang tính tham khảo. */
-export function parseZaloTextLocally(text: string): ParsedAddress {
+/** Tách ngay trên máy (không cần mạng). Kết quả chỉ mang tính tham khảo. */
+export function parseZaloText(text: string): ParsedAddress {
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -102,15 +100,3 @@ export function parseZaloTextLocally(text: string): ParsedAddress {
   };
 }
 
-/** Gọi LLM qua BE (services/api.ts#addressParseApi); BE lỗi/chưa triển khai → tự tách offline để tính năng luôn hoạt động. */
-export async function parseZaloText(text: string): Promise<ParseAddressResult> {
-  const trimmed = text.trim();
-  if (!trimmed) return { result: { name: '', phone: '', address: '', note: '' }, source: 'local' };
-
-  try {
-    const result = await addressParseApi.parse(trimmed);
-    return { result, source: 'llm' };
-  } catch {
-    return { result: parseZaloTextLocally(trimmed), source: 'local' };
-  }
-}

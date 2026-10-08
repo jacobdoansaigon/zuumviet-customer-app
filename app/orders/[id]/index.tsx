@@ -1,59 +1,49 @@
-// Chi tiết chuyến đi — Figma Hoạt động 1.3 (đã đánh giá) / 1.4 (chưa đánh giá)
-import React, { useCallback, useMemo, useState } from 'react';
-import { View, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
+// Chi tiết chuyến đi — Figma Hoạt động 1.3 (đã đánh giá) / 1.4 (chưa đánh giá). Dữ liệu GET /v1/customer/orders/:id:
+// tài xế (ảnh, điểm trung bình), xe, lộ trình + trạng thái từng điểm, thanh toán, đánh giá (canRate / rating).
+// "Báo sự cố": API chưa có kênh báo sự cố → gọi tổng đài hỗ trợ. Yêu thích / chặn tài xế: chưa có trên API → ẩn.
+import React, { useCallback, useState } from 'react';
+import { View, ScrollView, ActivityIndicator, Linking, StyleSheet } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
-import {
-  AppHeader,
-  AppText,
-  Button,
-  Dialog,
-  EmptyState,
-  Icon,
-  Icons,
-  RouteStops,
-  Screen,
-  Toast,
-  type RouteStop,
-} from '@/components/ui';
-import type { ActivityOrder, ActivityStopStatus } from '@/constants/mockOrders';
-import { fetchActivityOrder } from '@/components/activity/activityApi';
-import { updateLocalRating, useRatingsVersion, withLocalRating } from '@/components/activity/ratingStore';
-import {
-  STATUS_LABEL,
-  activeStatusLabel,
-  formatDateTimeTitle,
-  isActiveStatus,
-  isCancelledStatus,
-  isCompletedStatus,
-} from '@/components/activity/orderUtils';
+import { AppHeader, AppText, Button, Dialog, EmptyState, Icon, Icons, RouteStops, Screen, Toast, type RouteStop } from '@/components/ui';
+import { getOrder, isActiveStatus, ORDER_STATUS_LABEL, STOP_STATUS_LABEL, type OrderDetail, type StopStatus } from '@/services/orders';
+import { formatPhone } from '@/services/session';
+import { errorMessage } from '@/services/zuum';
+import { activeStatusLabel, formatDateTimeTitle, isCancelledStatus, isCompletedStatus } from '@/components/activity/orderUtils';
 import { TripCodeBar } from '@/components/activity/TripCodeBar';
 import { DriverRow } from '@/components/activity/DriverRow';
 import { PaymentSummary } from '@/components/activity/PaymentSummary';
 import { RatingStars } from '@/components/activity/RatingStars';
 import { Pill } from '@/components/activity/Pill';
 
-const STOP_STATUS: Record<ActivityStopStatus, { label: string; tone: RouteStop['statusTone'] }> = {
-  pending: { label: 'Chờ lấy hàng', tone: 'default' },
-  picked: { label: 'Đã lấy hàng', tone: 'success' },
-  delivering: { label: 'Đang giao', tone: 'warning' },
-  done: { label: 'Thành công', tone: 'success' },
-  failed: { label: 'Giao thất bại - Đang hoàn trả', tone: 'danger' },
+const SUPPORT_PHONE = '19001234';
+
+const STOP_TONE: Record<StopStatus, RouteStop['statusTone']> = {
+  pending: 'default',
+  arrived: 'warning',
+  delivered: 'success',
+  failed: 'danger',
+  returned: 'primary',
 };
+
+const CANCELLED_BY: Record<string, string> = { customer: 'Bạn đã huỷ', partner: 'Tài xế huỷ', staff: 'ZuumViet huỷ', system: 'Hệ thống huỷ' };
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const orderId = String(id ?? '');
-  const [order, setOrder] = useState<ActivityOrder | null>(null);
+  const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [reportVisible, setReportVisible] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const ratingsVersion = useRatingsVersion();
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setOrder(await fetchActivityOrder(orderId));
+      setOrder(await getOrder(orderId));
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(errorMessage(e, 'Không tải được chuyến đi'));
     } finally {
       setLoading(false);
     }
@@ -61,21 +51,15 @@ export default function OrderDetailScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      load();
-    }, [load])
+      void load();
+    }, [load]),
   );
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const view = useMemo(() => (order ? withLocalRating(order) : null), [order, ratingsVersion]);
+  const goRate = (stars?: number) => router.push(`/orders/${orderId}/rate${stars ? `?stars=${stars}` : ''}`);
 
-  const goRate = (stars?: number) =>
-    router.push(`/orders/${orderId}/rate${stars ? `?stars=${stars}` : ''}`);
+  const header = <AppHeader variant="light" title={order ? formatDateTimeTitle(Date.parse(order.timeline.createdAt)) : 'Chi tiết chuyến đi'} />;
 
-  const header = (
-    <AppHeader variant="light" title={view ? formatDateTimeTitle(view.createdAt) : 'Chi tiết chuyến đi'} />
-  );
-
-  if (loading && !view) {
+  if (loading && !order) {
     return (
       <Screen header={header}>
         <View style={styles.center}>
@@ -85,51 +69,58 @@ export default function OrderDetailScreen() {
     );
   }
 
-  if (!view) {
+  if (!order) {
     return (
       <Screen header={header}>
         <View style={styles.center}>
-          <EmptyState title="Không tìm thấy chuyến đi" actionLabel="Quay lại" onAction={() => router.back()} />
+          <EmptyState title={loadError ?? 'Không tìm thấy chuyến đi'} actionLabel="Quay lại" onAction={() => router.back()} />
         </View>
       </Screen>
     );
   }
 
+  const picked = order.status === 'picked_up' || order.status === 'completed';
   const stops: RouteStop[] = [
     {
-      title: view.pickup.title,
-      subtitle: view.pickup.address,
+      title: order.pickup.contactName ? `${order.pickup.contactName} · ${formatPhone(order.pickup.contactPhone)}` : order.pickup.address,
+      subtitle: order.pickup.contactName ? order.pickup.address : undefined,
       type: 'pickup',
-      status: view.pickup.status && isActiveStatus(view.status) ? STOP_STATUS[view.pickup.status].label : undefined,
-      statusTone: view.pickup.status ? STOP_STATUS[view.pickup.status].tone : undefined,
+      status: isActiveStatus(order.status) && picked ? order.steps.pickUp : undefined,
+      statusTone: picked ? 'success' : undefined,
     },
-    ...view.dropoffs.map<RouteStop>((d) => ({
-      title: d.title,
-      subtitle: d.address,
+    ...order.stops.map<RouteStop>((s) => ({
+      title: s.contactName ? `${s.contactName} · ${formatPhone(s.contactPhone)}` : s.address,
+      subtitle: s.contactName ? s.address : s.failReason ?? undefined,
       type: 'dropoff',
-      status: d.status && !isCompletedStatus(view.status) ? STOP_STATUS[d.status].label : undefined,
-      statusTone: d.status ? STOP_STATUS[d.status].tone : undefined,
+      status: s.status !== 'pending' ? STOP_STATUS_LABEL[s.status] : undefined,
+      statusTone: STOP_TONE[s.status],
     })),
   ];
 
-  const cancelled = isCancelledStatus(view.status);
-  const completed = isCompletedStatus(view.status);
-  const active = isActiveStatus(view.status);
-  const rating = view.rating;
+  const cancelled = isCancelledStatus(order.status);
+  const completed = isCompletedStatus(order.status);
+  const active = isActiveStatus(order.status);
+  const rating = order.rating;
 
   return (
     <Screen
       header={header}
-      footer={<Button title="Báo sự cố" variant="danger" flat onPress={() => setReportVisible(true)} />}
+      footer={
+        active || order.status === 'no_driver_found' ? (
+          <Button title="Theo dõi chuyến" flat onPress={() => router.push({ pathname: '/booking/tracking', params: { orderId: order.id } })} />
+        ) : (
+          <Button title="Báo sự cố" variant="danger" flat onPress={() => setReportVisible(true)} />
+        )
+      }
       footerPadded={false}
       keyboardAvoiding={false}
     >
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <TripCodeBar code={view.code} />
+        <TripCodeBar code={order.code} />
 
         <View style={styles.section}>
-          {view.driver ? (
-            <DriverRow driver={view.driver} />
+          {order.partner ? (
+            <DriverRow partner={order.partner} vehicle={order.vehicle} />
           ) : (
             <View style={styles.noDriver}>
               <Icon name={Icons.profile} size={22} color={Colors.textSecondary} />
@@ -141,25 +132,35 @@ export default function OrderDetailScreen() {
 
           {cancelled ? (
             <AppText size={13} weight="semiBold" color={Colors.error} style={styles.statusLine}>
-              Huỷ chuyến · {STATUS_LABEL[view.status] ?? ''}
+              {order.status === 'cancelled'
+                ? ['Huỷ chuyến', order.cancellation?.by ? CANCELLED_BY[order.cancellation.by] : '', order.cancellation?.reason?.label ?? '']
+                    .filter(Boolean)
+                    .join(' · ')
+                : ORDER_STATUS_LABEL[order.status]}
             </AppText>
           ) : active ? (
             <AppText size={13} weight="semiBold" color={Colors.primary} style={styles.statusLine}>
-              {activeStatusLabel(view.status)}
+              {activeStatusLabel(order.status)}
+            </AppText>
+          ) : null}
+          {order.cancellation && order.cancellation.fee > 0 ? (
+            <AppText size={13} color={Colors.error} style={styles.statusLine}>
+              Phí huỷ: {order.cancellation.fee.toLocaleString('vi-VN')}đ
             </AppText>
           ) : null}
 
           <AppText size={13} color={Colors.textSecondary} style={styles.serviceLine}>
-            {view.serviceName}
+            {order.service.name}
+            {order.distanceMeters > 0 ? ` · ${(order.distanceMeters / 1000).toFixed(1)}km` : ''}
           </AppText>
 
           <RouteStops stops={stops} titleSize={15} />
 
-          {view.note ? (
+          {order.note ? (
             <View style={styles.noteRow}>
               <Icon name={Icons.note} size={18} color={Colors.primary} />
               <AppText size={13} color={Colors.textSecondary} style={{ marginLeft: Spacing.sm, flex: 1 }}>
-                {view.note}
+                {order.note}
               </AppText>
             </View>
           ) : null}
@@ -167,22 +168,17 @@ export default function OrderDetailScreen() {
 
         <View style={styles.divider} />
         <View style={styles.section}>
-          <PaymentSummary payment={view.payment} />
+          <PaymentSummary method={order.paymentMethod} tip={order.tip} total={order.total} />
         </View>
         <View style={styles.divider} />
 
-        {view.driver && completed ? (
+        {order.partner && completed ? (
           <View style={styles.section}>
-            {rating && rating.stars > 0 ? (
+            {rating ? (
               <>
                 <AppText size={15}>Bạn đã đánh giá tài xế</AppText>
                 <View style={styles.ratingRow}>
-                  <RatingStars value={rating.stars} size={26} onChange={() => goRate(rating.stars)} />
-                  <Pill
-                    label={rating.favorite ? 'Yêu thích' : 'Thêm yêu thích'}
-                    icon={rating.favorite ? Icons.heart : Icons.heartOutline}
-                    onPress={() => updateLocalRating(view, { favorite: !rating.favorite, blocked: false })}
-                  />
+                  <RatingStars value={rating.stars} size={26} />
                 </View>
                 {rating.tags.length ? (
                   <View style={styles.tags}>
@@ -191,45 +187,47 @@ export default function OrderDetailScreen() {
                     ))}
                   </View>
                 ) : null}
+                {rating.comment ? (
+                  <AppText size={13} color={Colors.textSecondary} style={{ marginTop: Spacing.sm }}>
+                    “{rating.comment}”
+                  </AppText>
+                ) : null}
               </>
-            ) : (
+            ) : order.canRate ? (
               <>
                 <AppText size={15}>Chuyến đi của bạn thế nào?</AppText>
                 <View style={styles.ratingRow}>
                   <RatingStars value={0} size={28} onChange={(v) => goRate(v)} />
-                  <Pill
-                    label={rating?.blocked ? 'Đã chặn' : 'Chặn'}
-                    icon={Icons.block}
-                    tone="danger"
-                    filled={rating?.blocked}
-                    onPress={() => updateLocalRating(view, { blocked: !rating?.blocked, favorite: false })}
-                  />
                 </View>
               </>
+            ) : (
+              <AppText size={13} color={Colors.textSecondary}>
+                Đã hết thời gian đánh giá chuyến đi này.
+              </AppText>
             )}
           </View>
         ) : null}
-        {view.driver && completed ? <View style={styles.divider} /> : null}
+        {order.partner && completed ? <View style={styles.divider} /> : null}
       </ScrollView>
 
       <Dialog
         visible={reportVisible}
         onClose={() => setReportVisible(false)}
         title="Báo sự cố"
-        message={`Bạn gặp sự cố với chuyến xe ${view.code}? Tư vấn viên ZuumViet sẽ liên hệ với bạn trong thời gian sớm nhất.`}
+        message={`Bạn gặp sự cố với chuyến ${order.code}? Gọi tổng đài ZuumViet ${SUPPORT_PHONE} để được hỗ trợ ngay.`}
         actions={[
-          { label: 'Huỷ', variant: 'secondary', onPress: () => setReportVisible(false) },
+          { label: 'Đóng', variant: 'secondary', onPress: () => setReportVisible(false) },
           {
-            label: 'Gửi yêu cầu',
+            label: 'Gọi tổng đài',
             variant: 'danger',
             onPress: () => {
               setReportVisible(false);
-              setToast('Đã gửi báo sự cố. Chúng tôi sẽ liên hệ với bạn sớm.');
+              Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() => setToast('Không thể thực hiện cuộc gọi trên thiết bị này'));
             },
           },
         ]}
       />
-      <Toast visible={!!toast} message={toast ?? ''} tone="success" onHide={() => setToast(null)} />
+      <Toast visible={!!toast} message={toast ?? ''} tone="info" onHide={() => setToast(null)} />
     </Screen>
   );
 }

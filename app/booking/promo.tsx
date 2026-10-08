@@ -1,35 +1,96 @@
-// app/booking/promo.tsx — 1.6 "Nhập mã ưu đãi": ô nhập (icon vé), trạng thái trống, kết quả "Mã MUAXUAN2020 / ... / Sử dụng ngay"
-import React, { useState } from 'react';
-import { View, Pressable, StyleSheet } from 'react-native';
+// app/booking/promo.tsx — 1.6 "Nhập mã ưu đãi": ô nhập (icon vé) + danh sách mã khách dùng được (GET /v1/customer/coupons).
+// Áp mã = báo giá lại với couponCode — server kiểm tra (hết hạn, đơn tối thiểu, dịch vụ áp dụng…) và trả số tiền giảm;
+// sai thì hiện đúng lý do server trả, giữ nguyên mã cũ.
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { AppHeader, AppText, Icon, Icons, Screen, TextField } from '@/components/ui';
+import { AppHeader, AppText, Button, Icon, Icons, Screen, TextField } from '@/components/ui';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
-import { PROMO_CODES, type PromoDef } from '@/constants/mockBooking';
-import { useBooking, setOptions } from '@/services/bookingStore';
+import { useBooking, applyCoupon, removeCoupon, formatVnd } from '@/services/bookingStore';
+import { api, errorMessage, type ZuumResponse } from '@/services/zuum';
+
+type Coupon = ZuumResponse<'GET /v1/customer/coupons'>[number];
+
+function couponTitle(c: Coupon): string {
+  if (c.type === 'percent') return `Giảm ${c.value}%${c.maxDiscount ? ` tối đa ${formatVnd(c.maxDiscount)}` : ''}`;
+  return `Giảm ${formatVnd(c.value)}`;
+}
+
+function couponSub(c: Coupon): string {
+  const parts: string[] = [];
+  if (c.description) parts.push(c.description);
+  if (c.minOrderValue > 0) parts.push(`Đơn từ ${formatVnd(c.minOrderValue)}`);
+  if (c.endsAt) {
+    const d = new Date(c.endsAt);
+    parts.push(`HSD ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`);
+  }
+  return parts.join(' · ');
+}
 
 export default function PromoScreen() {
   const state = useBooking();
-  const applied = state.options.promo;
+  const applied = state.options.couponCode;
   const [code, setCode] = useState('');
-  const q = code.trim().toUpperCase();
-  const found = q ? PROMO_CODES.filter((p) => p.code.includes(q)) : [];
+  const [coupons, setCoupons] = useState<Coupon[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [applying, setApplying] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const apply = (p: PromoDef) => {
-    setOptions({ promo: p });
-    router.back();
+  useEffect(() => {
+    api('GET /v1/customer/coupons')
+      .then(setCoupons)
+      .catch((e) => setLoadError(errorMessage(e, 'Không tải được danh sách mã')));
+  }, []);
+
+  const q = code.trim().toUpperCase();
+  const list = useMemo(
+    () => (coupons ?? []).filter((c) => !q || c.code.includes(q) || c.name.toUpperCase().includes(q)),
+    [coupons, q],
+  );
+  const appliesHere = (c: Coupon) => c.services.length === 0 || c.services.some((s) => s.id === state.optionId);
+
+  const apply = async (value: string) => {
+    if (!value || applying) return;
+    setApplying(value);
+    setError(null);
+    try {
+      await applyCoupon(value);
+      router.back();
+    } catch (e) {
+      setError(errorMessage(e, 'Mã giảm giá không áp dụng được'));
+    } finally {
+      setApplying(null);
+    }
   };
 
   return (
     <Screen header={<AppHeader variant="dark" title="Nhập mã ưu đãi" left="arrow" />} scroll padded>
-      <TextField iconLeft={Icons.ticket} value={code} onChangeText={setCode} placeholder="Nhập mã ưu đãi" autoCapitalize="characters" autoCorrect={false} bold />
+      <TextField
+        iconLeft={Icons.ticket}
+        value={code}
+        onChangeText={(t) => {
+          setCode(t);
+          if (error) setError(null);
+        }}
+        placeholder="Nhập mã ưu đãi"
+        autoCapitalize="characters"
+        autoCorrect={false}
+        bold
+        returnKeyType="done"
+        onSubmitEditing={() => void apply(q)}
+        error={error ?? undefined}
+      />
+      {q.length >= 3 ? (
+        <Button title={`Áp dụng mã ${q}`} onPress={() => void apply(q)} loading={applying === q} style={{ marginTop: Spacing.md }} />
+      ) : null}
 
       {applied ? (
         <View style={styles.applied}>
           <Icon name={Icons.checkCircle} size={18} color={Colors.success} />
           <AppText size={13} style={{ flex: 1, marginLeft: Spacing.sm }}>
-            Đang áp dụng mã {applied.code}
+            Đang áp dụng mã {applied}
           </AppText>
-          <Pressable onPress={() => setOptions({ promo: null })} hitSlop={8}>
+          <Pressable onPress={removeCoupon} hitSlop={8}>
             <AppText size={13} weight="semiBold" color={Colors.primary}>
               Bỏ mã
             </AppText>
@@ -37,36 +98,46 @@ export default function PromoScreen() {
         </View>
       ) : null}
 
-      {found.length === 0 ? (
+      {coupons === null && !loadError ? (
+        <ActivityIndicator color={Colors.primary} style={{ marginTop: Spacing['2xl'] }} />
+      ) : loadError ? (
+        <AppText size={14} color={Colors.error} align="center" style={{ marginTop: Spacing['2xl'] }}>
+          {loadError}
+        </AppText>
+      ) : list.length === 0 ? (
         <View style={styles.empty}>
           <AppText size={17} color={Colors.textSecondary} align="center" style={{ lineHeight: 26 }}>
-            Chúng tôi không tìm thấy mã ưu đãi nào. Hay thử nhập mã ưu đãi
+            {coupons?.length ? 'Không có mã nào khớp. Bạn vẫn có thể nhập mã và bấm Áp dụng.' : 'Hiện chưa có mã ưu đãi dành cho bạn. Có mã từ chương trình khuyến mãi? Nhập mã ở ô trên.'}
           </AppText>
         </View>
       ) : (
         <View style={{ marginTop: Spacing.lg }}>
           <AppText size={13} color={Colors.textSecondary}>
-            Tìm thấy {found.length} mã khuyến mãi
+            {list.length} mã khuyến mãi dành cho bạn
           </AppText>
-          {found.map((p) => (
-            <Pressable key={p.code} onPress={() => apply(p)} style={styles.row}>
-              <View style={styles.ticket}>
-                <Icon name={Icons.ticket} size={22} color={Colors.primary} />
-              </View>
-              <View style={{ flex: 1, marginLeft: Spacing.md }}>
-                <AppText weight="bold" size={15}>
-                  {p.title}
-                </AppText>
-                <AppText size={12} color={Colors.textSecondary}>
-                  {p.description}
-                </AppText>
-                <AppText size={11} weight="semiBold" color={Colors.primary} style={{ marginTop: 2 }}>
-                  Sử dụng ngay
-                </AppText>
-              </View>
-              <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
-            </Pressable>
-          ))}
+          {list.map((c) => {
+            const usable = appliesHere(c);
+            return (
+              <Pressable key={c.code} onPress={() => usable && void apply(c.code)} disabled={!usable} style={[styles.row, !usable && { opacity: 0.5 }]}>
+                <View style={styles.ticket}>
+                  <Icon name={Icons.ticket} size={22} color={Colors.primary} />
+                </View>
+                <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                  <AppText weight="bold" size={15}>
+                    {c.code} · {couponTitle(c)}
+                  </AppText>
+                  <AppText size={12} color={Colors.textSecondary}>
+                    {c.name}
+                    {couponSub(c) ? ` · ${couponSub(c)}` : ''}
+                  </AppText>
+                  <AppText size={11} weight="semiBold" color={usable ? Colors.primary : Colors.textMuted} style={{ marginTop: 2 }}>
+                    {usable ? 'Sử dụng ngay' : `Chỉ áp dụng cho ${c.services.map((s) => s.name).join(', ')}`}
+                  </AppText>
+                </View>
+                {applying === c.code ? <ActivityIndicator size="small" color={Colors.primary} /> : <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />}
+              </Pressable>
+            );
+          })}
         </View>
       )}
     </Screen>

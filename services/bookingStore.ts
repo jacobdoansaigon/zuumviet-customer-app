@@ -1,33 +1,17 @@
-// services/bookingStore.ts — store nhỏ trong bộ nhớ cho luồng đặt hàng (module state + useSyncExternalStore).
-// Giữ bản nháp đơn giữa các bước: chọn dịch vụ → người gửi → người nhận → xác nhận → theo dõi.
-// - buildOrderPayload(): dựng body cho orderApi.createOrder theo Controller\Site\DeliveryOrders::add (zv-delivery);
-//   service_id lấy từ catalog thật (services/serviceCatalog.ts), không dùng id tạm trong mockBooking.
-// - refreshQuote(): POST /drymode để lấy giá + km BE tính (giá hiển thị ở màn xác nhận là giá BE, giá app chỉ là ước tính).
-// - submitBooking(): createOrder → startDriverSearch (BE chỉ tìm tài xế khi có process). Lỗi → ném ra cho màn hình
-//   báo, KHÔNG còn âm thầm tạo đơn mock (đơn mock chỉ dùng cho demo/QA qua createDemoOrder).
+// services/bookingStore.ts — bản nháp đơn trong bộ nhớ cho luồng đặt (module state + useSyncExternalStore):
+// chọn dịch vụ (catalog thật) → người gửi / điểm đón → người nhận / điểm đến → xác nhận → tạo đơn.
+// - Báo giá: POST /v1/customer/quotes (giá + quãng đường do server tính, có hạn `expiresAt`) — giá trên danh sách
+//   chọn dịch vụ chỉ là ước tính từ bảng giá catalog.
+// - Tạo đơn: POST /v1/customer/orders {quoteId, paymentMethod, pickup/stops (liên hệ + ghi chú theo đúng thứ tự
+//   điểm trong báo giá), note}. Server tự chuyển "đang tìm tài xế" / "đã hẹn giờ" — app không gọi thêm bước nào.
+// - Chi tiết không có trường riêng trên API (tầng lầu/đóng gói khi dọn nhà, mô tả sự cố gọi thợ, bốc xếp vận tải,
+//   tuỳ chọn xem hàng) được ghi vào ghi chú đơn / ghi chú điểm, KHÔNG cộng giá trên app.
 import { useSyncExternalStore } from 'react';
-import { orderApi, ORDER_STATUS, PROCESS_STATUS, getStoredCustomer, type DeliveryOrder } from '@/services/api';
-import { ensureServiceCatalog, findOptionByServiceId, resolveServiceId, serviceNameById } from '@/services/serviceCatalog';
-import {
-  SERVICE_GROUPS,
-  SERVICE_KEYS,
-  EXTRA_PRICES,
-  DEFAULT_SENDER_PLACE,
-  MOCK_DRIVER,
-  FAVORITE_DRIVERS,
-  PACKAGE_SIZES,
-  FREIGHT_WEIGHTS,
-  MOVING_BULKY_ITEMS,
-  SAMPLE_PLACES,
-  HCM_CENTER,
-  type ServiceKey,
-  type ServiceOptionDef,
-  type PackageSizeId,
-  type ViewOptionId,
-  type PromoDef,
-  type DriverDef,
-  type SamplePlace,
-} from '@/constants/mockBooking';
+import { findService, optionsFor, estimatePrice, type CatalogService, type ServiceOptionView } from '@/services/catalog';
+import { getProfile, localPhone } from '@/services/session';
+import { reversePlace } from '@/services/places';
+import { api, errorMessage, isApiError, onSessionChange, ZuumApiError, type ZuumResponse, type ZuumRoutes } from '@/services/zuum';
+import { MOVING_BULKY_ITEMS, SERVICE_GROUPS, TIP_STEP, type ServiceKey, type ViewOptionId } from '@/constants/booking';
 
 // ---------------------------------------------------------------- Kiểu dữ liệu
 export interface Place {
@@ -35,10 +19,10 @@ export interface Place {
   address: string;
   lat: number;
   lng: number;
-  savedLocationId?: number;
   placeId?: string;
-  /** 'default' = địa chỉ mẫu chưa có GPS thật */
-  source?: 'default' | 'gps' | 'search' | 'saved';
+  savedAddressId?: string;
+  /** gps: vị trí hiện tại · search: gợi ý tìm kiếm · saved: vị trí đã lưu · map: ghim bản đồ · history: đơn cũ */
+  source: 'gps' | 'search' | 'saved' | 'map' | 'history';
 }
 
 export interface Sender {
@@ -54,10 +38,10 @@ export interface Receiver {
   place: Place | null;
   cod: number;
   note: string;
-  packageSize: PackageSizeId;
+  /** id mức cân nặng trong catalog của dịch vụ đang chọn (null = mức nhẹ nhất) */
+  weightTierId: string | null;
   viewOption: ViewOptionId;
-  handDelivery: boolean;
-  /** Vận tải: hàng lớn/nặng cần thêm nhân công bốc xếp lên/xuống (tính thêm phí) */
+  /** Vận tải: hàng lớn/nặng cần người bốc xếp — ghi vào ghi chú điểm (API chưa có phụ phí riêng) */
   needsLoadingHelp: boolean;
 }
 
@@ -65,141 +49,67 @@ export type PaymentMethod = 'cash' | 'wallet';
 
 export interface BookingOptions {
   returnToPickup: boolean;
-  handToCustomer: number;
+  /** số lần × TIP_STEP */
   tip: number;
   /** epoch ms; null = "Bây giờ" */
   scheduledAt: number | null;
-  /** epoch ms giờ về (chỉ Xe đường dài — Thuê cả xe khứ hồi); null = một chiều */
-  returnAt: number | null;
-  /** chỉ có ý nghĩa khi returnAt khác null: xe/tài xế có ở lại phục vụ suốt hành trình (đón chiều về) hay không */
-  waitForReturn: boolean;
-  assignedDrivers: number[];
   note: string;
-  promo: PromoDef | null;
+  /** mã giảm giá đã áp (server kiểm tra khi báo giá) */
+  couponCode: string | null;
   paymentMethod: PaymentMethod;
-  /** Thuê nhân công: số block thời gian làm việc đã chọn cho hạng mục đang chọn (xem ServiceOptionDef.blockHours) */
+  /** dịch vụ cộng thêm (addons của catalog) */
+  addonIds: string[];
+  /** Thuê nhân công (tính theo block giờ): số block đã chọn → durationMinutes */
   laborBlocks: number;
-  /** Thuê nhân công: số nhân công đã chọn (từ người thứ 2 giảm EXTRA_PRICES.laborGroupDiscountPercent) */
-  laborWorkers: number;
-  /** Dọn nhà: tầng của nhà/căn hộ CŨ (điểm đi) — 0 = tầng trệt; có thang máy hay không (đủ tầng thì miễn phí) */
+  /** Dọn nhà: tầng/thang máy 2 đầu + đóng gói / tháo lắp / đồ đặc biệt (ghi chú đơn) */
   movingFloorFrom: number;
   movingElevatorFrom: boolean;
-  /** Dọn nhà: tầng của nhà/căn hộ MỚI (điểm đến) */
   movingFloorTo: number;
   movingElevatorTo: boolean;
-  /** Dọn nhà: cần đóng gói (thùng carton, bọc đồ dễ vỡ) / tháo lắp nội thất (giường, tủ, máy lạnh...) */
   movingPacking: boolean;
   movingDisassembly: boolean;
-  /** Dọn nhà: id các đồ đặc biệt cần báo trước cho đội bốc xếp (xem MOVING_BULKY_ITEMS) */
   movingBulkyItems: string[];
-  /** Gọi thợ: mô tả sự cố cần sửa — hỏi ngay từ màn Thông tin liên hệ, không đợi tới bước Ghi chú cuối cùng */
+  /** Gọi thợ: mô tả sự cố + yêu cầu khẩn cấp (ghi chú đơn) */
   handymanIssueNote: string;
-  /** Gọi thợ: ảnh hiện trạng đính kèm (uri cục bộ trên máy — BE chưa có API upload ảnh, xem buildOrderPayload) */
-  handymanPhotos: string[];
-  /** Gọi thợ: xử lý khẩn cấp, ưu tiên điều thợ ngay kể cả ngoài giờ (tính thêm EXTRA_PRICES.urgentCallout) */
   handymanUrgent: boolean;
 }
 
-export type StopStatus = 'new' | 'picking' | 'picked' | 'delivering' | 'completed' | 'failed' | 'returned';
+export type Quote = ZuumResponse<'POST /v1/customer/quotes'>;
+export type QuoteRequest = ZuumRoutes['POST /v1/customer/quotes']['body'];
+export type CreatedOrder = ZuumResponse<'POST /v1/customer/orders'>;
 
-export interface TrackedStop {
-  name: string;
-  phone: string;
-  address: string;
-  lat: number;
-  lng: number;
-  status: StopStatus;
-}
-
-/** Đơn đã chuẩn hoá cho màn theo dõi (từ API hoặc mock) */
-export interface TrackedOrder {
-  id: string;
-  code: string;
-  status: number;
-  service: ServiceKey;
-  optionId: string;
-  serviceName: string;
-  serviceDescription: string;
-  scheduledAt: number | null;
-  returnAt: number | null;
-  waitForReturn: boolean;
-  distanceKm: number;
-  promoLabel: string | null;
-  paymentMethod: PaymentMethod;
-  note: string;
-  pickup: TrackedStop;
-  stops: TrackedStop[];
-  driver: DriverDef | null;
-  total: number;
-  original: number;
-  etaMinutes: number;
-  createdAt: number;
-  isMock: boolean;
-  /**
-   * Đơn thật: đợt tìm tài xế gần nhất đã hết hạn mà chưa ai nhận (process COMPLETED/CANCELLED + quá date_expired,
-   * đơn vẫn ASSIGNING). BE không tự chuyển FAIL với điều phối thủ công nên app phải tự suy ra để hiện "Không tìm thấy".
-   */
-  searchExpired?: boolean;
-}
-
-/** Giá BE tính qua POST /site/deliveryorders/drymode cho bản nháp hiện tại */
+/** Báo giá của server cho bản nháp hiện tại */
 export interface ServerQuote {
   status: 'idle' | 'loading' | 'ready' | 'error';
-  total: number;
-  /** giá dịch vụ trước giảm giá (price_final_detail.price_service) */
-  original: number;
-  distanceKm: number;
-  error: string | null;
-  /** chữ ký bản nháp lúc báo giá — khác với hiện tại nghĩa là giá đã cũ */
+  /** chữ ký yêu cầu báo giá — khác bản nháp hiện tại nghĩa là giá đã cũ */
   key: string;
+  quote: Quote | null;
+  error: string | null;
+  errorCode: string | null;
 }
 
 export interface BookingState {
   service: ServiceKey;
+  /** id dịch vụ catalog đang chọn ('' khi catalog chưa tải) */
   optionId: string;
   sender: Sender;
   receivers: Receiver[];
   options: BookingOptions;
-  /** đơn mock + snapshot đơn thật vừa tạo (key = orderId) */
-  orders: Record<string, TrackedOrder>;
   quote: ServerQuote;
 }
-
-export interface PriceLine {
-  label: string;
-  amount: number;
-}
-export interface PriceSummary {
-  base: number;
-  lines: PriceLine[];
-  subtotal: number;
-  discount: number;
-  total: number;
-  distanceKm: number;
-}
-
-export type TrackingPhase = 'scheduled' | 'searching' | 'notfound' | 'accepted' | 'delivering' | 'completed' | 'cancelled';
 
 // ---------------------------------------------------------------- Store
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
-export function placeFromSample(p: SamplePlace, source: Place['source'] = 'search'): Place {
-  return { title: p.title, address: p.address, lat: p.lat, lng: p.lng, savedLocationId: p.savedLocationId, placeId: p.id, source };
-}
-
 const defaultOptions = (): BookingOptions => ({
   returnToPickup: false,
-  handToCustomer: 0,
   tip: 0,
   scheduledAt: null,
-  returnAt: null,
-  waitForReturn: true,
-  assignedDrivers: [],
   note: '',
-  promo: null,
+  couponCode: null,
   paymentMethod: 'cash',
+  addonIds: [],
   laborBlocks: 1,
-  laborWorkers: 1,
   movingFloorFrom: 0,
   movingElevatorFrom: false,
   movingFloorTo: 0,
@@ -208,7 +118,6 @@ const defaultOptions = (): BookingOptions => ({
   movingDisassembly: false,
   movingBulkyItems: [],
   handymanIssueNote: '',
-  handymanPhotos: [],
   handymanUrgent: false,
 });
 
@@ -219,24 +128,25 @@ const emptyReceiver = (): Receiver => ({
   place: null,
   cod: 0,
   note: '',
-  packageSize: 's',
+  weightTierId: null,
   viewOption: 'view',
-  handDelivery: false,
   needsLoadingHelp: false,
 });
 
-const firstOptionId = (service: ServiceKey) => SERVICE_GROUPS[service].options[0]!.id;
+const idleQuote = (): ServerQuote => ({ status: 'idle', key: '', quote: null, error: null, errorCode: null });
 
-const idleQuote = (): ServerQuote => ({ status: 'idle', total: 0, original: 0, distanceKm: 0, error: null, key: '' });
+function firstOptionId(service: ServiceKey): string {
+  const opts = optionsFor(service);
+  return (opts.find((o) => !o.paused) ?? opts[0])?.id ?? '';
+}
 
 function createInitialState(service: ServiceKey): BookingState {
   return {
     service,
     optionId: firstOptionId(service),
-    sender: { name: '', phone: '', place: placeFromSample(DEFAULT_SENDER_PLACE, 'default') },
+    sender: { name: '', phone: '', place: null },
     receivers: [],
     options: defaultOptions(),
-    orders: {},
     quote: idleQuote(),
   };
 }
@@ -267,51 +177,43 @@ export function useBooking(): BookingState {
 }
 export const getBookingState = () => state;
 
+// đăng xuất / hết phiên: bỏ bản nháp (có tên/SĐT/địa chỉ của người trước)
+onSessionChange((event) => {
+  if (event !== 'login') state = createInitialState('delivery');
+});
+
 // ---------------------------------------------------------------- Actions: dịch vụ / người gửi
 export function startBooking(service: ServiceKey) {
-  if (state.service === service) return;
-  update({ service, optionId: firstOptionId(service), receivers: [], options: defaultOptions() });
+  if (state.service === service && state.optionId) return;
+  update({ service, optionId: firstOptionId(service), receivers: state.service === service ? state.receivers : [], options: defaultOptions(), quote: idleQuote() });
 }
 
-export function selectOption(optionId: string) {
-  if (state.optionId !== optionId) update({ optionId });
+/** Catalog vừa tải xong / đổi → bảo đảm đang chọn 1 dịch vụ có thật trong nhóm */
+export function syncOptionWithCatalog() {
+  const opts = optionsFor(state.service);
+  if (!opts.length) return;
+  if (!opts.some((o) => o.id === state.optionId)) update({ optionId: firstOptionId(state.service) });
 }
 
-/**
- * Đổi loại xe ngay trong màn đặt (vd Xe máy ⇄ Xe hơi, xem URBAN_RIDE_KEYS) mà không reset
- * điểm đón/điểm đến — khác startBooking() vốn dùng khi bắt đầu luồng đặt mới từ Home.
- */
+/** Đổi dịch vụ ngay trong màn đặt (vd Xe máy ⇄ Xe hơi) mà không reset điểm đón/điểm đến */
 export function switchRideOption(service: ServiceKey, optionId: string) {
   if (state.service === service && state.optionId === optionId) return;
-  update({ service, optionId });
+  update((s) => ({ service, optionId, options: { ...s.options, addonIds: [] } }));
 }
 
-/**
- * Thuê nhân công: chọn hạng mục kèm số block thời gian làm việc (vd 2 block × 4 giờ = 8 giờ) và số
- * nhân công (xem ServiceOptionDef.blockHours/maxBlocks/maxWorkers). Dùng khi xác nhận từ dialog
- * "Thông tin dịch vụ" thay vì switchRideOption() vì cần lưu thêm 2 lựa chọn này.
- */
-export function selectLaborOption(service: ServiceKey, optionId: string, blocks: number, workers: number = 1) {
-  update((s) => ({
-    service,
-    optionId,
-    options: { ...s.options, laborBlocks: Math.max(1, Math.round(blocks) || 1), laborWorkers: Math.max(1, Math.round(workers) || 1) },
-  }));
+/** Thuê nhân công: chọn hạng mục kèm số block thời gian làm việc */
+export function selectLaborOption(service: ServiceKey, optionId: string, blocks: number) {
+  update((s) => ({ service, optionId, options: { ...s.options, addonIds: [], laborBlocks: Math.max(1, Math.round(blocks) || 1) } }));
 }
 
 /** Điền tên/SĐT người gửi từ hồ sơ đã đăng nhập (chỉ khi còn trống) */
 export async function hydrateSender() {
   if (state.sender.name && state.sender.phone) return;
-  try {
-    const c = await getStoredCustomer();
-    if (!c) return;
-    const name = String(c.full_name ?? c.fullname ?? '').trim();
-    let phone = String(c.phone ?? '').replace(/\D/g, '');
-    if (phone.length === 9) phone = `0${phone}`;
-    update((s) => ({ sender: { ...s.sender, name: s.sender.name || name, phone: s.sender.phone || phone } }));
-  } catch {
-    /* giữ trống — người dùng tự nhập */
-  }
+  const p = await getProfile();
+  if (!p) return;
+  const name = p.fullName.trim();
+  const phone = localPhone(p.phone);
+  update((s) => ({ sender: { ...s.sender, name: s.sender.name || name, phone: s.sender.phone || phone } }));
 }
 
 export function setSenderInfo(info: { name?: string; phone?: string }) {
@@ -322,28 +224,27 @@ export function setSenderPlace(place: Place) {
   update((s) => ({ sender: { ...s.sender, place } }));
 }
 
-/**
- * Điền sẵn lộ trình từ gợi ý / hoạt động gần đây (id SamplePlace).
- * Chở khách: điểm đến lấy tên/SĐT của người đặt; giao hàng: người dùng bổ sung thông tin người nhận.
- */
-export function prefillRoute(fromId?: string, toId?: string) {
-  const from = fromId ? SAMPLE_PLACES.find((p) => p.id === fromId) : undefined;
-  const to = toId ? SAMPLE_PLACES.find((p) => p.id === toId) : undefined;
-  if (!from && !to) return;
-  const isRide = SERVICE_GROUPS[state.service].kind !== 'delivery';
-  update((s) => ({
-    sender: from ? { ...s.sender, place: placeFromSample(from, 'saved') } : s.sender,
-    receivers: to
-      ? [{ ...emptyReceiver(), place: placeFromSample(to, 'saved'), name: isRide ? s.sender.name : '', phone: isRide ? s.sender.phone : '' }]
-      : s.receivers,
-  }));
+/** Chưa có điểm đón: lấy vị trí GPS hiện tại, đổi ra địa chỉ chữ qua API (lỗi thì để khách tự chọn) */
+export async function pickupFromGps(lat: number, lng: number) {
+  if (state.sender.place) return;
+  try {
+    const p = await reversePlace(lat, lng);
+    if (state.sender.place) return;
+    setSenderPlace({ title: p.name ?? 'Vị trí hiện tại', address: p.address, lat: p.lat, lng: p.lng, placeId: p.placeId, source: 'gps' });
+  } catch {
+    /* giữ trống — khách tự chọn điểm đón */
+  }
 }
 
-/** GPS thật về → thay toạ độ cho địa chỉ mẫu mặc định */
-export function applyGpsToDefaultPlace(lat: number, lng: number) {
-  const p = state.sender.place;
-  if (!p || p.source !== 'default') return;
-  update((s) => ({ sender: { ...s.sender, place: { ...p, lat, lng, source: 'gps' } } }));
+/** "Đặt lại" từ đơn cũ: điền sẵn điểm đón + các điểm đến (toạ độ thật của đơn) */
+export function prefillRoute(pickup: Place | null, stops: Place[]) {
+  const isRide = SERVICE_GROUPS[state.service].kind !== 'delivery';
+  update((s) => ({
+    sender: pickup ? { ...s.sender, place: pickup } : s.sender,
+    receivers: stops.length
+      ? stops.map((place) => ({ ...emptyReceiver(), place, name: isRide ? s.sender.name : '', phone: isRide ? s.sender.phone : '' }))
+      : s.receivers,
+  }));
 }
 
 // ---------------------------------------------------------------- Actions: người nhận
@@ -354,8 +255,7 @@ export function addReceiver(): number {
 }
 
 export function ensureReceiver(index: number) {
-  if (index < 0) return;
-  if (state.receivers[index]) return;
+  if (index < 0 || state.receivers[index]) return;
   const next = [...state.receivers];
   while (next.length <= index) next.push(emptyReceiver());
   update({ receivers: next });
@@ -374,17 +274,17 @@ export function removeReceiver(index: number) {
   update((s) => ({ receivers: s.receivers.filter((_, i) => i !== index) }));
 }
 
-export function isReceiverComplete(r: Receiver): boolean {
+export function isReceiverComplete(r: Receiver, s: BookingState = state): boolean {
   if (!r.place) return false;
-  // Chở khách / gọi thợ: điểm đến chỉ cần địa chỉ (tên & SĐT mặc định lấy của người đặt)
-  if (SERVICE_GROUPS[state.service].kind !== 'delivery') return true;
-  return r.name.trim().length > 0 && r.phone.replace(/\D/g, '').length >= 9;
+  // Chở khách: điểm đến chỉ cần địa chỉ (tên & SĐT mặc định của người đặt)
+  if (SERVICE_GROUPS[s.service].kind !== 'delivery') return true;
+  return r.name.trim().length > 0 && isValidPhoneVn(r.phone);
 }
 
 /** Bỏ các người nhận bỏ dở (quay lại màn đặt mà chưa điền xong) */
 export function pruneIncompleteReceivers() {
-  if (state.receivers.every(isReceiverComplete)) return;
-  update((s) => ({ receivers: s.receivers.filter(isReceiverComplete) }));
+  if (state.receivers.every((r) => isReceiverComplete(r))) return;
+  update((s) => ({ receivers: s.receivers.filter((r) => isReceiverComplete(r, s)) }));
 }
 
 export function setOptions(patch: Partial<BookingOptions>) {
@@ -396,17 +296,25 @@ export function resetDraft() {
   update({ receivers: [], options: defaultOptions(), quote: idleQuote() });
 }
 
-// ---------------------------------------------------------------- Giá & khoảng cách
-export function getOption(s: BookingState = state, optionId?: string): ServiceOptionDef {
-  const id = optionId ?? s.optionId;
-  // ID duy nhất trên toàn bộ app → tìm xuyên nhóm để giá xem trước đúng khi các nhóm
-  // được gộp chung 1 danh sách (vd Xe máy ⇄ Xe hơi, xem switchRideOption/URBAN_RIDE_KEYS)
-  for (const key of SERVICE_KEYS) {
-    const found = SERVICE_GROUPS[key].options.find((o) => o.id === id);
-    if (found) return found;
-  }
-  const opts = SERVICE_GROUPS[s.service].options;
-  return opts[0]!;
+// ---------------------------------------------------------------- Dịch vụ đang chọn
+export function getSelectedService(s: BookingState = state): CatalogService | null {
+  return findService(s.optionId);
+}
+
+/** Số điểm đến tối đa của dịch vụ đang chọn (0 = dịch vụ tận nơi) */
+export function maxStopsOf(s: BookingState = state): number {
+  return getSelectedService(s)?.rules.maxStops ?? SERVICE_GROUPS[s.service].maxStops;
+}
+
+export function completeReceivers(s: BookingState = state): Receiver[] {
+  return s.receivers.filter((r) => isReceiverComplete(r, s));
+}
+
+/** Bản nháp đủ dữ liệu để báo giá (có dịch vụ, điểm đón + ít nhất 1 điểm đến nếu dịch vụ có điểm đến) */
+export function isDraftReady(s: BookingState = state): boolean {
+  if (!s.sender.place || !getSelectedService(s)) return false;
+  if (maxStopsOf(s) === 0) return true;
+  return completeReceivers(s).length > 0;
 }
 
 export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
@@ -419,10 +327,10 @@ export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; l
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-/** Tổng quãng đường theo thứ tự điểm (ước lượng đường chim bay ×1.3) */
+/** Quãng đường ƯỚC LƯỢNG theo thứ tự điểm (đường chim bay ×1.3) — chỉ để ước tính giá trên danh sách */
 export function routeDistanceKm(s: BookingState = state): number {
   const pickup = s.sender.place;
-  const stops = s.receivers.filter(isReceiverComplete).map((r) => r.place!);
+  const stops = completeReceivers(s).map((r) => r.place!);
   if (!pickup || stops.length === 0) return 0;
   let km = 0;
   let prev: { lat: number; lng: number } = pickup;
@@ -434,205 +342,52 @@ export function routeDistanceKm(s: BookingState = state): number {
   return Math.round(km * 1.3 * 10) / 10;
 }
 
-export function computePrice(s: BookingState = state, optionId?: string): PriceSummary {
-  const opt = getOption(s, optionId);
-  const id = optionId ?? s.optionId;
-  const distanceKm = routeDistanceKm(s);
-  const stops = s.receivers.filter(isReceiverComplete);
-  const extraKm = Math.max(0, Math.ceil(distanceKm) - opt.includedKm);
-  const extraStops = Math.max(0, stops.length - 1);
-  const base = opt.basePrice + extraKm * opt.perKmPrice + extraStops * opt.extraStopPrice;
-
-  const lines: PriceLine[] = [{ label: SERVICE_GROUPS[s.service].labels.feeLabel, amount: base }];
-  // Thuê nhân công: thời gian làm việc chọn theo block (opt.blockHours) — chỉ áp giá nhiều block cho
-  // ĐÚNG hạng mục đang được chọn; các hạng mục khác trong danh sách vẫn xem giá khởi điểm (1 block).
-  const isSelectedLabor = s.service === 'labor' && id === s.optionId;
-  const laborBlocks = isSelectedLabor ? Math.max(1, s.options.laborBlocks || 1) : 1;
-  if (laborBlocks > 1) {
-    lines.push({ label: `Thêm ${laborBlocks - 1} block (${(laborBlocks - 1) * (opt.blockHours ?? 0)} giờ)`, amount: base * (laborBlocks - 1) });
-  }
-  // Thuê nhân công: mỗi nhân công thêm từ người thứ 2 làm đủ số block như người đầu, được giảm giá
-  // (đúng lời hứa "Nhóm từ 2 người: giảm X%/người" đã ghi sẵn ở infoLines từng hạng mục).
-  const laborWorkers = isSelectedLabor ? Math.max(1, s.options.laborWorkers || 1) : 1;
-  if (laborWorkers > 1) {
-    const perWorker = base * laborBlocks;
-    const extraWorkers = laborWorkers - 1;
-    const discounted = Math.round(perWorker * (1 - EXTRA_PRICES.laborGroupDiscountPercent / 100));
-    lines.push({ label: `Thêm ${extraWorkers} nhân công (giảm ${EXTRA_PRICES.laborGroupDiscountPercent}%/người)`, amount: discounted * extraWorkers });
-  }
-  // Gọi thợ: phụ phí xử lý khẩn cấp, công khai ngay khi khách chọn (không phát sinh ẩn sau khảo sát)
-  if (s.service === 'handyman' && s.options.handymanUrgent) {
-    lines.push({ label: 'Xử lý khẩn cấp', amount: EXTRA_PRICES.urgentCallout });
-  }
-  const handDelivery = stops.filter((r) => r.handDelivery).length * EXTRA_PRICES.handDelivery;
-  if (handDelivery) lines.push({ label: 'Giao hàng tận tay', amount: handDelivery });
-  const loadingHelp = stops.filter((r) => r.needsLoadingHelp).length * EXTRA_PRICES.loadingHelp;
-  if (loadingHelp) lines.push({ label: 'Nhân công bốc xếp', amount: loadingHelp });
-  // Dọn nhà: phụ phí tầng lầu (mỗi đầu tính riêng, tầng trệt/tầng 1 miễn phí, có thang máy thì luôn miễn phí)
-  // + đóng gói + tháo lắp nội thất — không áp cho Giao hàng/Vận tải/dịch vụ khác.
-  if (s.service === 'rental') {
-    const extraFloorsFrom = s.options.movingElevatorFrom ? 0 : Math.max(0, s.options.movingFloorFrom - 1);
-    const extraFloorsTo = s.options.movingElevatorTo ? 0 : Math.max(0, s.options.movingFloorTo - 1);
-    const floorFee = (extraFloorsFrom + extraFloorsTo) * EXTRA_PRICES.movingFloorFee;
-    if (floorFee) lines.push({ label: 'Phụ phí tầng lầu (không thang máy)', amount: floorFee });
-    if (s.options.movingPacking) lines.push({ label: 'Đóng gói đồ đạc', amount: EXTRA_PRICES.movingPacking });
-    if (s.options.movingDisassembly) lines.push({ label: 'Tháo lắp nội thất', amount: EXTRA_PRICES.movingDisassembly });
-  }
-  if (s.options.returnToPickup) lines.push({ label: 'Quay lại điểm giao hàng', amount: EXTRA_PRICES.returnToPickup });
-  if (s.options.handToCustomer) lines.push({ label: 'Gửi tận tay khách hàng', amount: s.options.handToCustomer * EXTRA_PRICES.handToCustomer });
-  if (s.options.tip) lines.push({ label: 'Tiền tip', amount: s.options.tip * EXTRA_PRICES.tip });
-
-  const subtotal = lines.reduce((sum, l) => sum + l.amount, 0);
-  let discount = 0;
-  const promo = s.options.promo;
-  if (promo) {
-    if (promo.percent) discount = Math.round((subtotal * promo.percent) / 100);
-    else if (promo.amount) discount = promo.amount;
-    if (promo.maxDiscount) discount = Math.min(discount, promo.maxDiscount);
-    discount = Math.min(discount, subtotal);
-  }
-  return { base, lines, subtotal, discount, total: Math.max(0, subtotal - discount), distanceKm };
+function resolveWeightTier(tierId: string | null, svc: CatalogService): string | null {
+  if (!tierId || !svc.weightTiers.length) return null;
+  if (svc.weightTiers.some((t) => t.id === tierId)) return tierId;
+  return null;
 }
 
-export function promoLabel(promo: PromoDef | null): string | null {
-  if (!promo) return null;
-  if (promo.percent) return `Giảm ${promo.percent}%`;
-  if (promo.amount) return `Giảm ${formatVnd(promo.amount)}`;
-  return `Mã ${promo.code}`;
+/** Giá ước tính (catalog) cho 1 lựa chọn dịch vụ với lộ trình hiện tại */
+export function estimateFor(option: ServiceOptionView, s: BookingState = state): number {
+  const svc = option.service;
+  const stops = completeReceivers(s);
+  const weightSurcharge = stops.reduce((sum, r) => sum + (svc.weightTiers.find((t) => t.id === r.weightTierId)?.surcharge ?? 0), 0);
+  const blocks = option.id === s.optionId ? s.options.laborBlocks : 1;
+  return estimatePrice(svc, {
+    distanceMeters: routeDistanceKm(s) * 1000,
+    stopCount: Math.max(1, stops.length),
+    durationMinutes: option.blockMinutes ? option.blockMinutes * blocks : null,
+    weightSurcharge,
+  });
 }
 
-/** Dọn nhà: gộp tầng lầu/thang máy 2 đầu + đóng gói + tháo lắp + đồ đặc biệt thành 1 dòng ghi chú cho đơn */
-function movingNote(s: BookingState): string {
-  const o = s.options;
-  const floorText = (label: string, floor: number, elevator: boolean) =>
-    floor > 0 ? `${label}: tầng ${floor}${elevator ? ' (có thang máy)' : ' (không thang máy)'}` : '';
-  const items = o.movingBulkyItems.map((id) => MOVING_BULKY_ITEMS.find((i) => i.id === id)?.label).filter(Boolean);
-  return [
-    floorText('Nhà cũ', o.movingFloorFrom, o.movingElevatorFrom),
-    floorText('Nhà mới', o.movingFloorTo, o.movingElevatorTo),
-    o.movingPacking ? 'Cần đóng gói đồ đạc' : '',
-    o.movingDisassembly ? 'Cần tháo lắp nội thất' : '',
-    items.length ? `Đồ đặc biệt: ${items.join(', ')}` : '',
-  ]
-    .filter(Boolean)
-    .join(' · ');
-}
-
-/** Gọi thợ: gộp mô tả sự cố + số ảnh đính kèm + mức độ khẩn cấp thành 1 dòng ghi chú cho đơn */
-function handymanNote(s: BookingState): string {
-  const o = s.options;
-  return [
-    o.handymanIssueNote.trim() ? `Sự cố: ${o.handymanIssueNote.trim()}` : '',
-    // Ảnh chỉ lưu cục bộ trên máy khách (uri file:// / blob:) — BE chưa có API upload ảnh nên KHÔNG gửi
-    // được ảnh thật lên server, chỉ báo số lượng để thợ biết khách có ảnh, có thể xin gửi qua Zalo/SMS.
-    o.handymanPhotos.length ? `Đã chụp ${o.handymanPhotos.length} ảnh hiện trạng (khách giữ trên máy)` : '',
-    o.handymanUrgent ? 'Yêu cầu xử lý khẩn cấp' : '',
-  ]
-    .filter(Boolean)
-    .join(' · ');
-}
-
-// ---------------------------------------------------------------- Payload BE
-/** Bản nháp đã có đủ dữ liệu để gửi lên BE chưa (có điểm đón + ít nhất 1 điểm đến/điểm tận nơi) */
-export function isDraftReady(s: BookingState = state): boolean {
-  const group = SERVICE_GROUPS[s.service];
-  if (!s.sender.place) return false;
-  if (group.kind === 'onsite') return true;
-  return s.receivers.some(isReceiverComplete);
-}
-
-/**
- * id dịch vụ thật trên BE cho option đang chọn. Ném lỗi rõ ràng khi chưa tải catalog hoặc BE chưa mở dịch vụ
- * (thay vì gửi id tạm trong mockBooking rồi nhận 422 "service not found" khó hiểu).
- */
-export function requireServiceId(s: BookingState = state): number {
-  const opt = getOption(s);
-  const id = resolveServiceId(s.service, opt);
-  if (!id) throw new Error(`Dịch vụ "${opt.name}" chưa được mở trên hệ thống. Vui lòng chọn dịch vụ khác.`);
-  return id;
-}
-
-/** Body cho POST /site/deliveryorders & /drymode (theo DeliveryOrders::add / addValidate) */
-export function buildOrderPayload(s: BookingState = state, serviceId: number = requireServiceId(s)): Record<string, unknown> {
-  const opt = getOption(s);
-  const group = SERVICE_GROUPS[s.service];
+// ---------------------------------------------------------------- Yêu cầu báo giá / tạo đơn
+/** Body POST /v1/customer/quotes cho bản nháp (null khi chưa đủ dữ liệu) */
+export function buildQuoteRequest(s: BookingState = state, couponCode: string | null = s.options.couponCode): QuoteRequest | null {
+  const svc = getSelectedService(s);
   const pickup = s.sender.place;
-  // Vận tải dùng thang tải trọng riêng (FREIGHT_WEIGHTS) — không tra theo PACKAGE_SIZES của giao hàng nhỏ
-  const isTransport = s.service === 'transport';
-  // Dọn nhà: không có khái niệm "kích cỡ gói hàng" — cả cuộc dọn nhà tính theo gói xe (đã chọn ở optionId)
-  const isRental = s.service === 'rental';
-  const sizeList = isTransport ? FREIGHT_WEIGHTS : PACKAGE_SIZES;
-  let stops = s.receivers.filter(isReceiverComplete);
-  // Dịch vụ tận nơi (gọi thợ): BE bắt buộc có details → dùng chính địa điểm của khách làm điểm đến duy nhất
-  if (group.kind === 'onsite' && stops.length === 0 && pickup) {
-    stops = [{ ...emptyReceiver(), name: s.sender.name, phone: s.sender.phone, place: pickup, viewOption: 'no_view' }];
-  }
-  const pickupDate = s.options.scheduledAt ? Math.floor(s.options.scheduledAt / 1000) : 0;
-  // Đơn hẹn giờ: BE bắt mỗi điểm giao có giờ giao > giờ lấy - 60' và cách điểm trước ≥ 30'
-  // (DeliveryOrderDetail::MAX_MINUTE / GAP_MINUTE_EACH_ITEM) → đặt giờ giao dự kiến tăng dần sau giờ lấy.
-  const wayoutDate = (i: number) => (pickupDate > 0 ? pickupDate + 3600 + i * 1800 : 0);
+  if (!svc || !pickup || !isDraftReady(s)) return null;
+  const o = s.options;
+  const stops = maxStopsOf(s) === 0 ? [] : completeReceivers(s);
+  const blockMinutes = svc.pricing.basis === 'time_block' ? svc.pricing.blockMinutes : 0;
+  const addonIds = o.addonIds.filter((id) => svc.addons.some((a) => a.id === id));
   return {
-    service_id: serviceId,
-    need_return_pickup: s.options.returnToPickup ? 1 : 0,
-    customer_address: pickup?.address ?? '',
-    customer_lat: pickup?.lat ?? 0,
-    customer_long: pickup?.lng ?? 0,
-    pickup_date: pickupDate,
-    pickup_location_id: pickup?.savedLocationId ?? 0,
-    pickup_fullname: s.sender.name,
-    pickup_address: pickup?.address ?? '',
-    pickup_phone: s.sender.phone,
-    pickup_lat: pickup?.lat ?? 0,
-    pickup_long: pickup?.lng ?? 0,
-    pickup_map_place_id: pickup?.placeId ?? '',
-    payment_method: s.options.paymentMethod === 'wallet' ? 1 : 3, // PAYMENT_METHOD_WALLET=1, CASH=3
-    // "Tài xế chỉ định" hiện chọn từ danh sách MẪU (FAVORITE_DRIVERS id 101–104) — gửi lên BE sẽ loại mọi tài xế thật
-    // ("Not in Allow List"). Chỉ gửi khi có id tài xế thật (TODO: màn chọn tài xế yêu thích từ BE).
-    allow_driver_id_list: [] as number[],
-    // Mã khuyến mãi trong app là dữ liệu MẪU; BE từ chối mã không có trong zv-promotion (422 error_coupon_code_invalid)
-    // → không gửi cho tới khi có API mã giảm giá thật.
-    coupon_code: '',
-    price_tip: s.options.tip * EXTRA_PRICES.tip,
-    // Thuê nhân công / Dọn nhà / Gọi thợ: BE chưa có field riêng cho thời gian làm việc theo block,
-    // số nhân công, tầng lầu/đóng gói/tháo lắp/đồ đặc biệt, hay mô tả sự cố/ảnh hiện trạng → ghi vào
-    // note đơn để tài xế/nhân công/thợ biết trước. TODO: chuyển sang field thật khi BE bổ sung.
-    note: [
-      s.options.note,
-      s.service === 'labor' && s.options.laborBlocks > 1 && opt.blockHours
-        ? `Thời gian làm việc: ${s.options.laborBlocks} block (${s.options.laborBlocks * opt.blockHours} giờ)`
-        : '',
-      s.service === 'labor' && s.options.laborWorkers > 1 ? `Số nhân công: ${s.options.laborWorkers}` : '',
-      isRental ? movingNote(s) : '',
-      s.service === 'handyman' ? handymanNote(s) : '',
-    ]
-      .filter(Boolean)
-      .join(' · '),
-    api_metric_place: 1,
-    api_metric_distance_matrix_drymode: 1,
-    details: stops.map((r, i) => ({
-      // Dọn nhà: không có "kích cỡ gói hàng" (cả cuộc dọn nhà tính theo gói xe, không theo từng món đồ)
-      weight_id: isRental ? 0 : (sizeList.find((p) => p.id === r.packageSize)?.weightId ?? 0),
-      // BE bắt buộc tên + SĐT ở mọi điểm đến (kể cả chở khách/thợ, nơi app không hỏi) → lấy của người đặt
-      fullname: r.name.trim() || s.sender.name,
-      phone: r.phone.replace(/\D/g, '') || s.sender.phone.replace(/\D/g, ''),
-      saved_location_id: r.place?.savedLocationId ?? 0,
-      wayout_date_delivered: wayoutDate(i),
-      wayout_address: r.place?.address ?? '',
-      wayout_lat: r.place?.lat ?? 0,
-      wayout_long: r.place?.lng ?? 0,
-      wayout_map_place_id: r.place?.placeId ?? '',
-      cod: r.cod,
-      // Vận tải/Dọn nhà: không có tuỳ chọn "xem hàng" (hàng lớn/cả nhà) → không chèn VIEW_NOTE
-      note:
-        group.kind === 'delivery' && !isTransport && !isRental
-          ? [r.note, VIEW_NOTE[r.viewOption]].filter(Boolean).join(' · ')
-          : isTransport && r.needsLoadingHelp
-            ? [r.note, 'Cần nhân công bốc xếp'].filter(Boolean).join(' · ')
-            : r.note,
-      // TODO: id ServiceAddon "Giao hàng tận tay" / "Bốc xếp" chưa rõ → chưa gửi addon, chỉ tính giá phía app
-      addons: [] as number[],
-      hand_delivery: r.handDelivery ? 1 : 0,
+    serviceId: svc.id,
+    pickup: { lat: pickup.lat, lng: pickup.lng, address: pickup.address },
+    stops: stops.map((r) => ({
+      lat: r.place!.lat,
+      lng: r.place!.lng,
+      address: r.place!.address,
+      codAmount: svc.rules.allowCod ? r.cod : 0,
+      weightTierId: resolveWeightTier(r.weightTierId, svc),
     })),
+    returnToPickup: svc.rules.allowReturnToPickup && o.returnToPickup,
+    scheduledAt: o.scheduledAt ? new Date(o.scheduledAt).toISOString() : null,
+    ...(blockMinutes > 0 ? { durationMinutes: Math.max(1, o.laborBlocks) * blockMinutes } : {}),
+    addonIds,
+    tip: o.tip * TIP_STEP,
+    ...(couponCode ? { couponCode } : {}),
   };
 }
 
@@ -642,391 +397,158 @@ const VIEW_NOTE: Record<ViewOptionId, string> = {
   no_view: 'Không được xem hàng',
 };
 
-// ---------------------------------------------------------------- Báo giá BE (drymode)
-/** Chữ ký các trường ảnh hưởng tới giá — đổi là phải báo giá lại */
-function quoteKey(s: BookingState): string {
-  const o = s.options;
-  return JSON.stringify([
-    s.service,
-    s.optionId,
-    s.sender.place?.lat,
-    s.sender.place?.lng,
-    s.receivers.filter(isReceiverComplete).map((r) => [r.place?.lat, r.place?.lng, r.cod, r.handDelivery, r.needsLoadingHelp, r.packageSize, r.place?.address]),
-    o.returnToPickup,
-    o.tip,
-    o.promo?.code,
-    o.scheduledAt,
-    o.paymentMethod,
+const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+const joinNote = (parts: string[]) => parts.map((p) => p.trim()).filter(Boolean).join(' · ');
+
+/** Dọn nhà: tầng lầu/thang máy 2 đầu + đóng gói + tháo lắp + đồ đặc biệt */
+function movingNote(o: BookingOptions): string {
+  const floorText = (label: string, floor: number, elevator: boolean) =>
+    floor > 0 ? `${label}: tầng ${floor}${elevator ? ' (có thang máy)' : ' (không thang máy)'}` : '';
+  const items = o.movingBulkyItems.map((id) => MOVING_BULKY_ITEMS.find((i) => i.id === id)?.label ?? '').filter(Boolean);
+  return joinNote([
+    floorText('Nhà cũ', o.movingFloorFrom, o.movingElevatorFrom),
+    floorText('Nhà mới', o.movingFloorTo, o.movingElevatorTo),
+    o.movingPacking ? 'Cần đóng gói đồ đạc' : '',
+    o.movingDisassembly ? 'Cần tháo lắp nội thất' : '',
+    items.length ? `Đồ đặc biệt: ${items.join(', ')}` : '',
   ]);
+}
+
+/** Gọi thợ: mô tả sự cố + khẩn cấp */
+function handymanNote(o: BookingOptions): string {
+  return joinNote([o.handymanIssueNote.trim() ? `Sự cố: ${o.handymanIssueNote.trim()}` : '', o.handymanUrgent ? 'Yêu cầu xử lý khẩn cấp' : '']);
+}
+
+/** Body POST /v1/customer/orders */
+export function buildOrderBody(s: BookingState, quoteId: string): ZuumRoutes['POST /v1/customer/orders']['body'] {
+  const group = SERVICE_GROUPS[s.service];
+  const o = s.options;
+  const isDelivery = group.kind === 'delivery';
+  const stops = maxStopsOf(s) === 0 ? [] : completeReceivers(s);
+  const contactPhone = (p: string) => (isValidPhoneVn(p) ? p.replace(/[\s.-]/g, '') : undefined);
+  return {
+    quoteId,
+    paymentMethod: o.paymentMethod,
+    pickup: {
+      contactName: s.sender.name.trim() || undefined,
+      contactPhone: contactPhone(s.sender.phone),
+    },
+    // Giao hàng / dọn nhà / vận tải: liên hệ + ghi chú từng điểm; chở khách: không có người nhận riêng
+    stops: isDelivery
+      ? stops.map((r) => ({
+          contactName: r.name.trim() || undefined,
+          contactPhone: contactPhone(r.phone),
+          note:
+            clip(
+              joinNote([
+                r.note,
+                s.service === 'delivery' ? VIEW_NOTE[r.viewOption] : '',
+                s.service === 'transport' && r.needsLoadingHelp ? 'Cần người bốc xếp' : '',
+              ]),
+              500,
+            ) || undefined,
+        }))
+      : [],
+    note:
+      clip(joinNote([o.note, s.service === 'rental' ? movingNote(o) : '', s.service === 'handyman' ? handymanNote(o) : '']), 1000) || undefined,
+  };
+}
+
+// ---------------------------------------------------------------- Báo giá
+const QUOTE_SAFETY_MS = 20_000;
+
+function quoteIsFresh(q: ServerQuote, key: string): q is ServerQuote & { status: 'ready'; quote: Quote } {
+  return q.status === 'ready' && q.key === key && !!q.quote && Date.parse(q.quote.expiresAt) - QUOTE_SAFETY_MS > Date.now();
 }
 
 let quoteSeq = 0;
 
 /**
- * Gọi POST /site/deliveryorders/drymode để lấy giá BE tính (có km Google Distance Matrix khi server có key).
- * Idempotent theo quoteKey: bản nháp chưa đổi thì không gọi lại. Lỗi được ghi vào quote.error (màn xác nhận hiện).
+ * Báo giá bản nháp hiện tại. Bỏ qua nếu đã có báo giá còn hạn cho đúng bản nháp này (chữ ký = body yêu cầu).
+ * Lỗi (ngoài vùng phục vụ, sai mã giảm giá, hẹn giờ quá sớm…) ghi vào quote.error để màn xác nhận hiện.
  */
 export async function refreshQuote(force = false): Promise<ServerQuote> {
   const s = state;
-  const key = quoteKey(s);
-  if (!force && s.quote.key === key && (s.quote.status === 'ready' || s.quote.status === 'loading')) return s.quote;
-  if (!isDraftReady(s)) {
-    const q = { ...idleQuote(), key };
-    update({ quote: q });
-    return q;
+  const req = buildQuoteRequest(s);
+  if (!req) {
+    if (s.quote.status !== 'idle') update({ quote: idleQuote() });
+    return state.quote;
   }
+  const key = JSON.stringify(req);
+  if (!force && (quoteIsFresh(s.quote, key) || (s.quote.status === 'loading' && s.quote.key === key))) return s.quote;
   const seq = ++quoteSeq;
-  update((cur) => ({ quote: { ...cur.quote, status: 'loading', error: null, key } }));
+  update((cur) => ({ quote: { ...cur.quote, status: 'loading', key, error: null, errorCode: null } }));
   try {
-    await ensureServiceCatalog();
-    const res = await orderApi.dryMode(buildOrderPayload(s));
-    if (seq !== quoteSeq) return state.quote; // đã có yêu cầu mới hơn
-    const detail = (res.price_final_detail ?? {}) as Record<string, unknown>;
-    const debug = (res.__debug ?? {}) as Record<string, unknown>;
-    const total = num(res.price_final);
-    const original = num(detail.price_service) || total;
-    const q: ServerQuote = { status: 'ready', total, original: Math.max(original, total), distanceKm: num(debug.p_S), error: null, key };
-    update({ quote: q });
-    return q;
+    const quote = await api('POST /v1/customer/quotes', { body: req });
+    if (seq !== quoteSeq) return state.quote;
+    update({ quote: { status: 'ready', key, quote, error: null, errorCode: null } });
   } catch (e) {
     if (seq !== quoteSeq) return state.quote;
-    const q: ServerQuote = { ...idleQuote(), status: 'error', error: e instanceof Error ? e.message : String(e), key };
-    update({ quote: q });
-    return q;
+    update({ quote: { status: 'error', key, quote: null, error: errorMessage(e), errorCode: e instanceof ZuumApiError ? e.code : null } });
   }
+  return state.quote;
 }
 
-/** Giá đang có hiệu lực cho bản nháp: giá BE nếu đã báo đúng bản nháp hiện tại, ngược lại ước tính của app */
-export function effectivePrice(s: BookingState = state): { total: number; original: number; distanceKm: number; fromServer: boolean } {
-  const local = computePrice(s);
-  if (s.quote.status === 'ready' && s.quote.key === quoteKey(s)) {
-    return { total: s.quote.total, original: s.quote.original, distanceKm: s.quote.distanceKm || local.distanceKm, fromServer: true };
+/** Báo giá còn hạn của đúng bản nháp hiện tại (null nếu chưa có / đã cũ) */
+export function currentQuote(s: BookingState = state): Quote | null {
+  const req = buildQuoteRequest(s);
+  if (!req) return null;
+  return quoteIsFresh(s.quote, JSON.stringify(req)) ? s.quote.quote : null;
+}
+
+/** Thử áp mã giảm giá: báo giá lại với mã này — server từ chối thì ném lỗi (giữ nguyên mã cũ) */
+export async function applyCoupon(code: string): Promise<NonNullable<Quote['coupon']>> {
+  const normalized = code.trim().toUpperCase();
+  const req = buildQuoteRequest(state, normalized);
+  if (!req) throw new ZuumApiError(0, 'draft.incomplete', 'Vui lòng nhập đủ lộ trình trước khi áp mã giảm giá');
+  const quote = await api('POST /v1/customer/quotes', { body: req });
+  if (!quote.coupon) throw new ZuumApiError(422, 'coupon.not_applied', 'Mã giảm giá không áp dụng được cho đơn này');
+  quoteSeq += 1;
+  update((s) => ({
+    options: { ...s.options, couponCode: normalized },
+    quote: { status: 'ready', key: JSON.stringify(req), quote, error: null, errorCode: null },
+  }));
+  return quote.coupon;
+}
+
+export function removeCoupon() {
+  setOptions({ couponCode: null });
+}
+
+/** Giá hiển thị: giá server nếu báo giá còn hạn cho bản nháp, ngược lại ước tính từ catalog */
+export function effectivePrice(s: BookingState = state): { total: number; original: number; distanceKm: number; fromServer: boolean; quote: Quote | null } {
+  const q = currentQuote(s);
+  if (q) {
+    return { total: q.price.total, original: q.price.total + q.price.discount, distanceKm: q.distanceMeters / 1000, fromServer: true, quote: q };
   }
-  return { total: local.total, original: local.subtotal, distanceKm: local.distanceKm, fromServer: false };
-}
-
-// ---------------------------------------------------------------- Đơn theo dõi (mock + snapshot)
-export const isMockOrderId = (id: string) => id.startsWith('mock-');
-
-function codeFromId(id: string): string {
-  if (isMockOrderId(id)) return id.slice(-6).toUpperCase();
-  return id;
-}
-
-/** Dựng TrackedOrder từ bản nháp hiện tại */
-export function trackedFromDraft(id: string, s: BookingState = state, price: PriceSummary = computePrice(s), isMock = true): TrackedOrder {
-  const opt = getOption(s);
-  const pickup = s.sender.place ?? placeFromSample(DEFAULT_SENDER_PLACE, 'default');
-  const stops = s.receivers.filter(isReceiverComplete);
-  return {
-    id,
-    code: `#${codeFromId(id)}`,
-    status: s.options.scheduledAt ? 2 /* STATUS_NEW_SCHEDULED */ : ORDER_STATUS.ASSIGNING,
-    service: s.service,
-    optionId: opt.id,
-    serviceName: opt.name,
-    serviceDescription: opt.description,
-    scheduledAt: s.options.scheduledAt,
-    returnAt: s.options.returnAt,
-    waitForReturn: s.options.waitForReturn,
-    distanceKm: price.distanceKm,
-    promoLabel: promoLabel(s.options.promo),
-    paymentMethod: s.options.paymentMethod,
-    note: s.options.note,
-    pickup: { name: s.sender.name, phone: s.sender.phone, address: pickup.address, lat: pickup.lat, lng: pickup.lng, status: 'picking' },
-    stops: stops.map((r) => ({ name: r.name, phone: r.phone, address: r.place!.address, lat: r.place!.lat, lng: r.place!.lng, status: 'new' })),
-    driver: null,
-    total: price.total,
-    original: price.subtotal,
-    etaMinutes: 10,
-    createdAt: Date.now(),
-    isMock,
-  };
-}
-
-export function rememberOrder(order: TrackedOrder) {
-  update((s) => ({ orders: { ...s.orders, [order.id]: order } }));
-  return order;
-}
-export const getStoredOrder = (id: string): TrackedOrder | null => state.orders[id] ?? null;
-
-export function updateStoredOrder(id: string, patch: Partial<TrackedOrder>): TrackedOrder | null {
-  const cur = state.orders[id];
-  if (!cur) return null;
-  const next = { ...cur, ...patch };
-  update((s) => ({ orders: { ...s.orders, [id]: next } }));
-  return next;
-}
-
-export function cancelStoredOrder(id: string) {
-  updateStoredOrder(id, { status: ORDER_STATUS.CUSTOMER_CANCELLED });
-}
-
-/** Đơn demo khi mở /booking/tracking không có orderId (hoặc để QA trạng thái) */
-export function createDemoOrder(id: string, variant?: string): TrackedOrder {
-  const hasDraft = state.receivers.some(isReceiverComplete) && state.sender.name;
-  const s: BookingState = hasDraft
-    ? state
-    : {
-        ...state,
-        sender: { name: state.sender.name || 'Phan Thanh Tùng', phone: state.sender.phone || '0352237832', place: state.sender.place ?? placeFromSample(DEFAULT_SENDER_PLACE, 'default') },
-        receivers: [
-          { ...emptyReceiver(), name: 'Tú Quỳnh', phone: '0352237833', place: placeFromSample(SAMPLE_PLACES[2]!) },
-          { ...emptyReceiver(), name: 'Nguyễn Văn A', phone: '0909000111', place: placeFromSample(SAMPLE_PLACES[3]!), cod: 250000 },
-        ],
-        options: { ...defaultOptions(), note: 'Hàng cần giao cẩn thận', promo: { code: 'MUAXUAN2020', title: 'Mã MUAXUAN2020', description: '', percent: 20 } },
-      };
-  const order = trackedFromDraft(id, s, computePrice(s), true);
-  if (variant === 'scheduled') {
-    order.scheduledAt = Date.now() + 2 * 3600 * 1000;
-    order.status = 2;
-  }
-  return rememberOrder(order);
-}
-
-const pickDriver = (o: TrackedOrder, s: BookingState = state): DriverDef => {
-  const wanted = s.options.assignedDrivers;
-  return FAVORITE_DRIVERS.find((d) => wanted.includes(d.id)) ?? o.driver ?? MOCK_DRIVER;
-};
-
-/** Tiến 1 bước trạng thái đơn mock: tìm tài xế → nhận → đến nơi → lấy hàng → giao từng điểm → hoàn thành */
-export function advanceMockOrder(id: string): TrackedOrder | null {
-  const o = state.orders[id];
-  if (!o) return null;
-  const S = ORDER_STATUS;
-  let patch: Partial<TrackedOrder>;
-  switch (o.status) {
-    case 2:
-    case S.NEW:
-      patch = { status: S.ASSIGNING };
-      break;
-    case S.ASSIGNING:
-      patch = { status: S.ACCEPTED, driver: pickDriver(o), etaMinutes: 10 };
-      break;
-    case S.ACCEPTED:
-      patch = { status: S.BOARDED, etaMinutes: 3 };
-      break;
-    case S.BOARDED:
-      patch = { status: S.PICKED, pickup: { ...o.pickup, status: 'picked' }, stops: o.stops.map((st) => ({ ...st, status: 'delivering' as StopStatus })) };
-      break;
-    case S.PICKED:
-    case S.STARTED:
-      patch = { status: S.DELIVERING };
-      break;
-    case S.DELIVERING: {
-      const idx = o.stops.findIndex((st) => st.status !== 'completed');
-      if (idx === -1) {
-        patch = { status: S.COMPLETED };
-      } else {
-        const stops = o.stops.map((st, i) => (i === idx ? { ...st, status: 'completed' as StopStatus } : st));
-        patch = { stops, status: stops.every((st) => st.status === 'completed') ? S.COMPLETED : S.DELIVERING };
-      }
-      break;
-    }
-    default:
-      return o; // trạng thái kết thúc
-  }
-  return updateStoredOrder(id, patch);
-}
-
-export const isTerminalStatus = (status: number) => status >= ORDER_STATUS.COMPLETED;
-
-export function getTrackingPhase(o: TrackedOrder): TrackedPhase {
-  const S = ORDER_STATUS;
-  const s = o.status;
-  if (s === S.COMPLETED) return 'completed';
-  if (s === S.FAIL) return 'notfound';
-  if (s >= S.CUSTOMER_CANCELLED) return 'cancelled';
-  if (s >= S.PICKED) return 'delivering';
-  if (s >= S.ACCEPTED || o.driver) return 'accepted';
-  if (s === S.NEW_SCHEDULED || (o.scheduledAt && s < S.ASSIGNING)) return 'scheduled';
-  if (o.searchExpired) return 'notfound';
-  return 'searching';
-}
-type TrackedPhase = TrackingPhase;
-
-/**
- * Đồng bộ trạng thái đợt tìm tài xế của đơn thật từ GET /site/deliveryorderprocesses/last.
- * Hết hạn = đợt gần nhất đã xong (COMPLETED/CANCELLED) hoặc kẹt (QUEUED/SCANNING quá date_expired — queue/worker chết),
- * hoặc đơn còn NEW mà chưa có đợt nào (bước bắt đầu tìm đã lỗi) → màn theo dõi hiện "Không tìm thấy" + nút thử lại.
- */
-export async function syncSearchState(orderId: string): Promise<void> {
-  const cur = state.orders[orderId];
-  if (!cur || cur.driver || (cur.status !== ORDER_STATUS.ASSIGNING && cur.status !== ORDER_STATUS.NEW)) return;
-  try {
-    const res = await orderApi.getLastProcess(orderId);
-    const last = res.items?.[0];
-    const now = Math.floor(Date.now() / 1000);
-    let expired: boolean;
-    if (!last) {
-      expired = cur.status === ORDER_STATUS.NEW && !cur.scheduledAt;
-    } else {
-      const st = Number(last.status);
-      const dateExpired = Number(last.date_expired);
-      const finished = st === PROCESS_STATUS.COMPLETED || st === PROCESS_STATUS.CANCELLED;
-      // QUEUED/SCANNING quá hạn thêm 60s = worker không chạy → coi như không tìm thấy
-      const stuck = !finished && dateExpired > 0 && dateExpired + 60 < now;
-      expired = (finished && dateExpired > 0 && dateExpired < now) || stuck;
-    }
-    if (expired !== !!cur.searchExpired) updateStoredOrder(orderId, { searchExpired: expired });
-  } catch {
-    /* giữ trạng thái cũ */
-  }
-}
-
-// ---------------------------------------------------------------- Chuẩn hoá đơn từ API
-const num = (v: unknown): number => (typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) || 0 : 0);
-const str = (v: unknown): string => (v == null ? '' : String(v));
-
-function detailStatus(detail: number, orderStatus: number): StopStatus {
-  // DeliveryOrderDetail: NEW=1, COMPLETED=3, FAILED=5, RETURNED=7
-  if (detail === 3) return 'completed';
-  if (detail === 5) return 'failed';
-  if (detail === 7) return 'returned';
-  if (orderStatus >= ORDER_STATUS.COMPLETED) return 'completed';
-  if (orderStatus >= ORDER_STATUS.PICKED) return 'delivering';
-  return 'new';
-}
-
-/** Tài xế từ JSON đơn (enrichOrderData: driver{full_name, phone, avatar_url, rating} + driver_account_id) */
-function driverFromApi(o: DeliveryOrder, base?: TrackedOrder | null): DriverDef | null {
-  const driverId = num(o.driver_account_id);
-  if (driverId <= 0) return null;
-  const d = (o.driver ?? {}) as Record<string, unknown>;
-  const name = str(d.full_name).trim();
-  const keepBase = base?.driver && base.driver.id === driverId ? base.driver : null;
-  return {
-    id: driverId,
-    name: name || keepBase?.name || 'Tài xế ZuumViet',
-    phone: str(d.phone) || keepBase?.phone || '',
-    avatar: str(d.avatar_url) || keepBase?.avatar || undefined,
-    rating: num(d.rating) || keepBase?.rating || 0,
-    reviews: keepBase?.reviews ?? 0,
-    plate: keepBase?.plate ?? '',
-    vehicle: keepBase?.vehicle ?? '',
-  };
-}
-
-/** Gộp dữ liệu API (getJsonDataForApp + enrichOrderData) lên snapshot đã có để đủ tên/địa chỉ hiển thị */
-export function normalizeApiOrder(o: DeliveryOrder, base?: TrackedOrder | null): TrackedOrder {
-  const id = String(o.id);
-  const status = num(o.status) || base?.status || ORDER_STATUS.ASSIGNING;
-  const pickupDate = num(o.pickup_date);
-  // total_distance BE luôn lưu bằng mét
-  const distanceKm = Math.round(num(o.total_distance) / 100) / 10;
-  const details = Array.isArray(o.details) ? (o.details as Record<string, unknown>[]) : null;
-  const stops: TrackedStop[] =
-    details && details.length
-      ? details.map((d, i) => ({
-          name: str(d.full_name) || base?.stops[i]?.name || `Điểm giao ${i + 1}`,
-          phone: str(d.phone) || base?.stops[i]?.phone || '',
-          address: str(d.wayout_address) || base?.stops[i]?.address || '',
-          lat: num(d.wayout_lat) || base?.stops[i]?.lat || HCM_CENTER.lat,
-          lng: num(d.wayout_long) || base?.stops[i]?.lng || HCM_CENTER.lng,
-          status: detailStatus(num(d.status), status),
-        }))
-      : (base?.stops ?? []).map((st) => ({ ...st, status: detailStatus(0, status) === 'new' ? st.status : detailStatus(0, status) }));
-  const coupon = str(o.coupon_code);
-  const discount = num(o.coupon_discount_value);
-  const total = num(o.price_final) || base?.total || 0;
-  // Nhóm/option từ service_id thật (catalog đã tải) — không có thì giữ snapshot, cuối cùng mới mặc định Giao hàng
-  const mapped = findOptionByServiceId(num(o.service_id));
-  const serviceName = mapped?.option.name ?? base?.serviceName ?? serviceNameById(num(o.service_id)) ?? 'Giao hàng';
-  return {
-    id,
-    code: `#${id}`,
-    status,
-    service: mapped?.service ?? base?.service ?? 'delivery',
-    optionId: mapped?.option.id ?? base?.optionId ?? '',
-    serviceName,
-    serviceDescription: mapped?.option.description ?? base?.serviceDescription ?? '',
-    scheduledAt: pickupDate > 0 ? pickupDate * 1000 : null,
-    returnAt: base?.returnAt ?? null,
-    waitForReturn: base?.waitForReturn ?? true,
-    distanceKm: distanceKm || base?.distanceKm || 0,
-    promoLabel: coupon ? (discount > 0 && discount <= 100 ? `Giảm ${discount}%` : `Mã ${coupon}`) : (base?.promoLabel ?? null),
-    // PAYMENT_METHOD_WALLET = 1, CASH = 3
-    paymentMethod: num(o.payment_method) === 1 ? 'wallet' : 'cash',
-    note: str(o.note) || base?.note || '',
-    pickup: {
-      name: str(o.pickup_fullname) || base?.pickup.name || '',
-      phone: str(o.pickup_phone) || base?.pickup.phone || '',
-      address: str(o.pickup_address) || base?.pickup.address || '',
-      lat: num(o.pickup_lat) || base?.pickup.lat || HCM_CENTER.lat,
-      lng: num(o.pickup_long) || base?.pickup.lng || HCM_CENTER.lng,
-      status: status >= ORDER_STATUS.PICKED ? 'picked' : 'picking',
-    },
-    stops,
-    driver: driverFromApi(o, base),
-    total,
-    original: base?.original && base.original >= total ? base.original : total,
-    etaMinutes: base?.etaMinutes ?? 10,
-    createdAt: num(o.date_created) ? num(o.date_created) * 1000 : (base?.createdAt ?? Date.now()),
-    isMock: false,
-  };
+  const svc = getSelectedService(s);
+  const view = svc ? optionsFor(s.service).find((o) => o.id === svc.id) : null;
+  const total = view ? estimateFor(view, s) + s.options.tip * TIP_STEP : 0;
+  return { total, original: total, distanceKm: routeDistanceKm(s), fromServer: false, quote: null };
 }
 
 // ---------------------------------------------------------------- Tạo đơn
-export interface SubmitResult {
-  orderId: string;
-  mock: boolean;
-  /** lỗi phụ (vd không khởi động được tìm tài xế) — đơn vẫn đã tạo */
-  error: string | null;
-}
-
 /**
- * Tạo đơn thật: POST /site/deliveryorders → POST /site/deliveryorderprocesses/{id} (bắt đầu tìm tài xế;
- * đơn hẹn giờ thì cron của BE tự mở process khi tới giờ). Mọi lỗi tạo đơn được ném ra cho màn xác nhận hiển thị.
+ * Tạo đơn từ báo giá còn hạn (báo giá lại nếu cần). Báo giá hết hạn giữa chừng (410 quote.expired): báo giá lại để
+ * khách xem giá mới rồi bấm xác nhận lần nữa — không tự tạo đơn với giá khác giá khách đã thấy.
  */
-export async function submitBooking(): Promise<SubmitResult> {
-  const s = state;
-  await ensureServiceCatalog();
-  const payload = buildOrderPayload(s);
-  const price = computePrice(s);
-  const created = await orderApi.createOrder(payload);
-  if (!created || typeof created.id !== 'number' || created.id <= 0) {
-    throw new Error('Phản hồi tạo đơn không hợp lệ');
-  }
-  const id = String(created.id);
-  const snapshot = trackedFromDraft(id, s, price, false);
-  rememberOrder(normalizeApiOrder(created, snapshot));
-  resetDraft();
-
-  let error: string | null = null;
-  if (!s.options.scheduledAt) {
-    try {
-      await orderApi.startDriverSearch(id);
-      updateStoredOrder(id, { status: ORDER_STATUS.ASSIGNING });
-    } catch (e) {
-      // Đơn đã tạo nhưng chưa bắt đầu tìm được tài xế (vd BE: error_scanning_process_not_expired khi đang có đợt quét khác)
-      // → đánh dấu để màn theo dõi hiện "Không tìm thấy tài xế" + nút "Thử lại" thay vì quay vòng "Đang tìm" mãi
-      error = e instanceof Error ? e.message : String(e);
-      updateStoredOrder(id, { searchExpired: true });
+export async function submitBooking(): Promise<CreatedOrder> {
+  let quote = currentQuote();
+  if (!quote) {
+    const q = await refreshQuote(true);
+    if (q.status !== 'ready' || !q.quote) {
+      throw new ZuumApiError(0, q.errorCode ?? 'quote.unavailable', q.error ?? 'Chưa lấy được giá, vui lòng thử lại');
     }
+    quote = q.quote;
   }
-  return { orderId: id, mock: false, error };
-}
-
-/** Tìm lại tài xế cho đơn thật (nút "Thử lại" ở màn theo dõi khi không tìm thấy tài xế) */
-export async function retrySearch(orderId: string): Promise<void> {
-  await orderApi.startDriverSearch(orderId);
-  updateStoredOrder(orderId, { status: ORDER_STATUS.ASSIGNING, driver: null });
-}
-
-/**
- * "Chọn tài xế trực tiếp": khách đã gặp tài xế ngoài đời và quét mã QR của họ để đặt chuyến ngay,
- * bỏ qua bước tìm/ghép tài xế. Chưa có API cho luồng này ở BE → tạo thẳng đơn mock ở trạng thái "đã nhận".
- */
-export function submitBookingWithDriver(driver: DriverDef): SubmitResult {
-  const s = state;
-  const price = computePrice(s);
-  const order = trackedFromDraft(`mock-${uid()}`, s, price, true);
-  order.driver = driver;
-  order.status = ORDER_STATUS.ACCEPTED;
-  order.etaMinutes = 5;
-  rememberOrder(order);
-  resetDraft();
-  return { orderId: order.id, mock: true, error: null };
+  try {
+    const created = await api('POST /v1/customer/orders', { body: buildOrderBody(state, quote.id) });
+    resetDraft();
+    return created;
+  } catch (e) {
+    if (isApiError(e, 'quote.expired', 'quote.not_found', 'coupon.changed')) void refreshQuote(true);
+    throw e;
+  }
 }
 
 // ---------------------------------------------------------------- Format helpers

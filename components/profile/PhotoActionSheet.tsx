@@ -10,7 +10,8 @@ import { AppText } from '@/components/ui';
 interface PhotoActionSheetProps {
   visible: boolean;
   onClose: () => void;
-  onPicked: (uri: string) => void;
+  /** uri cục bộ + mimeType (nếu thư viện ảnh trả về) — dùng để tải lên services/upload.ts */
+  onPicked: (uri: string, mimeType?: string | null) => void;
   onError?: (message: string) => void;
   /** false: không ép crop vuông (vd ảnh hiện trạng sự cố) — mặc định true (ảnh đại diện) */
   allowsEditing?: boolean;
@@ -47,13 +48,12 @@ export const PhotoActionSheet: React.FC<PhotoActionSheetProps> = ({ visible, onC
         mediaTypes: ['images'],
         allowsEditing,
         ...(allowsEditing ? { aspect } : null),
-        quality: 0.8,
+        quality: 0.7,
       };
       const result =
         source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
-      if (!result.canceled && result.assets?.[0]?.uri) {
-        onPicked(result.assets[0].uri);
-      }
+      const asset = !result.canceled ? result.assets?.[0] : undefined;
+      if (asset?.uri) onPicked(asset.uri, asset.mimeType ?? null);
     } catch {
       onError?.('Có lỗi xảy ra trong quá trình');
     } finally {

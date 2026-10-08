@@ -3,19 +3,24 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, Icon, Icons } from '@/components/ui';
-import type { ActivityOrder } from '@/constants/mockOrders';
 import { formatShortVnd } from './orderUtils';
 
-export const PaymentSummary: React.FC<{ payment: ActivityOrder['payment'] }> = ({ payment }) => (
+interface Props {
+  method: 'cash' | 'wallet';
+  tip: number;
+  total: number;
+}
+
+export const PaymentSummary: React.FC<Props> = ({ method, tip, total }) => (
   <View style={styles.row}>
     <View style={[styles.col, styles.method]}>
-      <Icon name={payment.method === 'wallet' ? Icons.wallet : Icons.cash} size={22} color={Colors.primary} />
+      <Icon name={method === 'wallet' ? Icons.wallet : Icons.cash} size={22} color={Colors.primary} />
       <View style={{ marginLeft: Spacing.sm }}>
         <AppText size={11} color={Colors.textSecondary}>
           Thanh toán
         </AppText>
         <AppText size={14} weight="semiBold">
-          {payment.methodLabel}
+          {method === 'wallet' ? 'Ví ZuumViet' : 'Tiền mặt'}
         </AppText>
       </View>
     </View>
@@ -25,7 +30,7 @@ export const PaymentSummary: React.FC<{ payment: ActivityOrder['payment'] }> = (
         Tiền Tip
       </AppText>
       <AppText size={14} weight="semiBold">
-        {payment.tip > 0 ? formatShortVnd(payment.tip) : '0đ'}
+        {tip > 0 ? formatShortVnd(tip) : '0đ'}
       </AppText>
     </View>
     <View style={styles.divider} />
@@ -34,7 +39,7 @@ export const PaymentSummary: React.FC<{ payment: ActivityOrder['payment'] }> = (
         Tổng tiền
       </AppText>
       <AppText size={14} weight="bold" color={Colors.primary}>
-        {payment.total > 0 ? formatShortVnd(payment.total) : '0đ'}
+        {total > 0 ? formatShortVnd(total) : '0đ'}
       </AppText>
     </View>
   </View>

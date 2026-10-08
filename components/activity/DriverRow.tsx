@@ -1,31 +1,40 @@
-// DriverRow — avatar 56 + tên đậm 16 + sao vàng + "53A-888.88 · Civic Trắng" (Figma Hoạt động 1.3)
+// DriverRow — avatar 56 + tên đậm 16 + sao vàng (điểm trung bình thật) + "53A-888.88 · Honda Wave Đen" (Figma Hoạt động 1.3)
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, Avatar } from '@/components/ui';
-import type { ActivityDriver } from '@/constants/mockOrders';
+import type { OrderPartner, OrderVehicle } from '@/services/orders';
 import { RatingStars } from './RatingStars';
 
 interface DriverRowProps {
-  driver: ActivityDriver;
+  partner: OrderPartner;
+  vehicle?: OrderVehicle | null;
   right?: React.ReactNode;
 }
 
-export const DriverRow: React.FC<DriverRowProps> = ({ driver, right }) => {
-  const meta = [driver.plate, driver.vehicle].filter(Boolean).join(' · ');
+export const DriverRow: React.FC<DriverRowProps> = ({ partner, vehicle, right }) => {
+  const meta = vehicle ? [vehicle.plate, [vehicle.brand, vehicle.model].filter(Boolean).join(' '), vehicle.color].filter(Boolean).join(' · ') : '';
+  const avg = partner.rating.average;
   return (
     <View style={styles.row}>
-      <Avatar uri={driver.avatar} name={driver.name} size={56} />
+      <Avatar uri={partner.photoUrl} name={partner.fullName} size={56} />
       <View style={styles.texts}>
         <AppText weight="bold" size={16}>
-          {driver.name}
+          {partner.fullName}
         </AppText>
         <View style={styles.stars}>
-          <RatingStars value={driver.rating} size={14} gap={2} />
-          <AppText size={12} color={Colors.textSecondary} style={{ marginLeft: 6 }}>
-            {driver.rating.toFixed(1)}
-            {driver.reviews ? ` · ${driver.reviews} đánh giá` : ''}
-          </AppText>
+          {avg != null ? (
+            <>
+              <RatingStars value={avg} size={14} gap={2} />
+              <AppText size={12} color={Colors.textSecondary} style={{ marginLeft: 6 }}>
+                {avg.toFixed(1)} · {partner.rating.count} đánh giá
+              </AppText>
+            </>
+          ) : (
+            <AppText size={12} color={Colors.textSecondary}>
+              Chưa có đánh giá
+            </AppText>
+          )}
         </View>
         {meta ? (
           <AppText size={13} color={Colors.textSecondary} style={{ marginTop: 2 }}>

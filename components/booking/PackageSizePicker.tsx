@@ -1,35 +1,41 @@
-// PackageSizePicker — 4 ô kích cỡ gói hàng: Siêu nhỏ / Nhỏ / Vừa / Lớn (Figma GH 1.4.1)
+// PackageSizePicker — các ô mức cân nặng của gói hàng (Figma GH 1.4.1). Mức + phụ phí lấy từ `weightTiers` của
+// dịch vụ đang chọn trong catalog API (không còn kích cỡ cứng trong app).
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppText, Icon, Icons } from '@/components/ui';
-import { PACKAGE_SIZES, type PackageSizeId, type PackageSizeDef } from '@/constants/mockBooking';
+import type { WeightTier } from '@/services/catalog';
 
 interface Props {
-  value: PackageSizeId;
-  onChange: (v: PackageSizeId) => void;
-  /** Vận tải dùng mức tải trọng riêng (FREIGHT_WEIGHTS) thay vì kích cỡ gói nhỏ mặc định */
-  sizes?: PackageSizeDef[];
+  tiers: WeightTier[];
+  /** id mức đang chọn — null = mức đầu tiên (nhẹ nhất) */
+  value: string | null;
+  onChange: (id: string) => void;
 }
 
-export const PackageSizePicker: React.FC<Props> = ({ value, onChange, sizes = PACKAGE_SIZES }) => (
-  <View style={styles.row}>
-    {sizes.map((p, i) => {
-      const on = p.id === value;
-      return (
-        <Pressable key={p.id} onPress={() => onChange(p.id)} style={[styles.tile, on && styles.tileOn, i > 0 && { marginLeft: Spacing.sm }]}>
-          <Icon name={Icons.box} size={16 + i * 4} color={on ? Colors.primary : Colors.textSecondary} />
-          <AppText weight="bold" size={13} color={on ? Colors.primary : Colors.text} style={{ marginTop: 6 }} numberOfLines={1}>
-            {p.label}
-          </AppText>
-          <AppText size={11} color={Colors.textSecondary} numberOfLines={1}>
-            {p.sub}
-          </AppText>
-        </Pressable>
-      );
-    })}
-  </View>
-);
+const vnd = (n: number) => `đ${Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
+
+export const PackageSizePicker: React.FC<Props> = ({ tiers, value, onChange }) => {
+  const current = value && tiers.some((t) => t.id === value) ? value : (tiers[0]?.id ?? null);
+  return (
+    <View style={styles.row}>
+      {tiers.map((t, i) => {
+        const on = t.id === current;
+        return (
+          <Pressable key={t.id} onPress={() => onChange(t.id)} style={[styles.tile, on && styles.tileOn, i > 0 && { marginLeft: Spacing.sm }]}>
+            <Icon name={Icons.box} size={16 + Math.min(i, 3) * 4} color={on ? Colors.primary : Colors.textSecondary} />
+            <AppText weight="bold" size={13} color={on ? Colors.primary : Colors.text} style={{ marginTop: 6 }} numberOfLines={1}>
+              {t.label}
+            </AppText>
+            <AppText size={11} color={Colors.textSecondary} numberOfLines={1}>
+              {t.surcharge > 0 ? `+${vnd(t.surcharge)}` : 'Không phụ phí'}
+            </AppText>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'stretch' },

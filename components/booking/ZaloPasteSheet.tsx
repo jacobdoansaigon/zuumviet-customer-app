@@ -1,14 +1,12 @@
 // components/booking/ZaloPasteSheet.tsx — "Dán từ Zalo": khách dán nguyên đoạn tin nhắn (tên/SĐT/địa chỉ lẫn
-// lộn), bấm "Phân tích" để tách ra qua LLM (có bộ tách offline dự phòng khi chưa gọi được BE/LLM — xem
-// services/addressParser.ts). Luôn cho xem & sửa kết quả trước khi áp dụng vào form, không tự ý ghi đè để
-// tránh điền sai tên/SĐT/địa chỉ của khách.
+// lộn), bấm "Phân tích" để tách ra (services/addressParser.ts, chạy trên máy). Luôn cho xem & sửa kết quả trước khi
+// áp dụng vào form; địa chỉ tách được sẽ mở màn tìm địa điểm để khách chọn đúng địa điểm thật.
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { AppText, BottomSheet, Button, Icon, Icons, TextField } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
-import { parseZaloText, type ParseSource } from '@/services/addressParser';
-import type { ParsedAddress } from '@/services/api';
+import { parseZaloText, type ParsedAddress } from '@/services/addressParser';
 
 interface ZaloPasteSheetProps {
   visible: boolean;
@@ -22,17 +20,13 @@ const PLACEHOLDER = 'Ví dụ: Chị Lan 0909123456\n123 Nguyễn Trãi, P.7, Q.
 
 export const ZaloPasteSheet: React.FC<ZaloPasteSheetProps> = ({ visible, onClose, includeContact = true, onApply }) => {
   const [text, setText] = useState('');
-  const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ParsedAddress | null>(null);
-  const [source, setSource] = useState<ParseSource | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const reset = () => {
     setText('');
     setResult(null);
-    setSource(null);
     setError(null);
-    setLoading(false);
   };
 
   const close = () => {
@@ -54,22 +48,15 @@ export const ZaloPasteSheet: React.FC<ZaloPasteSheetProps> = ({ visible, onClose
     }
   };
 
-  const analyze = async () => {
-    if (!text.trim() || loading) return;
-    setLoading(true);
+  const analyze = () => {
+    if (!text.trim()) return;
     setError(null);
-    try {
-      const { result: parsed, source: src } = await parseZaloText(text);
-      if (!parsed.address && !parsed.phone && !parsed.name) {
-        setResult(null);
-        setSource(null);
-        setError('Không nhận diện được thông tin nào trong đoạn vừa dán, thử dán đầy đủ hơn nhé.');
-      } else {
-        setResult(parsed);
-        setSource(src);
-      }
-    } finally {
-      setLoading(false);
+    const parsed = parseZaloText(text);
+    if (!parsed.address && !parsed.phone && !parsed.name) {
+      setResult(null);
+      setError('Không nhận diện được thông tin nào trong đoạn vừa dán, thử dán đầy đủ hơn nhé.');
+    } else {
+      setResult(parsed);
     }
   };
 
@@ -83,7 +70,7 @@ export const ZaloPasteSheet: React.FC<ZaloPasteSheetProps> = ({ visible, onClose
     <BottomSheet visible={visible} onClose={close} title="Dán từ Zalo/Messenger" showClose scroll contentStyle={styles.content}>
       <View style={{ gap: Spacing.sm }}>
         <AppText size={13} color={Colors.textSecondary}>
-          Dán nguyên đoạn tin nhắn khách gửi qua Zalo/Messenger (tên, số điện thoại, địa chỉ...), hệ thống sẽ tự tách ra.
+          Dán nguyên đoạn tin nhắn gửi qua Zalo/Messenger (tên, số điện thoại, địa chỉ...), ứng dụng sẽ tự tách ra để bạn kiểm tra.
         </AppText>
 
         <TextField value={text} onChangeText={setText} placeholder={PLACEHOLDER} multiline numberOfLines={5} inputStyle={styles.textArea} />
@@ -96,14 +83,14 @@ export const ZaloPasteSheet: React.FC<ZaloPasteSheetProps> = ({ visible, onClose
           </AppText>
         ) : null}
 
-        <Button title="Phân tích" onPress={() => void analyze()} loading={loading} disabled={!text.trim()} />
+        <Button title="Phân tích" onPress={analyze} disabled={!text.trim()} />
 
         {result ? (
           <View style={styles.resultCard}>
             <View style={styles.resultHead}>
               <Icon name={Icons.sparkles} size={16} color={Colors.primary} />
               <AppText size={12} weight="semiBold" color={Colors.primary} style={{ marginLeft: 6, flex: 1 }}>
-                {source === 'llm' ? 'Đã phân tích bằng AI' : 'Đã tách nhanh (ngoại tuyến) — kiểm tra lại trước khi dùng'}
+                Đã tách nhanh — kiểm tra lại trước khi dùng
               </AppText>
             </View>
 

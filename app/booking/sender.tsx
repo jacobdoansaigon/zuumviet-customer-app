@@ -1,35 +1,33 @@
-// app/booking/sender.tsx — GH 1.3 "Thông tin người gửi" (giao hàng / gọi thợ): địa chỉ + họ tên (danh bạ), SĐT → "Xác Nhận"
-// Dọn nhà: thêm tầng/thang máy của nhà cũ (điểm đi) — ảnh hưởng phụ phí bốc xếp, khác Giao hàng/Vận tải.
-// Gọi thợ: mô tả sự cố/ảnh hiện trạng/khẩn cấp hỏi ở bước chọn loại thợ (xem HandymanJobDialog trong
-// app/booking/index.tsx), KHÔNG hỏi ở đây — màn này chỉ còn địa chỉ + tên/SĐT như mọi dịch vụ khác.
+// app/booking/sender.tsx — GH 1.3 "Thông tin người gửi" (giao hàng / gọi thợ): địa chỉ + họ tên, SĐT → "Xác Nhận"
+// Dọn nhà: thêm tầng/thang máy của nhà cũ (điểm đi) — gửi kèm ghi chú đơn cho đội chuyển nhà.
+// Gọi thợ: mô tả sự cố/khẩn cấp hỏi ở bước chọn loại thợ (HandymanJobDialog), KHÔNG hỏi ở đây.
 // Chở khách (Xe máy / Xe hơi / Xe đường dài / Tài xế lái thay): chỉ địa chỉ + bản đồ tràn khung (chạm để đổi) → "Xác Nhận";
 // tên/SĐT lấy sẵn từ hồ sơ đăng nhập (hydrateSender), không cần hỏi lại.
+// "Dán từ Zalo": điền tên/SĐT; địa chỉ tách được mở màn tìm địa điểm (điền sẵn chữ) để khách chọn đúng địa điểm thật.
 import React, { useMemo, useState } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { AppHeader, AppText, Icon, Icons, Screen, TextField } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
-import { SERVICE_GROUPS, HCM_CENTER } from '@/constants/mockBooking';
-import { useBooking, setSenderInfo, setSenderPlace, setOptions, isValidPhoneVn } from '@/services/bookingStore';
-import { AddressBlock, AddressMapPreview, ContactPickerSheet, FlatFooter, FloorAccessPicker, ZaloPasteSheet, type MapStop } from '@/components/booking';
+import { SERVICE_GROUPS } from '@/constants/booking';
+import { useBooking, setSenderInfo, setOptions, isValidPhoneVn } from '@/services/bookingStore';
+import { AddressBlock, AddressMapPreview, FlatFooter, FloorAccessPicker, ZaloPasteSheet, type MapStop } from '@/components/booking';
 
 export default function SenderScreen() {
   const state = useBooking();
   const group = SERVICE_GROUPS[state.service];
   const labels = group.labels;
   const isRide = group.kind === 'ride';
-  // Dọn nhà: nhà cũ (điểm đi) cũng cần biết tầng/thang máy — khác hẳn Giao hàng/Vận tải
   const isRental = state.service === 'rental';
   const [name, setName] = useState(state.sender.name);
   const [phone, setPhone] = useState(state.sender.phone);
   const [floor, setFloor] = useState(state.options.movingFloorFrom);
   const [elevator, setElevator] = useState(state.options.movingElevatorFrom);
-  const [contacts, setContacts] = useState(false);
   const [zaloPaste, setZaloPaste] = useState(false);
   const place = state.sender.place;
   const valid = isRide ? !!place : name.trim().length >= 2 && isValidPhoneVn(phone) && !!place;
 
-  const openPicker = () => router.push({ pathname: '/booking/location', params: { target: 'sender' } });
+  const openPicker = (q?: string) => router.push({ pathname: '/booking/location', params: { target: 'sender', ...(q ? { q } : {}) } });
 
   const mapStops = useMemo<MapStop[]>(() => {
     if (!place) return [];
@@ -43,14 +41,11 @@ export default function SenderScreen() {
     else router.replace('/booking');
   };
 
-  // "Dán từ Zalo": chỉ ghi đè trường nào thực sự tách được, giữ nguyên phần khách đã tự nhập
+  // "Dán từ Zalo": chỉ ghi đè trường nào thực sự tách được; địa chỉ phải chọn lại từ gợi ý (cần toạ độ thật)
   const applyZaloPaste = (r: { name: string; phone: string; address: string; note: string }) => {
     if (r.name) setName(r.name);
     if (r.phone) setPhone(r.phone);
-    if (r.address) {
-      const anchor = place ?? HCM_CENTER;
-      setSenderPlace({ title: r.address, address: r.address, lat: anchor.lat + 0.006, lng: anchor.lng + 0.004, source: 'search' });
-    }
+    if (r.address) openPicker(r.address);
   };
 
   return (
@@ -69,11 +64,11 @@ export default function SenderScreen() {
           stops={mapStops}
           showRoute={false}
           hintLabel={`Chạm để đổi ${labels.mapPickupLabel.toLowerCase()}`}
-          onChange={openPicker}
+          onChange={() => openPicker()}
         />
       ) : (
         <View style={styles.body}>
-          <AddressBlock address={place?.address} placeholder={labels.senderLocationPlaceholder} onChange={openPicker} />
+          <AddressBlock address={place?.address} placeholder={labels.senderLocationPlaceholder} onChange={() => openPicker()} />
 
           <Pressable onPress={() => setZaloPaste(true)} style={styles.zaloRow}>
             <Icon name={Icons.paste} size={18} color={Colors.primary} style={{ marginRight: Spacing.sm }} />
@@ -89,8 +84,6 @@ export default function SenderScreen() {
             onChangeText={setName}
             placeholder="Họ và tên"
             autoCapitalize="words"
-            iconRight={Icons.contacts}
-            onIconRightPress={() => setContacts(true)}
             containerStyle={{ marginTop: Spacing.base }}
           />
           <TextField
@@ -100,20 +93,13 @@ export default function SenderScreen() {
             onChangeText={setPhone}
             placeholder={labels.senderPhonePlaceholder}
             keyboardType="phone-pad"
+            error={phone.trim() && !isValidPhoneVn(phone) ? 'Số điện thoại không hợp lệ' : undefined}
             containerStyle={{ marginTop: Spacing.base }}
           />
 
           {isRental ? <FloorAccessPicker label="Nhà/căn hộ cũ" floor={floor} elevator={elevator} onFloorChange={setFloor} onElevatorChange={setElevator} /> : null}
         </View>
       )}
-      <ContactPickerSheet
-        visible={contacts}
-        onClose={() => setContacts(false)}
-        onPick={(c) => {
-          setName(c.name);
-          setPhone(c.phone);
-        }}
-      />
       <ZaloPasteSheet visible={zaloPaste} onClose={() => setZaloPaste(false)} includeContact onApply={applyZaloPaste} />
     </Screen>
   );

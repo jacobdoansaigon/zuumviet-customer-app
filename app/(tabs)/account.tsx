@@ -11,7 +11,7 @@ import { ProfileRow } from '@/components/profile';
 import { displayName, formatPhone, logout, refreshProfile, useProfile } from '@/services/session';
 import { formatMoney } from '@/constants/mock';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
-import { useSavedLocations } from '@/services/profileStore';
+import { loadSavedAddresses, useSavedAddresses } from '@/services/addresses';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
 const TOAST_MESSAGES: Record<string, string> = {
@@ -29,12 +29,13 @@ export default function AccountScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const hideToast = useCallback(() => setToast(null), []);
 
-  const savedLocations = useSavedLocations();
+  const savedLocations = useSavedAddresses();
   const walletBalance = useWalletBalance();
 
   useFocusEffect(
     useCallback(() => {
       void refreshProfile().catch(() => undefined);
+      void loadSavedAddresses().catch(() => undefined);
     }, [])
   );
 
@@ -78,7 +79,7 @@ export default function AccountScreen() {
 
         <View style={styles.menu}>
           <ListRow icon={Icons.wallet} label="Tài khoản" badgeLabel={formatMoney(walletBalance)} onPress={() => router.push('/wallet')} />
-          <ListRow icon={Icons.bookmark} label="Vị trí đã lưu" badgeCount={savedLocations.length} onPress={() => router.push('/profile/saved-locations')} />
+          <ListRow icon={Icons.bookmark} label="Vị trí đã lưu" badgeCount={savedLocations?.length ?? 0} onPress={() => router.push('/profile/saved-locations')} />
           <ListRow icon={Icons.shield} label="Chính sách ZuumViet" onPress={() => router.push('/profile/policies')} />
           <ListRow icon={Icons.lock} label="Đổi mật khẩu" onPress={() => router.push('/profile/change-passcode')} />
           <ListRow icon={Icons.logout} iconColor={Colors.error} label="Đăng xuất" chevron={false} onPress={() => setConfirmLogout(true)} divider={false} />

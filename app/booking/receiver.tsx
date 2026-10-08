@@ -1,18 +1,27 @@
 // app/booking/receiver.tsx — GH 1.4.1 "Thông tin người nhận" (param index)
-// Giao hàng: địa chỉ, Giao hàng tận tay, họ tên/SĐT/COD/ghi chú, kích cỡ gói hàng (4 ô), tuỳ chọn xem hàng → "Xác Nhận"
-// Vận tải: hàng lớn/nặng — không có Giao hàng tận tay, không có tuỳ chọn xem hàng; đổi kích cỡ gói hàng
-// thành mức tải trọng (FREIGHT_WEIGHTS) và thêm tuỳ chọn "Cần người bốc xếp" (tính thêm phí)
-// Dọn nhà: KHÔNG phải giao hàng/vận tải — không có COD, kích cỡ gói hàng hay xem hàng. Thay bằng tầng/thang
-// máy nhà mới, tuỳ chọn đóng gói + tháo lắp nội thất, và danh sách đồ đặc biệt cần báo trước đội bốc xếp.
+// Giao hàng: địa chỉ, họ tên/SĐT, COD (khi dịch vụ cho thu hộ, tối đa theo catalog), ghi chú, mức cân nặng (catalog),
+// tuỳ chọn xem hàng (ghi chú điểm) → "Xác Nhận"
+// Vận tải: không có tuỳ chọn xem hàng; "Cần người bốc xếp" ghi chú cho tài xế (API chưa có phụ phí riêng)
+// Dọn nhà: KHÔNG phải giao hàng — tầng/thang máy nhà mới, đóng gói, tháo lắp, đồ đặc biệt: gửi kèm ghi chú đơn.
 // Chở khách: chỉ địa chỉ điểm đến + bản đồ tràn khung (chạm để đổi) → "Xác Nhận"; tên/SĐT lấy của người đặt
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Chip, Icon, Icons, Radio, Screen, SwitchRow, TextField } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
-import { SERVICE_GROUPS, VIEW_OPTIONS, HCM_CENTER, FREIGHT_WEIGHTS, MOVING_BULKY_ITEMS, EXTRA_PRICES, type PackageSizeId, type ViewOptionId } from '@/constants/mockBooking';
-import { useBooking, ensureReceiver, updateReceiver, setReceiverPlace, setOptions, isValidPhoneVn, formatThousands } from '@/services/bookingStore';
-import { AddressBlock, AddressMapPreview, ContactPickerSheet, FlatFooter, FloorAccessPicker, PackageSizePicker, ZaloPasteSheet, type MapStop } from '@/components/booking';
+import { SERVICE_GROUPS, VIEW_OPTIONS, MOVING_BULKY_ITEMS, type ViewOptionId } from '@/constants/booking';
+import {
+  useBooking,
+  ensureReceiver,
+  updateReceiver,
+  setOptions,
+  isValidPhoneVn,
+  formatThousands,
+  formatVnd,
+  getSelectedService,
+  isReceiverComplete,
+} from '@/services/bookingStore';
+import { AddressBlock, AddressMapPreview, FlatFooter, FloorAccessPicker, PackageSizePicker, ZaloPasteSheet, type MapStop } from '@/components/booking';
 
 export default function ReceiverScreen() {
   const { index: indexParam } = useLocalSearchParams<{ index?: string }>();
@@ -21,12 +30,13 @@ export default function ReceiverScreen() {
   const receiver = state.receivers[index];
   const group = SERVICE_GROUPS[state.service];
   const labels = group.labels;
-  // Chở khách: chỉ cần điểm đến; tên/SĐT không bắt buộc (mặc định lấy của người đi)
+  const svc = getSelectedService(state);
   const isDelivery = group.kind === 'delivery';
-  // Vận tải: hàng lớn/nặng — không giao tận tay, không xem hàng, có thể cần thêm nhân công bốc xếp
   const isTransport = state.service === 'transport';
-  // Dọn nhà: khác hẳn giao hàng/vận tải — xem comment đầu file
   const isRental = state.service === 'rental';
+  const allowCod = !!svc?.rules.allowCod;
+  const codMax = svc?.rules.codMaxAmount ?? 0;
+  const tiers = svc?.weightTiers ?? [];
 
   useEffect(() => {
     ensureReceiver(index);
@@ -36,34 +46,34 @@ export default function ReceiverScreen() {
   const [phone, setPhone] = useState(receiver?.phone ?? '');
   const [cod, setCod] = useState(receiver?.cod ? String(receiver.cod) : '');
   const [note, setNote] = useState(receiver?.note ?? '');
-  const [size, setSize] = useState<PackageSizeId>(receiver?.packageSize ?? 's');
+  const [tierId, setTierId] = useState<string | null>(receiver?.weightTierId ?? null);
   const [view, setView] = useState<ViewOptionId>(receiver?.viewOption ?? 'view');
-  const [hand, setHand] = useState(receiver?.handDelivery ?? false);
   const [loadingHelp, setLoadingHelp] = useState(receiver?.needsLoadingHelp ?? false);
   const [floorTo, setFloorTo] = useState(state.options.movingFloorTo);
   const [elevatorTo, setElevatorTo] = useState(state.options.movingElevatorTo);
   const [packing, setPacking] = useState(state.options.movingPacking);
   const [disassembly, setDisassembly] = useState(state.options.movingDisassembly);
   const [bulkyItems, setBulkyItems] = useState<string[]>(state.options.movingBulkyItems);
-  const [contacts, setContacts] = useState(false);
   const [zaloPaste, setZaloPaste] = useState(false);
 
   const toggleBulkyItem = (id: string) => setBulkyItems((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const place = receiver?.place ?? null;
-  const valid = !!place && (!isDelivery || (name.trim().length >= 2 && isValidPhoneVn(phone)));
+  const codValue = allowCod ? Number(cod.replace(/\D/g, '')) || 0 : 0;
+  const otherCod = state.receivers.reduce((sum, r, i) => (i !== index && isReceiverComplete(r, state) ? sum + r.cod : sum), 0);
+  const codError = allowCod && codMax > 0 && codValue + otherCod > codMax ? `Tổng thu hộ tối đa ${formatVnd(codMax)} cho mỗi đơn` : null;
+  const phoneError = isDelivery && phone.trim() && !isValidPhoneVn(phone) ? 'Số điện thoại không hợp lệ' : null;
+  const valid = !!place && !codError && (!isDelivery || (name.trim().length >= 2 && isValidPhoneVn(phone)));
 
-  const openPicker = () => router.push({ pathname: '/booking/location', params: { target: 'receiver', index: String(index), back: '1' } });
+  const openPicker = (q?: string) =>
+    router.push({ pathname: '/booking/location', params: { target: 'receiver', index: String(index), back: '1', ...(q ? { q } : {}) } });
 
-  // "Dán từ Zalo": chỉ ghi đè trường nào thực sự tách được, giữ nguyên phần khách đã tự nhập
+  // "Dán từ Zalo": chỉ ghi đè trường nào thực sự tách được; địa chỉ phải chọn lại từ gợi ý (cần toạ độ thật)
   const applyZaloPaste = (r: { name: string; phone: string; address: string; note: string }) => {
     if (r.name) setName(r.name);
     if (r.phone) setPhone(r.phone);
     if (r.note) setNote((n) => n || r.note);
-    if (r.address) {
-      const anchor = place ?? state.sender.place ?? HCM_CENTER;
-      setReceiverPlace(index, { title: r.address, address: r.address, lat: anchor.lat + 0.006, lng: anchor.lng + 0.004, source: 'search' });
-    }
+    if (r.address) openPicker(r.address);
   };
 
   // Bản đồ xem trước (chở khách): điểm đón + điểm đến
@@ -79,17 +89,25 @@ export default function ReceiverScreen() {
     updateReceiver(index, {
       name: name.trim() || (isDelivery ? '' : state.sender.name),
       phone: phone.trim() || (isDelivery ? '' : state.sender.phone),
-      cod: Number(cod.replace(/\D/g, '')) || 0,
+      cod: codValue,
       note: note.trim(),
-      packageSize: size,
+      weightTierId: tierId ?? tiers[0]?.id ?? null,
       viewOption: view,
-      handDelivery: hand,
       needsLoadingHelp: loadingHelp,
     });
     if (isRental) setOptions({ movingFloorTo: floorTo, movingElevatorTo: elevatorTo, movingPacking: packing, movingDisassembly: disassembly, movingBulkyItems: bulkyItems });
     if (router.canGoBack()) router.back();
     else router.replace('/booking');
   };
+
+  const zaloRow = (
+    <Pressable onPress={() => setZaloPaste(true)} style={styles.zaloRow}>
+      <Icon name={Icons.paste} size={18} color={Colors.primary} style={{ marginRight: Spacing.sm }} />
+      <AppText size={14} weight="bold" color={Colors.primary}>
+        Dán từ Zalo/Messenger — tự điền tên, SĐT, địa chỉ
+      </AppText>
+    </Pressable>
+  );
 
   return (
     <Screen
@@ -101,14 +119,8 @@ export default function ReceiverScreen() {
     >
       {isRental ? (
         <View style={styles.body}>
-          <AddressBlock address={place?.address} placeholder={labels.receiverPlaceholder} markerType="dropoff" onChange={openPicker} />
-
-          <Pressable onPress={() => setZaloPaste(true)} style={styles.zaloRow}>
-            <Icon name={Icons.paste} size={18} color={Colors.primary} style={{ marginRight: Spacing.sm }} />
-            <AppText size={14} weight="bold" color={Colors.primary}>
-              Dán từ Zalo/Messenger — tự điền tên, SĐT, địa chỉ
-            </AppText>
-          </Pressable>
+          <AddressBlock address={place?.address} placeholder={labels.receiverPlaceholder} markerType="dropoff" onChange={() => openPicker()} />
+          {zaloRow}
 
           <TextField
             label="Họ và tên người liên hệ"
@@ -117,8 +129,6 @@ export default function ReceiverScreen() {
             onChangeText={setName}
             placeholder="Họ và tên người liên hệ tại nhà mới"
             autoCapitalize="words"
-            iconRight={Icons.contacts}
-            onIconRightPress={() => setContacts(true)}
             containerStyle={styles.field}
           />
           <TextField
@@ -128,20 +138,15 @@ export default function ReceiverScreen() {
             onChangeText={setPhone}
             placeholder="Số điện thoại liên hệ"
             keyboardType="phone-pad"
+            error={phoneError ?? undefined}
             containerStyle={styles.field}
           />
 
           <FloorAccessPicker label="Nhà/căn hộ mới" floor={floorTo} elevator={elevatorTo} onFloorChange={setFloorTo} onElevatorChange={setElevatorTo} />
 
           <View style={styles.divider} />
-          <SwitchRow icon={Icons.box} label="Cần đóng gói đồ đạc" sublabel={`đ${EXTRA_PRICES.movingPacking.toLocaleString('vi-VN')} · thùng carton, bọc đồ dễ vỡ`} value={packing} onValueChange={setPacking} />
-          <SwitchRow
-            icon={Icons.hardHat}
-            label="Cần tháo lắp nội thất"
-            sublabel={`đ${EXTRA_PRICES.movingDisassembly.toLocaleString('vi-VN')} · giường, tủ, máy lạnh...`}
-            value={disassembly}
-            onValueChange={setDisassembly}
-          />
+          <SwitchRow icon={Icons.box} label="Cần đóng gói đồ đạc" sublabel="Thùng carton, bọc đồ dễ vỡ — gửi kèm yêu cầu" value={packing} onValueChange={setPacking} />
+          <SwitchRow icon={Icons.hardHat} label="Cần tháo lắp nội thất" sublabel="Giường, tủ, máy lạnh... — gửi kèm yêu cầu" value={disassembly} onValueChange={setDisassembly} />
 
           <AppText weight="bold" size={14} style={{ marginTop: Spacing.lg, marginBottom: Spacing.sm }}>
             Đồ đặc biệt cần lưu ý (nếu có)
@@ -151,32 +156,23 @@ export default function ReceiverScreen() {
               <Chip key={item.id} label={item.label} active={bulkyItems.includes(item.id)} onPress={() => toggleBulkyItem(item.id)} style={styles.chip} />
             ))}
           </View>
+          <AppText size={12} color={Colors.textMuted} style={{ marginTop: Spacing.xs }}>
+            Các yêu cầu trên được gửi kèm ghi chú đơn để đội chuyển nhà chuẩn bị — giá báo ở bước xác nhận chưa gồm chi phí phát sinh.
+          </AppText>
 
           <TextField label="Ghi chú thêm" value={note} onChangeText={setNote} placeholder="Vd: đồ dễ vỡ, cần đến sớm buổi sáng..." containerStyle={styles.field} />
         </View>
       ) : isDelivery ? (
         <View style={styles.body}>
-          <AddressBlock address={place?.address} placeholder={labels.receiverPlaceholder} markerType="dropoff" onChange={openPicker} />
-
-          <Pressable onPress={() => setZaloPaste(true)} style={styles.zaloRow}>
-            <Icon name={Icons.paste} size={18} color={Colors.primary} style={{ marginRight: Spacing.sm }} />
-            <AppText size={14} weight="bold" color={Colors.primary}>
-              Dán từ Zalo/Messenger — tự điền tên, SĐT, địa chỉ
-            </AppText>
-          </Pressable>
+          <AddressBlock address={place?.address} placeholder={labels.receiverPlaceholder} markerType="dropoff" onChange={() => openPicker()} />
+          {zaloRow}
 
           {isTransport ? (
-            <SwitchRow
-              icon={Icons.box}
-              label="Cần người bốc xếp"
-              sublabel={`đ${EXTRA_PRICES.loadingHelp.toLocaleString('vi-VN')}`}
-              value={loadingHelp}
-              onValueChange={setLoadingHelp}
-            />
-          ) : (
-            <SwitchRow icon={Icons.handHold} label="Giao hàng tận tay" sublabel="đ10,000" value={hand} onValueChange={setHand} />
-          )}
-          <View style={styles.divider} />
+            <>
+              <SwitchRow icon={Icons.box} label="Cần người bốc xếp" sublabel="Gửi kèm yêu cầu cho tài xế" value={loadingHelp} onValueChange={setLoadingHelp} />
+              <View style={styles.divider} />
+            </>
+          ) : null}
 
           <TextField
             label="Họ và tên người nhận"
@@ -185,8 +181,6 @@ export default function ReceiverScreen() {
             onChangeText={setName}
             placeholder="Họ và tên người nhận"
             autoCapitalize="words"
-            iconRight={Icons.contacts}
-            onIconRightPress={() => setContacts(true)}
             containerStyle={styles.field}
           />
           <TextField
@@ -196,28 +190,32 @@ export default function ReceiverScreen() {
             onChangeText={setPhone}
             placeholder="Số điện thoại người nhận"
             keyboardType="phone-pad"
+            error={phoneError ?? undefined}
             containerStyle={styles.field}
           />
-          <TextField
-            label="COD"
-            value={formatThousands(cod)}
-            onChangeText={(t) => setCod(t.replace(/\D/g, ''))}
-            placeholder="Nhập số tiền"
-            suffix="đ"
-            keyboardType="number-pad"
-            helper="Tài xế sẽ trả tiền hàng trước và thu lại số tiền đó từ người nhận"
-            containerStyle={styles.field}
-          />
+          {allowCod ? (
+            <TextField
+              label="COD"
+              value={formatThousands(cod)}
+              onChangeText={(t) => setCod(t.replace(/\D/g, ''))}
+              placeholder="Nhập số tiền"
+              suffix="đ"
+              keyboardType="number-pad"
+              error={codError ?? undefined}
+              helper={codError ? undefined : 'Tài xế sẽ trả tiền hàng trước và thu lại số tiền đó từ người nhận'}
+              containerStyle={styles.field}
+            />
+          ) : null}
           <TextField label="Ghi chú sản phẩm" value={note} onChangeText={setNote} placeholder="Ghi chú sản phẩm" containerStyle={styles.field} />
 
-          <View style={{ marginTop: Spacing.lg }}>
-            {isTransport && (
+          {tiers.length ? (
+            <View style={{ marginTop: Spacing.lg }}>
               <AppText weight="bold" size={14} style={{ marginBottom: Spacing.sm }}>
-                Khối lượng hàng ước tính
+                {isTransport ? 'Khối lượng hàng ước tính' : 'Cân nặng gói hàng'}
               </AppText>
-            )}
-            <PackageSizePicker value={size} onChange={setSize} sizes={isTransport ? FREIGHT_WEIGHTS : undefined} />
-          </View>
+              <PackageSizePicker tiers={tiers} value={tierId} onChange={setTierId} />
+            </View>
+          ) : null}
 
           {!isTransport && (
             <View style={styles.radios}>
@@ -234,18 +232,10 @@ export default function ReceiverScreen() {
           markerType="dropoff"
           stops={mapStops}
           hintLabel={`Chạm để đổi ${labels.mapDropLabel.toLowerCase()}`}
-          onChange={openPicker}
+          onChange={() => openPicker()}
         />
       )}
 
-      <ContactPickerSheet
-        visible={contacts}
-        onClose={() => setContacts(false)}
-        onPick={(c) => {
-          setName(c.name);
-          setPhone(c.phone);
-        }}
-      />
       <ZaloPasteSheet visible={zaloPaste} onClose={() => setZaloPaste(false)} includeContact onApply={applyZaloPaste} />
     </Screen>
   );

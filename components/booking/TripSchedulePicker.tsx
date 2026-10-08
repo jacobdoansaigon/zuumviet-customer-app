@@ -1,121 +1,107 @@
-// components/booking/TripSchedulePicker.tsx — "Lịch trình" dùng chung cho Thuê cả xe & Xe ghép: chọn
-// một chiều (mặc định) hoặc khứ hồi (đi & về), ngày + giờ đi (mặc định 6:00 sáng), và nếu khứ hồi thì
-// thêm ngày + giờ về. Mỗi dòng (ngày đi / giờ đi / ngày về / giờ về) là 1 dải cuộn ngang riêng: ngày hiện
-// 3 ô rồi cuộn tiếp, giờ hiện ~5 mốc rồi cuộn tiếp. Trạng thái đang chọn dùng tông tím NHẠT (viền + nền
-// lavender, chữ tím) thay vì tím đặc, để tránh nặng màu khi nhiều dòng chọn cùng lúc trên 1 màn.
-// allowRoundTrip=false (Xe ghép): ẩn hẳn lựa chọn khứ hồi, chỉ còn ngày giờ đi.
+// components/booking/TripSchedulePicker.tsx — "Ngày giờ đi" cho Thuê cả xe (xe đường dài): dải ngày cuộn ngang (3 ô/màn)
+// + dải giờ khởi hành. Giờ theo giờ Việt Nam; mốc giờ không đủ "đặt trước tối thiểu" của dịch vụ (catalog) bị làm mờ.
+// Chuyến về (khứ hồi có ngày giờ về) chưa có trên API → không hỏi; muốn quay về điểm đón thì chọn "Khứ hồi" ở màn xác nhận.
 import React from 'react';
 import { View, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { AppText, Chip, Icons, SwitchRow } from '@/components/ui';
-import { DEPART_TIME_CHOICES, type DateOption, type TripScheduleValue } from '@/constants/mockIntercity';
+import { AppText, Chip } from '@/components/ui';
+import type { DateOption } from '@/services/intercity';
+
+export interface TripScheduleValue {
+  /** YYYY-MM-DD (giờ VN) */
+  dateKey: string;
+  /** "06:00" */
+  time: string;
+}
+
+/** Giờ khởi hành thường gặp cho tuyến liên tỉnh */
+export const DEPART_TIME_CHOICES = ['05:00', '06:00', '07:00', '08:00', '09:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'];
+
+/** Ngày (giờ VN) + giờ → epoch ms */
+export function scheduleToTs(v: TripScheduleValue): number {
+  return Date.parse(`${v.dateKey}T${v.time}:00+07:00`);
+}
+
+/** Mốc sớm nhất còn đặt được (đủ `leadMinutes` báo trước) trong danh sách ngày/giờ — mặc định 6:00 sáng nếu được */
+export function defaultTripSchedule(dateOptions: DateOption[], leadMinutes: number, preferred = '06:00'): TripScheduleValue {
+  const earliest = Date.now() + (leadMinutes + 5) * 60_000;
+  for (const d of dateOptions) {
+    const pref = { dateKey: d.key, time: preferred };
+    if (scheduleToTs(pref) >= earliest) return pref;
+    const t = DEPART_TIME_CHOICES.find((time) => scheduleToTs({ dateKey: d.key, time }) >= earliest);
+    if (t) return { dateKey: d.key, time: t };
+  }
+  const last = dateOptions[dateOptions.length - 1]!;
+  return { dateKey: last.key, time: preferred };
+}
 
 interface Props {
   value: TripScheduleValue;
-  onChange: (patch: Partial<TripScheduleValue>) => void;
-  /** danh sách ngày cho chiều đi */
+  onChange: (next: TripScheduleValue) => void;
   dateOptions: DateOption[];
-  /** danh sách ngày cho chiều về (phạm vi có thể xa hơn chiều đi); mặc định dùng chung dateOptions nếu không truyền */
-  returnDateOptions?: DateOption[];
+  /** phút báo trước tối thiểu (rules.minScheduleLeadMinutes) */
+  leadMinutes: number;
   timeChoices?: string[];
-  /** false (Xe ghép): ẩn lựa chọn khứ hồi, chỉ còn ngày giờ đi. Mặc định true (Thuê cả xe). */
-  allowRoundTrip?: boolean;
 }
 
-export const TripSchedulePicker: React.FC<Props> = ({ value, onChange, dateOptions, returnDateOptions, timeChoices = DEPART_TIME_CHOICES, allowRoundTrip = true }) => {
-  const returnOptions = (returnDateOptions ?? dateOptions).filter((d) => d.key >= value.departDateKey);
+export const TripSchedulePicker: React.FC<Props> = ({ value, onChange, dateOptions, leadMinutes, timeChoices = DEPART_TIME_CHOICES }) => {
   // Hiện đúng 3 ô ngày/màn hình rồi cuộn ngang cho các ngày còn lại
   const { width: winWidth } = useWindowDimensions();
   const dateCellWidth = Math.max(88, Math.floor((winWidth - Spacing.screen * 2 - Spacing.sm * 2) / 3));
+  const earliest = Date.now() + leadMinutes * 60_000;
+  const usable = (dateKey: string, time: string) => scheduleToTs({ dateKey, time }) >= earliest;
 
   return (
     <View style={styles.card}>
       <AppText size={15} weight="bold" style={styles.title}>
-        {allowRoundTrip ? 'Lịch trình' : 'Ngày giờ đi'}
+        Ngày giờ đi
       </AppText>
-
-      {allowRoundTrip ? (
-        <>
-          <View style={styles.tripTypeRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateStrip}>
+        {dateOptions.map((d) => {
+          const on = d.key === value.dateKey;
+          return (
             <Pressable
-              onPress={() => onChange({ tripType: 'oneway' })}
-              style={[styles.tripTypeBtn, value.tripType === 'oneway' && styles.tripTypeBtnActive]}
+              key={d.key}
+              onPress={() => {
+                const time = usable(d.key, value.time) ? value.time : (timeChoices.find((t) => usable(d.key, t)) ?? value.time);
+                onChange({ dateKey: d.key, time });
+              }}
+              style={[styles.dateCell, { width: dateCellWidth }, on && styles.dateCellActive]}
             >
-              <AppText size={14} weight="bold" color={value.tripType === 'oneway' ? Colors.primary : Colors.textSecondary}>
-                Chỉ chiều đi
+              <AppText size={13} weight={on ? 'bold' : 'medium'} color={on ? Colors.primary : Colors.text}>
+                {d.label}
+              </AppText>
+              <AppText size={11} color={on ? Colors.primary : Colors.textSecondary}>
+                {d.sub}
               </AppText>
             </Pressable>
-            <Pressable
-              onPress={() => onChange({ tripType: 'roundtrip', returnDateKey: value.returnDateKey < value.departDateKey ? value.departDateKey : value.returnDateKey })}
-              style={[styles.tripTypeBtn, value.tripType === 'roundtrip' && styles.tripTypeBtnActive]}
-            >
-              <AppText size={14} weight="bold" color={value.tripType === 'roundtrip' ? Colors.primary : Colors.textSecondary}>
-                Khứ hồi (đi &amp; về)
-              </AppText>
-            </Pressable>
-          </View>
-
-          <AppText size={13} weight="semiBold" color={Colors.textSecondary} style={styles.subLabel}>
-            Ngày giờ đi
-          </AppText>
-        </>
-      ) : null}
-      <DateStrip
-        options={dateOptions}
-        value={value.departDateKey}
-        cellWidth={dateCellWidth}
-        onChange={(k) => onChange({ departDateKey: k, returnDateKey: value.returnDateKey < k ? k : value.returnDateKey })}
-      />
-      <TimeChips choices={timeChoices} value={value.departTime} onChange={(t) => onChange({ departTime: t })} />
-
-      {allowRoundTrip && value.tripType === 'roundtrip' ? (
-        <>
-          <AppText size={13} weight="semiBold" color={Colors.textSecondary} style={styles.subLabel}>
-            Ngày giờ về
-          </AppText>
-          <DateStrip options={returnOptions} value={value.returnDateKey} cellWidth={dateCellWidth} onChange={(k) => onChange({ returnDateKey: k })} />
-          <TimeChips choices={timeChoices} value={value.returnTime} onChange={(t) => onChange({ returnTime: t })} />
-
-          <SwitchRow
-            icon={Icons.steering}
-            label="Phục vụ suốt hành trình"
-            sublabel={
-              value.waitForReturn
-                ? 'Có — xe & tài xế ở lại đón bạn cho chuyến về'
-                : 'Không — xe không cần ở lại, chỉ đưa bạn đi chiều đi'
-            }
-            value={value.waitForReturn}
-            onValueChange={(v) => onChange({ waitForReturn: v })}
-            style={styles.waitRow}
-          />
-        </>
+          );
+        })}
+      </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeStrip}>
+        {timeChoices.map((t) => {
+          const ok = usable(value.dateKey, t);
+          return (
+            <Chip
+              key={t}
+              label={t}
+              active={t === value.time}
+              variant="soft"
+              size="sm"
+              onPress={ok ? () => onChange({ ...value, time: t }) : undefined}
+              style={[styles.timeChip, !ok && { opacity: 0.35 }]}
+            />
+          );
+        })}
+      </ScrollView>
+      {leadMinutes > 0 ? (
+        <AppText size={11} color={Colors.textMuted} style={{ marginTop: Spacing.xs }}>
+          Đặt trước tối thiểu {leadMinutes >= 60 ? `${Math.round((leadMinutes / 60) * 10) / 10} giờ` : `${leadMinutes} phút`}
+        </AppText>
       ) : null}
     </View>
   );
 };
-
-const DateStrip: React.FC<{ options: DateOption[]; value: string; cellWidth: number; onChange: (key: string) => void }> = ({ options, value, cellWidth, onChange }) => (
-  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateStrip}>
-    {options.map((d) => (
-      <Pressable key={d.key} onPress={() => onChange(d.key)} style={[styles.dateCell, { width: cellWidth }, d.key === value && styles.dateCellActive]}>
-        <AppText size={13} weight={d.key === value ? 'bold' : 'medium'} color={d.key === value ? Colors.primary : Colors.text}>
-          {d.label}
-        </AppText>
-        <AppText size={11} color={d.key === value ? Colors.primary : Colors.textSecondary}>
-          {d.sub}
-        </AppText>
-      </Pressable>
-    ))}
-  </ScrollView>
-);
-
-const TimeChips: React.FC<{ choices: string[]; value: string; onChange: (t: string) => void }> = ({ choices, value, onChange }) => (
-  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeStrip}>
-    {choices.map((t) => (
-      <Chip key={t} label={t} active={t === value} variant="soft" size="sm" onPress={() => onChange(t)} style={styles.timeChip} />
-    ))}
-  </ScrollView>
-);
 
 const styles = StyleSheet.create({
   card: {
@@ -127,18 +113,6 @@ const styles = StyleSheet.create({
     ...Shadow.sm,
   },
   title: { marginBottom: Spacing.sm },
-  tripTypeRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
-  tripTypeBtn: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surfaceAlt,
-  },
-  tripTypeBtnActive: { backgroundColor: Colors.primaryBg, borderColor: Colors.primary },
-  subLabel: { marginTop: Spacing.md, marginBottom: 6 },
   dateStrip: { gap: Spacing.sm, paddingBottom: Spacing.xs },
   dateCell: {
     paddingVertical: Spacing.sm,
@@ -149,9 +123,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dateCellActive: { backgroundColor: Colors.primaryBg, borderColor: Colors.primary },
-  timeStrip: { gap: Spacing.sm, paddingBottom: Spacing.xs },
+  timeStrip: { gap: Spacing.sm, paddingBottom: Spacing.xs, marginTop: Spacing.sm },
   timeChip: { marginRight: 0, marginBottom: 0 },
-  waitRow: { marginTop: Spacing.xs },
 });
 
 export default TripSchedulePicker;

@@ -1,58 +1,32 @@
-// ActiveTripBanner — banner nổi trên tab bar (Figma Home): card trắng bo 12 shadow,
-// icon scooter tím, "Đang tìm chuyến xe" 11 tím, địa chỉ bold 16, "Xe máy" xám 13, giờ "12:19pm" xám phải
+// ActiveTripBanner — banner nổi trên tab bar (Figma Home): card trắng bo 12 shadow, icon dịch vụ tím,
+// trạng thái 11 tím, địa chỉ bold 16, tên dịch vụ xám 13, giờ "12:19pm" xám phải. Dữ liệu: đơn scope=active mới nhất.
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { AppText, Icon, Icons } from '@/components/ui';
-import { ORDER_STATUS, type DeliveryOrder } from '@/services/api';
-import { findOptionByServiceId, serviceNameById } from '@/services/serviceCatalog';
-import { formatTime12h } from '@/constants/mock';
+import { AppText, Icon, type IconName } from '@/components/ui';
+import type { OrderListItem } from '@/services/orders';
+import { activeStatusLabel, formatTime12, orderIcon } from '@/components/activity/orderUtils';
 
 export type ActiveTripInfo = {
-  id: number;
+  id: string;
   status: string;
   address: string;
   service: string;
   time: string;
+  icon: IconName;
 };
 
-function pickString(o: Record<string, unknown>, keys: string[]): string {
-  for (const k of keys) {
-    const v = o[k];
-    if (typeof v === 'string' && v.trim()) return v.trim();
-    if (v && typeof v === 'object') {
-      const nested = v as Record<string, unknown>;
-      const addr = nested.address ?? nested.full_address ?? nested.name;
-      if (typeof addr === 'string' && addr.trim()) return addr.trim();
-    }
-  }
-  return '';
-}
-
-/** Rút thông tin hiển thị từ đơn BE (tên field khác nhau tuỳ version → thử nhiều key) */
-export function describeActiveOrder(o: DeliveryOrder): ActiveTripInfo {
-  const status = Number(o.status);
-  const statusLabel =
-    status === ORDER_STATUS.NEW_SCHEDULED
-      ? 'Đã hẹn giờ, chờ tới giờ đón'
-      : status === ORDER_STATUS.NEW || status === ORDER_STATUS.ASSIGNING
-      ? 'Đang tìm chuyến xe'
-      : status === ORDER_STATUS.ACCEPTED
-        ? 'Tài xế đang đến lấy hàng'
-        : status === ORDER_STATUS.BOARDED
-          ? 'Tài xế đã đến nơi'
-          : 'Đang giao hàng';
-
-  const address =
-    pickString(o, ['pickup_address', 'from_address', 'sender_address', 'address', 'pickup', 'from']) || `Đơn hàng #${o.id}`;
-  // service_id thật → tên option trong catalog (đã tải sau đăng nhập); chưa có thì tên BE, cuối cùng mới 'Giao hàng'
-  const serviceId = Number(o.service_id) || 0;
-  const service = findOptionByServiceId(serviceId)?.option.name || serviceNameById(serviceId) || pickString(o, ['service_name']) || 'Giao hàng';
-
-  const created = Number(o.date_created ?? o.created_at ?? 0);
-  const date = created > 0 ? new Date(created > 1e12 ? created : created * 1000) : new Date();
-
-  return { id: o.id, status: statusLabel, address, service, time: formatTime12h(date) };
+/** Thông tin hiển thị của 1 đơn đang chạy */
+export function describeActiveOrder(o: OrderListItem): ActiveTripInfo {
+  const target = o.status === 'picked_up' ? (o.stops.find((s) => s.status === 'pending' || s.status === 'arrived')?.address ?? o.pickupAddress) : o.pickupAddress;
+  return {
+    id: o.id,
+    status: activeStatusLabel(o.status),
+    address: target,
+    service: o.service.name,
+    time: formatTime12(Date.parse(o.scheduledAt ?? o.createdAt)),
+    icon: orderIcon(o),
+  };
 }
 
 interface ActiveTripBannerProps {
@@ -65,7 +39,7 @@ export const ActiveTripBanner: React.FC<ActiveTripBannerProps> = ({ trip, onPres
   <View pointerEvents="box-none" style={[styles.wrap, { bottom }]}>
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && { opacity: 0.94 }]}>
       <View style={styles.iconWrap}>
-        <Icon name={Icons.scooter} size={28} color={Colors.primary} />
+        <Icon name={trip.icon} size={28} color={Colors.primary} />
       </View>
       <View style={{ flex: 1 }}>
         <AppText size={11} weight="semiBold" color={Colors.primary}>

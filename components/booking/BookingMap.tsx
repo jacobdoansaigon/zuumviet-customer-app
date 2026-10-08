@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Colors } from '@/constants/theme';
-import { HCM_CENTER } from '@/constants/mockBooking';
+import { HCM_CENTER } from '@/constants/booking';
 import { MapMarkerView, MARKER_SIZE } from './MapMarkerView';
 import type { BookingMapProps } from './mapTypes';
 

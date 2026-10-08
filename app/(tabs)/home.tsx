@@ -1,6 +1,6 @@
 // Trang chủ — Figma HOME 1.2 (3385-663): header tím chào theo giờ + avatar, lưới dịch vụ đè header,
 // thẻ ví thưởng gradient (pill số thành viên bên phải),
-// "Gợi ý cho bạn" (hoạt động gần đây / gợi ý theo giờ, 3 hàng cuộn dọc, bấm → mở đặt với lộ trình điền sẵn),
+// "Gợi ý cho bạn" (đặt lại chuyến gần đây của chính khách, bấm → mở đặt với lộ trình thật của đơn cũ),
 // "Tại sao chọn ZuumViet?" (1 thẻ / màn, cuộn ngang 4 khác biệt),
 // "Dành cho bạn / Tất cả" (2 hàng × 2 thẻ, cuộn ngang), "Đối tác của ZuumViet" (banner quảng cáo cuộn ngang),
 // footer app (logo, liên kết, công ty, phiên bản), banner chuyến đang đi nổi trên tab bar.
@@ -19,16 +19,18 @@ import {
   AppFooter,
   ActivitySuggestions,
   ActiveTripBanner,
+  buildReorderSuggestions,
   describeActiveOrder,
   type HomeServiceKey,
   type ActiveTripInfo,
+  type ReorderSuggestion,
 } from '@/components/home';
-import { orderApi, isActiveOrder } from '@/services/api';
+import { listOrders } from '@/services/orders';
+import { ensureCatalog } from '@/services/catalog';
+import { useRealtime, useRealtimeRefetch } from '@/hooks/useRealtime';
 import { displayName, formatPhone, refreshProfile, restoreSession, useProfile } from '@/services/session';
 import { MOCK_PROMOS, MOCK_COMMUNITY, getGreeting } from '@/constants/mock';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
-import { ensureServiceCatalog } from '@/services/serviceCatalog';
-import { localAvatarStore } from '@/services/profileStore';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
 const HEADER_OVERLAP = 40;
@@ -37,23 +39,26 @@ export default function HomeScreen() {
   useStatusBarStyle('light');
   const customer = useProfile();
   const [activeTrip, setActiveTrip] = useState<ActiveTripInfo | null>(null);
+  const [suggestions, setSuggestions] = useState<ReorderSuggestion[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [greeting, setGreeting] = useState(getGreeting());
-  const localAvatar = localAvatarStore.use();
   const walletBalance = useWalletBalance();
 
   const loadOrders = useCallback(async () => {
+    await ensureCatalog().catch(() => null);
     try {
-      await ensureServiceCatalog().catch(() => null);
-      const res = await orderApi.getOrders();
-      const items = res?.items ?? [];
-      const active = items.find(isActiveOrder);
-      setActiveTrip(active ? describeActiveOrder(active) : null);
+      const [active, history] = await Promise.all([listOrders('active', 1, 5), listOrders('history', 1, 20)]);
+      const current = active.items[0];
+      setActiveTrip(current ? describeActiveOrder(current) : null);
+      setSuggestions(buildReorderSuggestions(history.items));
     } catch {
-      // chưa cấu hình API / chưa có đơn → không hiện banner
-      setActiveTrip(null);
+      // mạng lỗi → giữ nguyên những gì đang hiện
     }
   }, []);
+
+  // đơn đổi trạng thái / kết nối lại realtime → cập nhật banner chuyến đang đi
+  useRealtime('order.updated', () => void loadOrders());
+  useRealtimeRefetch(() => void loadOrders());
 
   useEffect(() => {
     void restoreSession().then((ok) => {
@@ -80,7 +85,7 @@ export default function HomeScreen() {
   };
 
   const name = displayName(customer, customer?.phone ? formatPhone(customer.phone) : 'bạn');
-  const avatarUri = localAvatar ?? customer?.avatarUrl ?? null;
+  const avatarUri = customer?.avatarUrl ?? null;
 
   return (
     <View style={styles.root}>
@@ -112,16 +117,14 @@ export default function HomeScreen() {
             />
           </View>
 
-          <View style={styles.section}>
-            <ActivitySuggestions
-              onPress={(s) =>
-                router.push({
-                  pathname: '/booking',
-                  params: { service: s.service, ...(s.fromPlaceId ? { from: s.fromPlaceId } : {}), ...(s.toPlaceId ? { to: s.toPlaceId } : {}) },
-                })
-              }
-            />
-          </View>
+          {suggestions.length ? (
+            <View style={styles.section}>
+              <ActivitySuggestions
+                items={suggestions}
+                onPress={(s) => router.push({ pathname: '/booking', params: { service: s.service, reorder: s.orderId } })}
+              />
+            </View>
+          ) : null}
 
           <SectionHeader title="Tại sao chọn ZuumViet?" style={styles.newsHeader} />
           <WhyZuumCarousel />
@@ -137,7 +140,7 @@ export default function HomeScreen() {
       </ScrollView>
 
       {activeTrip ? (
-        <ActiveTripBanner trip={activeTrip} onPress={() => router.push(`/booking/tracking?orderId=${activeTrip.id}`)} bottom={Spacing.md} />
+        <ActiveTripBanner trip={activeTrip} onPress={() => router.push({ pathname: '/booking/tracking', params: { orderId: activeTrip.id } })} bottom={Spacing.md} />
       ) : null}
     </View>
   );

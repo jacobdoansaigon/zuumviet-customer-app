@@ -4,7 +4,7 @@ import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { AppText, Icon, type IconName } from '@/components/ui';
-import { SERVICE_GROUPS, type ServiceKey } from '@/constants/mockBooking';
+import { SERVICE_GROUPS, type ServiceKey } from '@/constants/booking';
 
 export type HomeServiceKey = ServiceKey;
 

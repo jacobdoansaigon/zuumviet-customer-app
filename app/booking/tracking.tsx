@@ -1,137 +1,103 @@
 // app/booking/tracking.tsx — 1.5: bản đồ + bottom sheet theo trạng thái đơn
-// (đang tìm tài xế / lên lịch / không tìm thấy / tìm thấy / đang giao / hoàn thành / đã huỷ).
-// orderId thật → poll orderApi.getOrderDetail mỗi 5s + đợt tìm tài xế (syncSearchState); push deliveryorder_accept/update
-// (hooks/useNotifications) chỉ làm poll sớm hơn. BE lỗi → báo toast, KHÔNG chuyển sang mô phỏng.
-// orderId mock / không có → mô phỏng tiến trình. QA: ?demo=notfound | ?demo=scheduled
-import React, { useEffect, useMemo, useState } from 'react';
+// (đã hẹn giờ / đang tìm tài xế / không tìm thấy / tài xế đang đến / đang thực hiện / hoàn thành / đã huỷ).
+// Nguồn: GET /v1/customer/orders/:id. Cập nhật realtime qua socket /customer: order.updated (tải lại đơn) +
+// partner.location (di chuyển ghim tài xế ngay); mỗi lần kết nối lại / push về đơn này cũng tải lại; dự phòng poll 30s.
+// ETA: ước lượng đường chim bay từ vị trí tài xế ở ~25 km/h (API chưa có ETA) — luôn ghi "khoảng".
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, ScrollView, Linking, ActivityIndicator, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AppText, BottomSheet, Icons, ListRow, Toast } from '@/components/ui';
+import { AppText, BottomSheet, Button, Icons, ListRow, Toast } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { orderApi, ORDER_STATUS, getErrorMessage } from '@/services/api';
-import { SERVICE_GROUPS } from '@/constants/mockBooking';
-import {
-  useBooking,
-  getStoredOrder,
-  createDemoOrder,
-  advanceMockOrder,
-  isMockOrderId,
-  isTerminalStatus,
-  normalizeApiOrder,
-  rememberOrder,
-  updateStoredOrder,
-  getTrackingPhase,
-  retrySearch,
-  syncSearchState,
-} from '@/services/bookingStore';
-import { ensureServiceCatalog } from '@/services/serviceCatalog';
+import { SERVICE_GROUPS } from '@/constants/booking';
+import { estimateEtaMinutes, getOrder, groupOfOrder, isActiveStatus, retryOrder, type OrderDetail } from '@/services/orders';
+import { ensureCatalog } from '@/services/catalog';
+import { errorMessage, isApiError } from '@/services/zuum';
+import { useRealtime, useRealtimeRefetch } from '@/hooks/useRealtime';
 import { useOrderPushRefresh } from '@/hooks/useNotifications';
 import { BookingMap, RoundIconButton, TrackingSheet, type MapStop } from '@/components/booking';
-import { buildTrackingLink, shareTrackingLink } from '@/services/shareLink';
 
-const MOCK_STEP_MS = 6000;
-const POLL_MS = 5000;
-const DEMO_ID = 'mock-demo';
+const FALLBACK_POLL_MS = 30_000;
 const SUPPORT_PHONE = '19001234';
 
+type LatLng = { lat: number; lng: number };
+
 export default function TrackingScreen() {
-  const { orderId: orderIdParam, demo, from } = useLocalSearchParams<{ orderId?: string; demo?: string; from?: string }>();
-  const orderId = orderIdParam && orderIdParam.length > 0 ? orderIdParam : DEMO_ID;
-  const state = useBooking();
-  const order = state.orders[orderId] ?? null;
-  const usingMock = isMockOrderId(orderId);
-  const [retried, setRetried] = useState(false);
-  // push deliveryorder_accept/update về đúng đơn này → tăng pushTick để poll ngay
-  const pushTick = useOrderPushRefresh(usingMock ? null : orderId);
-  const [runKey, setRunKey] = useState(0);
+  const { orderId: orderIdParam, from } = useLocalSearchParams<{ orderId?: string; from?: string }>();
+  const orderId = typeof orderIdParam === 'string' && orderIdParam ? orderIdParam : null;
+  const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [partnerLoc, setPartnerLoc] = useState<LatLng | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [menu, setMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [sheetH, setSheetH] = useState(0);
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
+  const failures = useRef(0);
+  const pushTick = useOrderPushRefresh(orderId);
 
-  // Đơn mock / demo: tạo nếu chưa có; demo=notfound → sau 4s báo không tìm thấy
-  useEffect(() => {
-    if (!isMockOrderId(orderId)) return;
-    if (!getStoredOrder(orderId)) createDemoOrder(orderId, demo);
-    if (demo === 'notfound' && !retried) {
-      const t = setTimeout(() => updateStoredOrder(orderId, { status: ORDER_STATUS.FAIL }), 4000);
-      return () => clearTimeout(t);
+  const load = useCallback(async () => {
+    if (!orderId) return;
+    try {
+      const data = await getOrder(orderId);
+      failures.current = 0;
+      setOrder(data);
+      setLoadError(null);
+      setPartnerLoc(data.partnerLocation ? { lat: data.partnerLocation.lat, lng: data.partnerLocation.lng } : null);
+    } catch (e) {
+      failures.current += 1;
+      if (isApiError(e, 'order.not_found')) setLoadError(errorMessage(e));
+      else if (failures.current === 2) setToast(`Không cập nhật được đơn: ${errorMessage(e)}`);
     }
-    return undefined;
-  }, [orderId, demo, retried]);
+  }, [orderId]);
 
-  // Mô phỏng tiến trình đơn (đơn hẹn giờ giữ trạng thái "lên lịch" lâu hơn)
   useEffect(() => {
-    if (!usingMock) return;
-    if (demo === 'notfound' && !retried) return;
-    let t: ReturnType<typeof setTimeout> | null = null;
-    const schedule = () => {
-      const cur = getStoredOrder(orderId);
-      if (!cur || isTerminalStatus(cur.status)) return;
-      t = setTimeout(
-        () => {
-          advanceMockOrder(orderId);
-          schedule();
-        },
-        cur.status === 2 ? MOCK_STEP_MS * 3 : MOCK_STEP_MS,
-      );
-    };
-    schedule();
-    return () => {
-      if (t) clearTimeout(t);
-    };
-  }, [usingMock, orderId, demo, retried, runKey]);
+    void ensureCatalog().catch(() => undefined);
+  }, []);
 
-  // Đơn thật: poll BE (đơn + đợt tìm tài xế). Lỗi mạng → toast sau 2 lần, vẫn poll tiếp.
   useEffect(() => {
-    if (usingMock) return;
-    let cancelled = false;
-    let failures = 0;
-    let timer: ReturnType<typeof setInterval> | null = null;
-    const load = async () => {
-      try {
-        await ensureServiceCatalog().catch(() => null);
-        const data = await orderApi.getOrderDetail(orderId);
-        if (cancelled) return;
-        failures = 0;
-        const next = rememberOrder(normalizeApiOrder(data, getStoredOrder(orderId)));
-        if (isTerminalStatus(next.status)) {
-          if (timer) clearInterval(timer);
-          return;
-        }
-        await syncSearchState(orderId);
-      } catch (e) {
-        failures += 1;
-        if (failures === 2 && !cancelled) setToast(`Không cập nhật được đơn: ${getErrorMessage(e)}`);
-      }
-    };
     void load();
-    timer = setInterval(load, POLL_MS);
-    return () => {
-      cancelled = true;
-      if (timer) clearInterval(timer);
-    };
-  }, [usingMock, orderId, pushTick]);
+  }, [load, pushTick]);
+
+  // Realtime: đơn đổi trạng thái → tải lại; vị trí tài xế → cập nhật ghim; (re)connect → tải lại (có thể đã lỡ sự kiện)
+  useRealtime('order.updated', (p) => {
+    if (p.orderId === orderId) void load();
+  });
+  useRealtime('partner.location', (p) => {
+    if (p.orderId === orderId) setPartnerLoc({ lat: p.lat, lng: p.lng });
+  });
+  useRealtimeRefetch(() => void load());
+
+  // Dự phòng khi socket chập chờn: poll chậm lúc đơn còn chạy
+  const active = order ? isActiveStatus(order.status) || order.status === 'no_driver_found' : true;
+  useEffect(() => {
+    if (!orderId || !active) return;
+    const t = setInterval(() => void load(), FALLBACK_POLL_MS);
+    return () => clearInterval(t);
+  }, [orderId, active, load]);
+
+  const showPartner = !!partnerLoc && (order?.status === 'assigned' || order?.status === 'arrived_pickup' || order?.status === 'picked_up');
+  const eta = order && showPartner ? estimateEtaMinutes(order, partnerLoc) : null;
 
   const stops = useMemo<MapStop[]>(() => {
     if (!order) return [];
-    const group = SERVICE_GROUPS[order.service];
+    const group = SERVICE_GROUPS[groupOfOrder(order.service)];
     const L = group.labels;
     const list: MapStop[] = [
       { id: 'pickup', lat: order.pickup.lat, lng: order.pickup.lng, type: 'pickup', label: L.mapPickupLabel },
-      ...order.stops.map<MapStop>((s, i) => ({ id: `drop-${i}`, lat: s.lat, lng: s.lng, type: 'dropoff', label: group.maxStops > 1 ? `${L.mapDropLabel} ${i + 1}` : L.mapDropLabel })),
+      ...order.stops.map<MapStop>((s, i) => ({
+        id: `drop-${s.id}`,
+        lat: s.lat,
+        lng: s.lng,
+        type: 'dropoff',
+        label: order.stops.length > 1 ? `${L.mapDropLabel} ${i + 1}` : L.mapDropLabel,
+      })),
     ];
-    const phase = getTrackingPhase(order);
-    if (order.driver && (phase === 'accepted' || phase === 'delivering')) {
-      const target = phase === 'accepted' ? order.pickup : (order.stops.find((s) => s.status !== 'completed') ?? order.pickup);
-      const from = phase === 'accepted' ? { lat: order.pickup.lat + 0.006, lng: order.pickup.lng - 0.005 } : order.pickup;
-      list.push({ id: 'driver', lat: (from.lat + target.lat) / 2, lng: (from.lng + target.lng) / 2, type: 'driver', label: order.driver.name });
-    }
+    if (showPartner && partnerLoc) list.push({ id: 'driver', lat: partnerLoc.lat, lng: partnerLoc.lng, type: 'driver', label: order.partner?.fullName });
     return list;
-  }, [order]);
+  }, [order, partnerLoc, showPartner]);
 
   const goHome = () => {
     try {
@@ -146,64 +112,52 @@ export default function TrackingScreen() {
     else router.back();
   };
   const retry = async () => {
-    if (usingMock) {
-      updateStoredOrder(orderId, { status: ORDER_STATUS.ASSIGNING, driver: null });
-      setRetried(true);
-      setRunKey((k) => k + 1);
-      setToast('Đang tìm lại tài xế gần bạn...');
-      return;
-    }
+    if (!orderId || retrying) return;
+    setRetrying(true);
     try {
-      await retrySearch(orderId);
-      updateStoredOrder(orderId, { searchExpired: false });
+      setOrder(await retryOrder(orderId));
       setToast('Đang tìm lại tài xế gần bạn...');
     } catch (e) {
-      setToast(getErrorMessage(e, 'Không bắt đầu lại được việc tìm tài xế'));
+      setToast(errorMessage(e, 'Không bắt đầu lại được việc tìm tài xế'));
+    } finally {
+      setRetrying(false);
     }
   };
-  const call = (phone?: string) => {
+  const call = (phone?: string | null) => {
     if (!phone) return;
     Linking.openURL(`tel:${phone}`).catch(() => setToast('Không thể thực hiện cuộc gọi trên thiết bị này'));
   };
-  const shareTrip = async () => {
-    if (!order) return;
-    const res = await shareTrackingLink({
-      title: 'Theo dõi chuyến của tôi trên ZuumViet',
-      message: `Mình đang đi chuyến ${order.code} trên ZuumViet, bạn theo dõi giúp mình nhé.`,
-      url: buildTrackingLink('trip', orderId),
-    });
-    setToast(res === 'copied' ? 'Đã sao chép liên kết theo dõi chuyến' : res === 'unavailable' ? 'Thiết bị không hỗ trợ chia sẻ' : 'Đã mở hộp thoại chia sẻ');
-  };
 
-  const phase = order ? getTrackingPhase(order) : null;
-  const cancellable = phase === 'searching' || phase === 'scheduled' || phase === 'accepted';
+  const cancellable = !!order?.allowedActions.includes('cancel');
 
   return (
     <View style={styles.root}>
       <BookingMap stops={stops} bottomPadding={sheetH} />
       <RoundIconButton icon={Icons.close} onPress={close} style={[styles.close, { top: insets.top + Spacing.md }]} accessibilityLabel="Đóng" />
-      {order?.isMock ? (
-        <View style={[styles.mockTag, { top: insets.top + Spacing.md + 8 }]}>
-          <AppText size={11} weight="semiBold" color={Colors.textSecondary}>
-            Đơn mô phỏng
-          </AppText>
-        </View>
-      ) : null}
 
       <View style={styles.sheet} onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}>
         <ScrollView style={{ maxHeight: height * 0.68 }} contentContainerStyle={{ paddingBottom: insets.bottom + Spacing.md }} showsVerticalScrollIndicator={false}>
           {order ? (
             <TrackingSheet
               order={order}
+              etaMinutes={eta}
               expanded={expanded}
               onToggle={() => setExpanded((v) => !v)}
               onMore={() => setMenu(true)}
-              onRetry={retry}
-              onCall={() => call(order.driver?.phone)}
-              onChat={() => setToast('Tính năng nhắn tin với tài xế sẽ sớm ra mắt')}
-              onRate={() => router.push(`/orders/${orderId}/rate`)}
+              onRetry={() => void retry()}
+              retrying={retrying}
+              onCall={() => call(order.partner?.phone)}
+              onChat={() => setToast('Tính năng nhắn tin với tài xế sắp ra mắt')}
+              onRate={() => router.push(`/orders/${order.id}/rate`)}
               onHome={goHome}
             />
+          ) : loadError || !orderId ? (
+            <View style={styles.loading}>
+              <AppText size={14} color={Colors.textSecondary} align="center">
+                {loadError ?? 'Không tìm thấy đơn hàng'}
+              </AppText>
+              <Button title="Về trang chủ" variant="outline" onPress={goHome} style={{ marginTop: Spacing.md }} />
+            </View>
           ) : (
             <View style={styles.loading}>
               <ActivityIndicator color={Colors.primary} />
@@ -216,14 +170,15 @@ export default function TrackingScreen() {
       </View>
 
       <BottomSheet visible={menu} onClose={() => setMenu(false)} contentStyle={{ paddingHorizontal: 0, paddingBottom: Spacing.sm }}>
-        {cancellable ? (
+        {cancellable && order ? (
           <ListRow
             icon={Icons.closeCircle}
             iconColor={Colors.error}
             label="Huỷ đơn hàng"
+            sublabel={order.cancelFeeIfNow ? `Phí huỷ nếu huỷ bây giờ: ${order.cancelFeeIfNow.toLocaleString('vi-VN')}đ` : 'Miễn phí huỷ lúc này'}
             onPress={() => {
               setMenu(false);
-              router.push({ pathname: '/booking/cancel', params: { orderId } });
+              router.push({ pathname: '/booking/cancel', params: { orderId: order.id } });
             }}
           />
         ) : null}
@@ -231,19 +186,10 @@ export default function TrackingScreen() {
           icon={Icons.headset}
           label="Liên hệ hỗ trợ"
           sublabel={`Tổng đài ${SUPPORT_PHONE}`}
-          onPress={() => {
-            setMenu(false);
-            call(SUPPORT_PHONE);
-          }}
-        />
-        <ListRow
-          icon={Icons.share}
-          label="Chia sẻ chuyến cho người thân"
-          sublabel="Người thân xem được vị trí, không cần cài app"
           divider={false}
           onPress={() => {
             setMenu(false);
-            void shareTrip();
+            call(SUPPORT_PHONE);
           }}
         />
       </BottomSheet>
@@ -256,15 +202,6 @@ export default function TrackingScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.mapBg },
   close: { position: 'absolute', left: Spacing.screen },
-  mockTag: {
-    position: 'absolute',
-    right: Spacing.screen,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
-    ...Shadow.sm,
-  },
   sheet: {
     position: 'absolute',
     left: 0,
@@ -275,5 +212,5 @@ const styles = StyleSheet.create({
     borderTopRightRadius: BorderRadius.xl,
     ...Shadow.lg,
   },
-  loading: { alignItems: 'center', paddingVertical: Spacing['2xl'] },
+  loading: { alignItems: 'center', paddingVertical: Spacing['2xl'], paddingHorizontal: Spacing.screen },
 });

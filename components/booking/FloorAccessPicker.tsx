@@ -1,6 +1,6 @@
 // FloorAccessPicker — Dọn nhà: tầng + thang máy của MỘT đầu (nhà cũ hoặc nhà mới). Dùng ở cả
-// app/booking/sender.tsx (điểm đi) và app/booking/receiver.tsx (điểm đến) vì mỗi đầu tính phụ phí riêng.
-// Không có thang máy → tính phụ phí mỗi tầng từ tầng 2 trở lên (xem EXTRA_PRICES.movingFloorFee).
+// app/booking/sender.tsx (điểm đi) và app/booking/receiver.tsx (điểm đến). Gửi kèm ghi chú đơn để đội chuyển nhà
+// chuẩn bị nhân lực — API chưa có phụ phí tầng lầu nên app không cộng giá.
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Colors, Spacing } from '@/constants/theme';
@@ -33,7 +33,7 @@ export const FloorAccessPicker: React.FC<Props> = ({ label, floor, elevator, onF
     {floor > 0 ? (
       <SwitchRow
         label="Có thang máy"
-        sublabel="Không có thang máy sẽ tính thêm phụ phí mỗi tầng"
+        sublabel="Báo trước để đội chuyển nhà chuẩn bị nhân lực"
         value={elevator}
         onValueChange={onElevatorChange}
         style={{ marginTop: Spacing.sm }}

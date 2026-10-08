@@ -4,8 +4,9 @@ import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, Icon, Icons, StopMarker } from '@/components/ui';
-import { DELIVERY_LABELS, type ServiceLabels } from '@/constants/mockBooking';
+import { DELIVERY_LABELS, type ServiceLabels } from '@/constants/booking';
 import { isReceiverComplete, type Sender, type Receiver } from '@/services/bookingStore';
+import { formatPhone } from '@/services/session';
 
 interface StopRowProps {
   type: 'pickup' | 'dropoff';
@@ -78,7 +79,7 @@ export const StopList: React.FC<StopListProps> = ({
   maxStops = 10,
 }) => {
   const complete = receivers.map((r, index) => ({ r, index })).filter((x) => isReceiverComplete(x.r));
-  const senderTitle = sender.name && sender.phone ? `${sender.name} - ${sender.phone}` : undefined;
+  const senderTitle = sender.name && sender.phone ? `${sender.name} - ${formatPhone(sender.phone)}` : undefined;
   const canAdd = maxStops > 0 && complete.length < maxStops;
   return (
     <View style={styles.wrap}>
@@ -96,7 +97,7 @@ export const StopList: React.FC<StopListProps> = ({
           key={r.id}
           type="dropoff"
           // Chở khách (1 điểm đến): hiện tên địa điểm; giao hàng: tên - SĐT người nhận
-          title={maxStops === 1 ? r.place?.title || r.place?.address || labels.receiverStatus : r.name && r.phone ? `${r.name} - ${r.phone}` : r.place?.title || labels.receiverStatus}
+          title={maxStops === 1 ? r.place?.title || r.place?.address || labels.receiverStatus : r.name && r.phone ? `${r.name} - ${formatPhone(r.phone)}` : r.place?.title || labels.receiverStatus}
           status={labels.receiverStatus}
           subtitle={r.place?.address}
           connector={canAdd || i < complete.length - 1}

@@ -8,7 +8,7 @@ import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppHeader, AppText, Button, EmptyState, Icon, Icons, Screen } from '@/components/ui';
 import { promoVisual } from '@/components/home';
 import { MOCK_PROMOS } from '@/constants/mock';
-import { SERVICE_GROUPS, toServiceKey } from '@/constants/mockBooking';
+import { SERVICE_GROUPS, toServiceKey } from '@/constants/booking';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
 export default function PromotionDetailScreen() {
