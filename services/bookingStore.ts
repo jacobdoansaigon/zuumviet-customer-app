@@ -10,6 +10,7 @@ import { useSyncExternalStore } from 'react';
 import { findService, optionsFor, estimatePrice, type CatalogService, type ServiceOptionView } from '@/services/catalog';
 import { getProfile, localPhone } from '@/services/session';
 import { reversePlace } from '@/services/places';
+import { VN_OFFSET_MS, vnDateKey } from '@/services/vnTime';
 import { api, errorMessage, isApiError, onSessionChange, ZuumApiError, type ZuumResponse, type ZuumRoutes } from '@/services/zuum';
 import { MOVING_BULKY_ITEMS, SERVICE_GROUPS, TIP_STEP, type ServiceKey, type ViewOptionId } from '@/constants/booking';
 
@@ -194,18 +195,30 @@ export function startBooking(service: ServiceKey) {
 export function syncOptionWithCatalog() {
   const opts = optionsFor(state.service);
   if (!opts.length) return;
-  if (!opts.some((o) => o.id === state.optionId)) update({ optionId: firstOptionId(state.service) });
+  if (!opts.some((o) => o.id === state.optionId)) {
+    const optionId = firstOptionId(state.service);
+    update((s) => ({ optionId, options: { ...s.options, scheduledAt: keepSchedule(optionId, s.options.scheduledAt) } }));
+  }
 }
 
 /** Đổi dịch vụ ngay trong màn đặt (vd Xe máy ⇄ Xe hơi) mà không reset điểm đón/điểm đến */
 export function switchRideOption(service: ServiceKey, optionId: string) {
   if (state.service === service && state.optionId === optionId) return;
-  update((s) => ({ service, optionId, options: { ...s.options, addonIds: [] } }));
+  update((s) => ({ service, optionId, options: { ...s.options, addonIds: [], scheduledAt: keepSchedule(optionId, s.options.scheduledAt) } }));
+}
+
+/** Đổi sang dịch vụ không nhận hẹn giờ → bỏ giờ hẹn đã chọn (màn xác nhận không còn chỗ để xoá) */
+function keepSchedule(optionId: string, scheduledAt: number | null): number | null {
+  return scheduledAt && findService(optionId)?.rules.allowScheduling ? scheduledAt : null;
 }
 
 /** Thuê nhân công: chọn hạng mục kèm số block thời gian làm việc */
 export function selectLaborOption(service: ServiceKey, optionId: string, blocks: number) {
-  update((s) => ({ service, optionId, options: { ...s.options, addonIds: [], laborBlocks: Math.max(1, Math.round(blocks) || 1) } }));
+  update((s) => ({
+    service,
+    optionId,
+    options: { ...s.options, addonIds: [], scheduledAt: keepSchedule(optionId, s.options.scheduledAt), laborBlocks: Math.max(1, Math.round(blocks) || 1) },
+  }));
 }
 
 /** Điền tên/SĐT người gửi từ hồ sơ đã đăng nhập (chỉ khi còn trống) */
@@ -385,7 +398,7 @@ export function buildQuoteRequest(s: BookingState = state, couponCode: string | 
       weightTierId: resolveWeightTier(r.weightTierId, svc),
     })),
     returnToPickup: svc.rules.allowReturnToPickup && o.returnToPickup,
-    scheduledAt: o.scheduledAt ? new Date(o.scheduledAt).toISOString() : null,
+    scheduledAt: svc.rules.allowScheduling && o.scheduledAt ? new Date(o.scheduledAt).toISOString() : null,
     ...(blockMinutes > 0 ? { durationMinutes: Math.max(1, o.laborBlocks) * blockMinutes } : {}),
     addonIds,
     tip: o.tip * TIP_STEP,
@@ -530,11 +543,21 @@ export function effectivePrice(s: BookingState = state): { total: number; origin
 }
 
 // ---------------------------------------------------------------- Tạo đơn
+const priceChanged = (total: number) =>
+  new ZuumApiError(409, 'quote.price_changed', `Giá vừa cập nhật thành ${formatVnd(total)} — vui lòng kiểm tra lại rồi bấm Xác nhận`);
+
+async function createFromQuote(quoteId: string): Promise<CreatedOrder> {
+  const created = await api('POST /v1/customer/orders', { body: buildOrderBody(state, quoteId) });
+  resetDraft();
+  return created;
+}
+
 /**
- * Tạo đơn từ báo giá còn hạn (báo giá lại nếu cần). Báo giá hết hạn giữa chừng (410 quote.expired): báo giá lại để
- * khách xem giá mới rồi bấm xác nhận lần nữa — không tự tạo đơn với giá khác giá khách đã thấy.
+ * Tạo đơn ĐÚNG với giá khách đang thấy (`shownTotal` — giá server đã báo hiển thị trên màn xác nhận).
+ * Phải báo giá lại (báo giá vừa hết hạn / server báo quote.expired) mà tổng tiền khác → không tạo đơn, ném
+ * `quote.price_changed` để màn xác nhận hiện giá mới và khách bấm xác nhận lần nữa. Giá không đổi → tạo đơn luôn.
  */
-export async function submitBooking(): Promise<CreatedOrder> {
+export async function submitBooking(shownTotal: number): Promise<CreatedOrder> {
   let quote = currentQuote();
   if (!quote) {
     const q = await refreshQuote(true);
@@ -543,13 +566,15 @@ export async function submitBooking(): Promise<CreatedOrder> {
     }
     quote = q.quote;
   }
+  if (quote.price.total !== shownTotal) throw priceChanged(quote.price.total);
   try {
-    const created = await api('POST /v1/customer/orders', { body: buildOrderBody(state, quote.id) });
-    resetDraft();
-    return created;
+    return await createFromQuote(quote.id);
   } catch (e) {
-    if (isApiError(e, 'quote.expired', 'quote.not_found', 'coupon.changed')) void refreshQuote(true);
-    throw e;
+    if (!isApiError(e, 'quote.expired', 'quote.not_found', 'coupon.changed')) throw e;
+    const q = await refreshQuote(true);
+    if (q.status !== 'ready' || !q.quote) throw e;
+    if (q.quote.price.total !== shownTotal) throw priceChanged(q.quote.price.total);
+    return createFromQuote(q.quote.id);
   }
 }
 
@@ -571,16 +596,13 @@ export function isValidPhoneVn(p: string): boolean {
 
 const two = (n: number) => String(n).padStart(2, '0');
 
-/** "Bây giờ" | "18h30" | "Ngày mai, 08h00" | "25/09, 08h00" */
+/** "Bây giờ" | "18h30" | "Ngày mai, 08h00" | "25/09, 08h00" — theo giờ Việt Nam (như bộ chọn giờ) */
 export function formatScheduleLabel(ts: number | null): string {
   if (!ts) return 'Bây giờ';
-  const d = new Date(ts);
-  const now = new Date();
-  const time = `${two(d.getHours())}h${two(d.getMinutes())}`;
-  const sameDay = d.toDateString() === now.toDateString();
-  if (sameDay) return time;
-  const tomorrow = new Date(now);
-  tomorrow.setDate(now.getDate() + 1);
-  if (d.toDateString() === tomorrow.toDateString()) return `Ngày mai, ${time}`;
-  return `${two(d.getDate())}/${two(d.getMonth() + 1)}, ${time}`;
+  const d = new Date(ts + VN_OFFSET_MS); // đọc bằng getUTC* = giờ VN
+  const time = `${two(d.getUTCHours())}h${two(d.getUTCMinutes())}`;
+  const day = vnDateKey(ts);
+  if (day === vnDateKey(Date.now())) return time;
+  if (day === vnDateKey(Date.now() + 24 * 3600_000)) return `Ngày mai, ${time}`;
+  return `${two(d.getUTCDate())}/${two(d.getUTCMonth() + 1)}, ${time}`;
 }

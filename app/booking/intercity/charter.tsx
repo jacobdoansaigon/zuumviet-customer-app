@@ -9,6 +9,7 @@ import { Colors, Spacing } from '@/constants/theme';
 import { useBooking, completeReceivers, switchRideOption, setOptions, estimateFor, formatVnd } from '@/services/bookingStore';
 import { optionsFor, useCatalog, type ServiceOptionView } from '@/services/catalog';
 import { buildDateOptions } from '@/services/intercity';
+import { useVnToday } from '@/hooks/useVnToday';
 import { ServiceInfoDialog, TripSchedulePicker, defaultTripSchedule, scheduleToTs, type TripScheduleValue } from '@/components/booking';
 
 export default function CharterScreen() {
@@ -17,10 +18,14 @@ export default function CharterScreen() {
   const options = optionsFor('intercity', catalog);
   const selected = options.find((o) => o.id === state.optionId) ?? options.find((o) => !o.paused) ?? null;
   const rules = selected?.service.rules;
+  const canSchedule = !!rules?.allowScheduling;
   const lead = rules?.minScheduleLeadMinutes ?? 0;
-  const dateOptions = useMemo(() => buildDateOptions(Math.max(1, Math.min(14, (rules?.maxScheduleDays ?? 7) + 1))), [rules?.maxScheduleDays]);
+  const maxDays = rules?.maxScheduleDays ?? 0;
+  const today = useVnToday();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `today`: dựng lại dải ngày khi qua nửa đêm (giờ VN)
+  const dateOptions = useMemo(() => buildDateOptions(Math.max(1, Math.min(14, maxDays + 1))), [maxDays, today]);
   const [info, setInfo] = useState<ServiceOptionView | null>(null);
-  const [schedule, setSchedule] = useState<TripScheduleValue>(() => defaultTripSchedule(dateOptions, lead));
+  const [schedule, setSchedule] = useState<TripScheduleValue | null>(() => (canSchedule ? defaultTripSchedule(dateOptions, lead, maxDays) : null));
   const destLabel = completeReceivers(state)[0]?.place?.title ?? '';
   const pickupLabel = state.sender.place?.title ?? '';
 
@@ -29,10 +34,16 @@ export default function CharterScreen() {
     if (selected && selected.id !== state.optionId) switchRideOption('intercity', selected.id);
   }, [selected, state.optionId]);
 
-  // Đồng bộ ngày giờ đi vào bản nháp (scheduledAt của báo giá)
+  // Catalog tải xong sau khi mở màn / qua ngày mới làm ngày đang chọn rơi khỏi dải → chọn lại mặc định hợp lệ
   useEffect(() => {
-    setOptions({ scheduledAt: scheduleToTs(schedule) });
-  }, [schedule]);
+    if (!canSchedule) return;
+    if (!schedule || !dateOptions.some((d) => d.key === schedule.dateKey)) setSchedule(defaultTripSchedule(dateOptions, lead, maxDays));
+  }, [canSchedule, schedule, dateOptions, lead, maxDays]);
+
+  // Đồng bộ ngày giờ đi vào bản nháp (scheduledAt của báo giá); dịch vụ không nhận hẹn giờ → đi ngay
+  useEffect(() => {
+    setOptions({ scheduledAt: canSchedule && schedule ? scheduleToTs(schedule) : null });
+  }, [schedule, canSchedule]);
 
   const pick = (o: ServiceOptionView) => {
     if (!o.paused) switchRideOption('intercity', o.id);
@@ -58,7 +69,9 @@ export default function CharterScreen() {
           </AppText>
         </View>
 
-        <TripSchedulePicker value={schedule} onChange={setSchedule} dateOptions={dateOptions} leadMinutes={lead} />
+        {canSchedule && schedule ? (
+          <TripSchedulePicker value={schedule} onChange={setSchedule} dateOptions={dateOptions} leadMinutes={lead} maxDays={maxDays} />
+        ) : null}
 
         <AppText size={15} weight="bold" style={styles.sectionTitle}>
           Chọn hạng xe

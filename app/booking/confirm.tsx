@@ -1,7 +1,9 @@
 // app/booking/confirm.tsx — GH 1.6 / VT 1.6 "Xác nhận giao hàng": tuỳ chọn theo luật của dịch vụ (catalog):
 // quay về điểm đón (allowReturnToPickup), dịch vụ cộng thêm (addons), tiền tip, hẹn giờ (allowScheduling, tối thiểu
 // minScheduleLeadMinutes, tối đa maxScheduleDays), ghi chú; footer Mã giảm giá | Tiền mặt/Ví, giá, "Xác nhận" → tạo đơn.
-// Giá ở footer là giá server báo (POST /v1/customer/quotes) — trong lúc chờ chỉ hiện ước tính "~".
+// Giá ở footer là giá server báo (POST /v1/customer/quotes) — trong lúc chờ chỉ hiện ước tính "~" và KHÔNG cho xác nhận.
+// Chỉ tạo đơn với đúng giá đang hiện: báo giá tự làm mới trước khi hết hạn; phải báo giá lại mà giá khác → hiện giá mới,
+// khách bấm xác nhận lần nữa. Trả tiền mặt mà còn nợ phí huỷ đơn trước → báo trước khoản tài xế sẽ thu thêm.
 import React, { useEffect, useState } from 'react';
 import { View, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
@@ -21,8 +23,10 @@ import {
   maxStopsOf,
   completeReceivers,
 } from '@/services/bookingStore';
-import { errorMessage } from '@/services/zuum';
+import { errorMessage, isApiError } from '@/services/zuum';
+import { vnDateKey, vnDateTime } from '@/services/vnTime';
 import { FlatFooter, OptionRow, PaymentSheet } from '@/components/booking';
+import { useWalletSummary } from '@/hooks/useWalletBalance';
 
 type ScheduleChoice = { label: string; minutes?: number; tomorrowAt?: number };
 
@@ -36,14 +40,12 @@ const SCHEDULE_CHOICES: ScheduleChoice[] = [
   { label: 'Ngày mai, 14h00', tomorrowAt: 14 },
 ];
 
-/** Thời điểm hẹn của 1 lựa chọn (cộng 2 phút để còn đủ "báo trước tối thiểu" lúc server báo giá) */
+/** Thời điểm hẹn của 1 lựa chọn (cộng 2 phút để còn đủ "báo trước tối thiểu" lúc server báo giá); "ngày mai" theo giờ VN */
 function choiceTs(c: ScheduleChoice): number | null {
   if (c.minutes) return Date.now() + (c.minutes + 2) * 60_000;
   if (c.tomorrowAt != null) {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    d.setHours(c.tomorrowAt, 0, 0, 0);
-    return d.getTime();
+    const tomorrow = vnDateKey(Date.now() + 24 * 3600_000);
+    return vnDateTime(tomorrow, `${String(c.tomorrowAt).padStart(2, '0')}:00`);
   }
   return null;
 }
@@ -59,7 +61,17 @@ export default function ConfirmScreen() {
   const [timeSheet, setTimeSheet] = useState(false);
   const [paySheet, setPaySheet] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ title: string; message: string } | null>(null);
+  const wallet = useWalletSummary();
+
+  // Báo giá còn hạn mà khách vẫn ở màn này → tự báo giá lại 25 giây trước khi hết hạn (giá hiện luôn còn dùng được)
+  const expiresAt = quote.status === 'ready' ? quote.quote?.expiresAt : undefined;
+  useEffect(() => {
+    if (!expiresAt) return;
+    const ms = Math.max(0, Date.parse(expiresAt) - 25_000 - Date.now());
+    const t = setTimeout(() => void refreshQuote(true), ms);
+    return () => clearTimeout(t);
+  }, [expiresAt]);
 
   // Báo giá lại mỗi khi bản nháp đổi (refreshQuote tự bỏ qua nếu đã có giá còn hạn cho đúng bản nháp), chờ 400ms gom thao tác
   useEffect(() => {
@@ -94,14 +106,22 @@ export default function ConfirmScreen() {
   const toggleAddon = (id: string) =>
     setOptions({ addonIds: opt.addonIds.includes(id) ? opt.addonIds.filter((x) => x !== id) : [...opt.addonIds, id] });
 
+  // chỉ xác nhận khi giá đang hiện là giá server báo, còn hạn, cho đúng bản nháp này
+  const canSubmit = !!svc && price.fromServer && quote.status === 'ready' && !submitting;
+  const debt = opt.paymentMethod === 'cash' ? (wallet?.debt ?? 0) : 0;
+
   const onConfirm = async () => {
-    if (submitting) return;
+    if (!canSubmit) return;
     setSubmitting(true);
     try {
-      const order = await submitBooking();
+      const order = await submitBooking(price.total);
       router.replace({ pathname: '/booking/tracking', params: { orderId: order.id, from: 'booking' } });
     } catch (e) {
-      setError(errorMessage(e, 'Không tạo được đơn hàng. Vui lòng thử lại.'));
+      setError(
+        isApiError(e, 'quote.price_changed')
+          ? { title: 'Giá đã thay đổi', message: errorMessage(e) }
+          : { title: 'Không tạo được đơn', message: errorMessage(e, 'Không tạo được đơn hàng. Vui lòng thử lại.') },
+      );
     } finally {
       setSubmitting(false);
     }
@@ -162,7 +182,24 @@ export default function ConfirmScreen() {
           ) : null}
         </View>
       </View>
-      <FlatFooter title="Xác nhận" loading={submitting} disabled={!svc || quote.status === 'loading'} onPress={onConfirm} />
+      {debt > 0 ? (
+        <View style={styles.debtRow}>
+          <Icon name={Icons.info} size={16} color={Colors.error} />
+          <AppText size={12} color={Colors.text} style={{ flex: 1, marginLeft: Spacing.xs }}>
+            Bạn còn nợ phí huỷ đơn trước {formatVnd(debt)} — tài xế sẽ thu thêm khoản này khi bạn trả tiền mặt.
+          </AppText>
+        </View>
+      ) : null}
+      {quote.status === 'error' && !couponError ? (
+        <FlatFooter title="Lấy lại giá" onPress={() => void refreshQuote(true)} />
+      ) : (
+        <FlatFooter
+          title={canSubmit || submitting ? 'Xác nhận' : quote.status === 'error' ? 'Chưa có giá' : 'Đang lấy giá…'}
+          loading={submitting}
+          disabled={!canSubmit}
+          onPress={onConfirm}
+        />
+      )}
     </View>
   );
 
@@ -267,7 +304,7 @@ export default function ConfirmScreen() {
         onClose={() => setPaySheet(false)}
         onSelect={(m) => setOptions({ paymentMethod: m })}
       />
-      <ErrorSheet visible={!!error} title="Không tạo được đơn" message={error ?? ''} actionLabel="Đóng" onAction={() => setError(null)} onClose={() => setError(null)} />
+      <ErrorSheet visible={!!error} title={error?.title} message={error?.message ?? ''} actionLabel="Đóng" onAction={() => setError(null)} onClose={() => setError(null)} />
     </Screen>
   );
 }
@@ -277,6 +314,7 @@ const styles = StyleSheet.create({
   noteInput: { flex: 1, fontSize: 15, color: Colors.text, paddingVertical: 0, minHeight: 44, textAlignVertical: 'top', ...NO_WEB_OUTLINE },
   breakdown: { paddingHorizontal: Spacing.screen, paddingVertical: Spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border },
   lineRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 3 },
+  debtRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: Spacing.screen, paddingBottom: Spacing.sm },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border, backgroundColor: Colors.white },
   payRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.md },
   payHalf: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.sm },

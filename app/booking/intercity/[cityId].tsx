@@ -21,22 +21,30 @@ import {
   type TripKind,
 } from '@/services/intercity';
 import { formatVnd } from '@/services/bookingStore';
+import { useVnToday } from '@/hooks/useVnToday';
 import { errorMessage } from '@/services/zuum';
 
-const DATE_OPTIONS = buildDateOptions(7);
 
 export default function IntercityTripsScreen() {
   const { cityId, kind: kindParam } = useLocalSearchParams<{ cityId: string; kind?: string }>();
   const cities = useIntercityCities();
   const city = findCity(cityId, cities);
   const [kind, setKind] = useState<TripKind>(kindParam === 'carpool' ? 'carpool' : 'bus');
-  const [dateKey, setDateKey] = useState(DATE_OPTIONS[0]!.key);
+  const today = useVnToday();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `today`: "Hôm nay / Ngày mai" đúng cả khi màn mở qua nửa đêm
+  const dateOptions = useMemo(() => buildDateOptions(7), [today]);
+  const [dateKey, setDateKey] = useState(today);
   const [slotId, setSlotId] = useState<(typeof TIME_SLOTS)[number]['id']>('all');
   const [trips, setTrips] = useState<IntercityTrip[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const slot = TIME_SLOTS.find((s) => s.id === slotId)!;
-  const dateOption = DATE_OPTIONS.find((d) => d.key === dateKey);
+  const dateOption = dateOptions.find((d) => d.key === dateKey);
+
+  // qua ngày mới: ngày đang chọn đã thành quá khứ → chuyển về hôm nay
+  useEffect(() => {
+    if (dateKey < today) setDateKey(today);
+  }, [dateKey, today]);
 
   useEffect(() => {
     void ensureIntercityCities().catch((e) => setError(errorMessage(e)));
@@ -123,7 +131,7 @@ export default function IntercityTripsScreen() {
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateStrip}>
-          {DATE_OPTIONS.map((d) => (
+          {dateOptions.map((d) => (
             <Pressable key={d.key} onPress={() => setDateKey(d.key)} style={[styles.dateCell, d.key === dateKey && styles.dateCellActive]}>
               <AppText size={13} weight={d.key === dateKey ? 'bold' : 'medium'} color={d.key === dateKey ? Colors.white : Colors.text}>
                 {d.label}
