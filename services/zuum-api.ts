@@ -1027,6 +1027,7 @@ export interface ZuumRoutes {
         comment: null | string;
       };
       canRate: boolean;
+      cancelFreeUntil: null | string;
       cancelFeeIfNow?: number;
     };
   };
@@ -1185,6 +1186,7 @@ export interface ZuumRoutes {
         comment: null | string;
       };
       canRate: boolean;
+      cancelFreeUntil: null | string;
       cancelFeeIfNow?: number;
     };
   };
@@ -1348,6 +1350,7 @@ export interface ZuumRoutes {
         comment: null | string;
       };
       canRate: boolean;
+      cancelFreeUntil: null | string;
       cancelFeeIfNow?: number;
     };
   };
@@ -1521,6 +1524,7 @@ export interface ZuumRoutes {
         comment: null | string;
       };
       canRate: boolean;
+      cancelFreeUntil: null | string;
       cancelFeeIfNow?: number;
     };
   };
@@ -2888,6 +2892,7 @@ export interface ZuumRoutes {
       offerId: string;
       orderId: string;
       expiresAt: string;
+      expiresInSeconds: number;
       distanceToPickupMeters: number;
       service: {
         id: string;
@@ -3068,6 +3073,7 @@ export interface ZuumRoutes {
         comment: null | string;
       };
       canRate: boolean;
+      cancelFreeUntil: null | string;
       cancelFeeIfNow?: number;
     };
   };
@@ -3277,6 +3283,7 @@ export interface ZuumRoutes {
         comment: null | string;
       };
       canRate: boolean;
+      cancelFreeUntil: null | string;
       cancelFeeIfNow?: number;
     };
   };
@@ -3439,6 +3446,7 @@ export interface ZuumRoutes {
         comment: null | string;
       };
       canRate: boolean;
+      cancelFreeUntil: null | string;
       cancelFeeIfNow?: number;
     };
   };
@@ -3597,6 +3605,7 @@ export interface ZuumRoutes {
         comment: null | string;
       };
       canRate: boolean;
+      cancelFreeUntil: null | string;
       cancelFeeIfNow?: number;
     };
   };
@@ -3758,6 +3767,7 @@ export interface ZuumRoutes {
         comment: null | string;
       };
       canRate: boolean;
+      cancelFreeUntil: null | string;
       cancelFeeIfNow?: number;
     };
   };
@@ -3928,6 +3938,7 @@ export interface ZuumRoutes {
         comment: null | string;
       };
       canRate: boolean;
+      cancelFreeUntil: null | string;
       cancelFeeIfNow?: number;
     };
   };
@@ -4091,6 +4102,7 @@ export interface ZuumRoutes {
         comment: null | string;
       };
       canRate: boolean;
+      cancelFreeUntil: null | string;
       cancelFeeIfNow?: number;
     };
   };
@@ -4248,6 +4260,7 @@ export interface ZuumRoutes {
         comment: null | string;
       };
       canRate: boolean;
+      cancelFreeUntil: null | string;
       cancelFeeIfNow?: number;
     });
   };
@@ -5344,6 +5357,23 @@ export interface ZuumRoutes {
       createdAt: string;
     };
   };
+  'GET /v1/public/affiliate/referral-check': {
+    query: {
+      tree: "customer" | "partner";
+      code: string;
+    };
+    response: ({
+      valid: false;
+      code: string;
+      displayName: null;
+      full: boolean;
+    }) | ({
+      valid: true;
+      code: string;
+      displayName: string;
+      full: boolean;
+    });
+  };
   'POST /v1/public/auth/refresh': {
     body: {
       refreshToken: string;
@@ -5725,6 +5755,7 @@ export interface ZuumPartnerEvents {
     offerId: string;
     orderId: string;
     expiresAt: string;
+    expiresInSeconds: number;
   };
   "offer.withdrawn": {
     offerId: string;
