@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "ZUUMCUSTOMER",
-    "slug": "zv-customer-app",
+    "slug": "zuumviet",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -67,9 +67,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "0f1974ba-2473-48e9-b3a1-717d273b9847"
+        "projectId": "bc34f2d8-c624-4509-8eb7-1b9a70c51364"
       }
     },
-    "owner": "acbook"
+    "owner": "acbooks-team"
   }
 }
