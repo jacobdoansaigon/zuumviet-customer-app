@@ -1,6 +1,7 @@
 // Chi tiết khuyến mãi: khối hero icon+gradient theo đúng dịch vụ (promoVisual) + nhãn ưu đãi, tiêu đề,
-// mã (khung gạch đứt), HSD, điều kiện, nút "Đặt ngay"
-import React from 'react';
+// mã (khung gạch đứt) + HSD — CHỈ khi mã của chương trình đúng là mã khách dùng được (GET /v1/customer/coupons), điều
+// kiện, nút "Đặt ngay". Nội dung chương trình là tĩnh; mã thật luôn lấy từ API.
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -10,11 +11,27 @@ import { promoVisual } from '@/components/home';
 import { PROMOS } from '@/constants/content';
 import { SERVICE_GROUPS, toServiceKey } from '@/constants/booking';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
+import { api, type ZuumResponse } from '@/services/zuum';
+
+type Coupon = ZuumResponse<'GET /v1/customer/coupons'>[number];
+
+const ddmmyyyy = (iso: string) => {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+};
 
 export default function PromotionDetailScreen() {
   useStatusBarStyle('dark');
   const { id } = useLocalSearchParams<{ id: string }>();
   const item = PROMOS.find((p) => p.id === id);
+  const [coupon, setCoupon] = useState<Coupon | null>(null);
+
+  useEffect(() => {
+    if (!item) return;
+    api('GET /v1/customer/coupons')
+      .then((list) => setCoupon(list.find((c) => c.code.toUpperCase() === item.code.toUpperCase()) ?? null))
+      .catch(() => setCoupon(null));
+  }, [item]);
 
   if (!item) {
     return (
@@ -58,25 +75,36 @@ export default function PromotionDetailScreen() {
           {item.summary}
         </AppText>
 
-        <View style={styles.codeBox}>
-          <View style={{ flex: 1 }}>
-            <AppText size={11} color={Colors.textSecondary}>
-              Mã ưu đãi
+        {coupon ? (
+          <>
+            <View style={styles.codeBox}>
+              <View style={{ flex: 1 }}>
+                <AppText size={11} color={Colors.textSecondary}>
+                  Mã ưu đãi
+                </AppText>
+                <AppText size={20} weight="extraBold" color={Colors.primary} style={{ letterSpacing: 1 }}>
+                  {coupon.code}
+                </AppText>
+              </View>
+              {coupon.endsAt ? (
+                <View style={styles.expiryPill}>
+                  <Icon name={Icons.clock} size={14} color={Colors.textSecondary} />
+                  <AppText size={12} color={Colors.textSecondary} style={{ marginLeft: 4 }}>
+                    HSD {ddmmyyyy(coupon.endsAt)}
+                  </AppText>
+                </View>
+              ) : null}
+            </View>
+            <AppText size={12} color={Colors.textMuted} style={{ marginTop: Spacing.xs }}>
+              Chọn mã ở mục "Mã giảm giá" tại bước xác nhận đơn.
             </AppText>
-            <AppText size={20} weight="extraBold" color={Colors.primary} style={{ letterSpacing: 1 }}>
-              {item.code}
-            </AppText>
-          </View>
-          <View style={styles.expiryPill}>
-            <Icon name={Icons.clock} size={14} color={Colors.textSecondary} />
-            <AppText size={12} color={Colors.textSecondary} style={{ marginLeft: 4 }}>
-              HSD {item.expiry}
-            </AppText>
-          </View>
-        </View>
-        <AppText size={12} color={Colors.textMuted} style={{ marginTop: Spacing.xs }}>
-          Nhập mã ở mục "Mã giảm giá" tại bước xác nhận đơn.
-        </AppText>
+          </>
+        ) : (
+          <AppText size={12} color={Colors.textMuted} style={{ marginTop: Spacing.md }}>
+            Mã ưu đãi của chương trình được gửi vào Hộp thư khi tài khoản của bạn đủ điều kiện; mã dùng được luôn hiện ở mục
+            "Mã giảm giá" tại bước xác nhận đơn.
+          </AppText>
+        )}
 
         <AppText weight="bold" size={15} style={styles.sectionTitle}>
           Điều kiện áp dụng

@@ -53,14 +53,14 @@ export const NEWS: NewsItem[] = [
     body: [
       'ZuumViet chính thức triển khai dịch vụ giao hàng Siêu tốc tại khu vực TP. Hồ Chí Minh. Đơn hàng sẽ được tài xế nhận trong vòng 5 phút và giao đến tay người nhận trong tối đa 60 phút kể từ khi lấy hàng.',
       'Dịch vụ áp dụng cho các kiện hàng dưới 30kg, kích cỡ tối đa 50x40x40cm. Phí dịch vụ được tính theo quãng đường thực tế và đã bao gồm VAT.',
-      'Trong tháng ra mắt, khách hàng nhập mã MUAXUAN2020 để được giảm 20% cho 3 đơn Siêu tốc đầu tiên. Chúc bạn có trải nghiệm giao hàng nhanh chóng cùng ZuumViet!',
+      'Mã giảm giá dành cho bạn (nếu có) được gửi vào Hộp thư và hiện ở mục "Mã giảm giá" tại bước xác nhận đơn. Chúc bạn có trải nghiệm giao hàng nhanh chóng cùng ZuumViet!',
     ],
   },
   {
     id: 'n2',
-    title: 'Giảm 20% cho đơn hàng đầu tiên với mã MUAXUAN2020',
+    title: 'Ưu đãi cho đơn hàng đầu tiên',
     excerpt:
-      'Nhập mã MUAXUAN2020 khi xác nhận đơn để nhận ưu đãi giảm 20%, tối đa 30.000đ. Áp dụng cho tất cả dịch vụ giao hàng.',
+      'Khách hàng mới nhận mã giảm giá cho đơn đầu tiên trong Hộp thư. Mã dùng được hiện sẵn ở mục "Mã giảm giá" khi xác nhận đơn.',
     image: 'https://picsum.photos/seed/zuum-news-2/800/450',
     date: '15/09/2026',
     body: [
@@ -220,6 +220,7 @@ export type PromoItem = {
   tag: string;
   /** Nhãn ưu đãi nổi bật trên khối minh hoạ: "-20%", "-30K", "0Đ"... */
   discount: string;
+  /** mã của chương trình — app chỉ hiện khi đúng là mã khách dùng được (GET /v1/customer/coupons) */
   code: string;
   /** dd/mm/yyyy */
   expiry: string;
@@ -306,17 +307,6 @@ export const PROMOS: PromoItem[] = [
     service: 'driver',
     summary: 'Giảm 20.000đ cho mỗi chuyến Tài xế lái thay Xe hơi, không giới hạn số lần.',
     conditions: ['Áp dụng gói "Xe hơi"', 'Không áp dụng gói "Xe máy"', 'Đặt trước tối thiểu 1 giờ'],
-  },
-  {
-    id: 'p8',
-    title: 'Mời bạn bè, nhận 20K mỗi người',
-    tag: 'Cộng đồng',
-    discount: '+20K',
-    code: 'MOIBAN20',
-    expiry: '31/12/2026',
-    service: 'delivery',
-    summary: 'Mỗi người bạn đăng ký bằng mã giới thiệu của bạn và hoàn thành 1 đơn, bạn nhận 20.000đ vào Tài khoản thưởng.',
-    conditions: ['Người được mời phải là tài khoản mới', 'Thưởng ghi nhận sau khi đơn đầu tiên hoàn thành', 'Không giới hạn số người mời'],
   },
 ];
 
