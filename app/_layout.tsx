@@ -1,19 +1,29 @@
 // Root layout — ZUUMCUSTOMER: load font Mulish, SafeAreaProvider, StatusBar, Stack không header.
 // Không liệt kê từng Stack.Screen để mọi route trong app/ đều hoạt động.
-import React from 'react';
+// Toàn app: push + đăng ký thiết bị (useNotifications), kết nối realtime khi đã đăng nhập (useRealtimeConnection),
+// hết phiên đăng nhập (làm mới token thất bại) → về màn đăng nhập.
+import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 import { useAppFonts } from '@/hooks/useAppFonts';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useRealtimeConnection } from '@/hooks/useRealtime';
+import { onSessionChange } from '@/services/zuum';
 
-function AppWithNotifications() {
-  // Push chỉ cần trên native; web bỏ qua để tránh treo flow auth (xử lý trong hook)
-  useNotifications({
-    onTokenReady: async () => {},
-  });
+function AppShell() {
+  useNotifications();
+  useRealtimeConnection();
+
+  useEffect(
+    () =>
+      onSessionChange((event) => {
+        if (event === 'expired') router.replace({ pathname: '/(auth)/login', params: { reason: 'expired' } });
+      }),
+    [],
+  );
 
   return (
     <Stack
@@ -40,7 +50,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      <AppWithNotifications />
+      <AppShell />
     </SafeAreaProvider>
   );
 }

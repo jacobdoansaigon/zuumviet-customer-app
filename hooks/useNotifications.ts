@@ -1,21 +1,23 @@
-// useNotifications — push qua Expo Push (zv-notify gửi ExponentPushToken[...] lên exp.host).
-// - Lấy Expo push token → GET /site/notifydevices/init (cần JWT) ngay khi có token và mỗi lần đăng nhập lại;
-//   đăng xuất → /deinit để BE ngừng gửi về máy này.
-// - Push từ zv-delivery tới khách: data.type = 'deliveryorder_accept' {driver_account_id, order_id}
-//   | 'deliveryorder_update' {order_id, order_status, order_detail_id, order_detail_status, ...}.
-//   Foreground: phát sự kiện cho màn theo dõi (useOrderPushRefresh) để poll ngay; bấm vào thông báo: mở màn theo dõi đơn.
-import { useEffect, useRef, useState } from 'react';
+// useNotifications — push (Expo Push) + đăng ký thiết bị với API.
+// - PUT /v1/customer/devices/:deviceId {platform, appVersion, osVersion, model, pushToken, pushEnabled} sau khi đăng nhập,
+//   khi mở app (đã đăng nhập) và mỗi khi Expo đổi token. Không có token (giả lập, web, từ chối quyền) vẫn đăng ký
+//   với pushToken null để server biết máy này. Đăng xuất: services/session.ts gỡ thiết bị.
+// - Kênh Android server dùng: "orders" (đơn hàng) và "default" — tạo sẵn khi mở app.
+// - data của push: { type: 'order'|'wallet'|'system'|'campaign'|…, notificationId, orderId?, bookingId?, tripId? }.
+//   Đang mở app: gợi ý màn theo dõi tải lại; bấm thông báo: đánh dấu đã đọc + mở đúng màn.
+import { useEffect, useState } from 'react';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform, Alert, Dimensions } from 'react-native';
-import { router } from 'expo-router';
-import { addSessionListener, deviceApi, getStoredCustomer } from '@/services/api';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+import { router, type Href } from 'expo-router';
+import { api, getDeviceId, hasSession, onSessionChange } from '@/services/zuum';
+import { emitOrderHint, onOrderHint } from '@/services/realtime';
+import { getProfile } from '@/services/session';
 
-// Configure how notifications are displayed while app is foregrounded
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
       shouldShowBanner: true,
@@ -24,192 +26,184 @@ if (Platform.OS !== 'web') {
   });
 }
 
-export type PushToken = string;
-
-export type OrderPushData = {
+/** Payload `data` của push do API gửi */
+export interface PushData {
   type: string;
-  order_id?: number | string;
-  order_status?: number | string;
-  driver_account_id?: number | string;
-  [key: string]: unknown;
-};
-
-type UseNotificationsOptions = {
-  onTokenReady?: (token: PushToken) => void;
-};
-
-// ---------------------------------------------------------------- bus push đơn hàng (foreground)
-const orderPushListeners = new Set<(data: OrderPushData) => void>();
-
-export function subscribeOrderPush(listener: (data: OrderPushData) => void): () => void {
-  orderPushListeners.add(listener);
-  return () => {
-    orderPushListeners.delete(listener);
-  };
+  notificationId: string | null;
+  orderId: string | null;
+  bookingId: string | null;
+  tripId: string | null;
 }
 
-function emitOrderPush(data: OrderPushData) {
-  orderPushListeners.forEach((l) => l(data));
+function readPushData(raw: unknown): PushData | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const d = raw as Record<string, unknown>;
+  if (typeof d.type !== 'string') return null;
+  const s = (v: unknown) => (typeof v === 'string' && v ? v : null);
+  return { type: d.type, notificationId: s(d.notificationId), orderId: s(d.orderId), bookingId: s(d.bookingId), tripId: s(d.tripId) };
 }
 
-/** Tick tăng mỗi khi có push về đơn `orderId` (null = mọi đơn) — màn theo dõi đưa vào deps của effect poll */
+/** Tick tăng mỗi khi có push về đơn `orderId` lúc app đang mở — đưa vào deps của effect tải lại đơn */
 export function useOrderPushRefresh(orderId: string | null): number {
   const [tick, setTick] = useState(0);
   useEffect(() => {
-    return subscribeOrderPush((data) => {
-      if (orderId == null || String(data.order_id ?? '') === orderId) setTick((t) => t + 1);
+    if (!orderId) return;
+    return onOrderHint((id) => {
+      if (id === orderId) setTick((t) => t + 1);
     });
   }, [orderId]);
   return tick;
 }
 
-const isOrderPush = (data: Record<string, unknown>): data is OrderPushData =>
-  typeof data.type === 'string' && data.type.startsWith('deliveryorder_');
+// ---------------------------------------------------------------- đăng ký thiết bị
+let pushToken: string | null = null;
+let pushEnabled = false;
+let registeredKey: string | null = null;
 
-// ---------------------------------------------------------------- đăng ký thiết bị với BE
-let currentPushToken: PushToken | null = null;
-let registeredFor: string | null = null; // `${accountId}:${token}` đã init thành công
+const APP_VERSION = String(Constants.expoConfig?.version ?? '1.0.0');
+const PLATFORM: 'ios' | 'android' | 'web' = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
 
-/** Gửi token lên zv-notify nếu đã đăng nhập (idempotent theo tài khoản + token) */
-export async function syncPushDevice(): Promise<void> {
-  if (!currentPushToken) return;
-  const customer = await getStoredCustomer();
-  if (!customer?.id) return;
-  const key = `${customer.id}:${currentPushToken}`;
-  if (registeredFor === key) return;
+/** Gửi thông tin thiết bị + push token lên API (bỏ qua nếu chưa đăng nhập hoặc đã gửi đúng nội dung này) */
+export async function syncDevice(): Promise<void> {
+  if (!(await hasSession())) return;
+  const profile = await getProfile();
+  const deviceId = await getDeviceId();
+  const key = `${profile?.id ?? ''}|${pushToken ?? ''}|${pushEnabled ? 1 : 0}`;
+  if (registeredKey === key) return;
   try {
-    const { width, height } = Dimensions.get('window');
-    await deviceApi.init(currentPushToken, {
-      screen_width: Math.round(width),
-      screen_height: Math.round(height),
-      device_name: Device.modelName ?? '',
-      device_brand: Device.brand ?? '',
-      os: `${Platform.OS} ${Device.osVersion ?? ''}`.trim(),
+    await api('PUT /v1/customer/devices/:deviceId', {
+      params: { deviceId },
+      body: {
+        platform: PLATFORM,
+        appVersion: APP_VERSION,
+        osVersion: Device.osVersion ? `${Platform.OS} ${Device.osVersion}` : Platform.OS,
+        model: [Device.brand, Device.modelName].filter(Boolean).join(' ') || undefined,
+        pushToken,
+        pushEnabled: !!pushToken && pushEnabled,
+      },
     });
-    registeredFor = key;
+    registeredKey = key;
   } catch (e) {
-    console.warn('[push] notifydevices/init failed', e);
+    console.warn('[push] đăng ký thiết bị lỗi', e);
   }
 }
 
-async function unregisterPushDevice(): Promise<void> {
-  if (!currentPushToken) return;
-  registeredFor = null;
+async function ensureAndroidChannels() {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync('orders', {
+    name: 'Đơn hàng',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#59267C',
+    sound: 'default',
+  });
+  await Notifications.setNotificationChannelAsync('default', {
+    name: 'Thông báo chung',
+    importance: Notifications.AndroidImportance.DEFAULT,
+    lightColor: '#59267C',
+    sound: 'default',
+  });
+}
+
+async function obtainPushToken(): Promise<string | null> {
+  if (Platform.OS === 'web' || !Device.isDevice) return null;
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  let status = existing;
+  if (existing !== 'granted') status = (await Notifications.requestPermissionsAsync()).status;
+  pushEnabled = status === 'granted';
+  if (!pushEnabled) return null;
   try {
-    await deviceApi.deinit(currentPushToken);
-  } catch {
-    /* token hết hạn cũng không sao */
-  }
-}
-
-export function useNotifications({ onTokenReady }: UseNotificationsOptions = {}) {
-  const notificationListener = useRef<Notifications.EventSubscription | undefined>(undefined);
-  const responseListener = useRef<Notifications.EventSubscription | undefined>(undefined);
-
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      return;
-    }
-
-    registerForPushNotifications().then((token) => {
-      if (!token) return;
-      currentPushToken = token;
-      void syncPushDevice();
-      if (onTokenReady) onTokenReady(token);
-    });
-
-    const unsubscribeSession = addSessionListener((event) => {
-      if (event === 'login') void syncPushDevice();
-      else void unregisterPushDevice();
-    });
-
-    // Notification received while app is open (foreground)
-    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
-      const data = (notification.request.content.data ?? {}) as Record<string, unknown>;
-      if (isOrderPush(data)) emitOrderPush(data);
-    });
-
-    // Người dùng bấm vào thông báo (nền / đã tắt app)
-    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = (response.notification.request.content.data ?? {}) as Record<string, unknown>;
-      if (isOrderPush(data)) emitOrderPush(data);
-      handleNotificationNavigation(data);
-    });
-
-    // App mở từ thông báo khi đang tắt hẳn
-    Notifications.getLastNotificationResponseAsync()
-      .then((response) => {
-        if (!response) return;
-        handleNotificationNavigation((response.notification.request.content.data ?? {}) as Record<string, unknown>);
-      })
-      .catch(() => undefined);
-
-    return () => {
-      notificationListener.current?.remove();
-      responseListener.current?.remove();
-      unsubscribeSession();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-}
-
-// Điều hướng theo loại push
-function handleNotificationNavigation(data: Record<string, unknown>) {
-  const type = String(data.type ?? '');
-  const orderId = data.order_id != null ? String(data.order_id) : '';
-  if (type.startsWith('deliveryorder_') && orderId) {
-    router.push({ pathname: '/booking/tracking', params: { orderId } });
-    return;
-  }
-  switch (type) {
-    case 'wallet':
-      router.push('/wallet');
-      break;
-    case 'system':
-      router.push('/account');
-      break;
-    default:
-      router.push('/home');
-  }
-}
-
-async function registerForPushNotifications(): Promise<PushToken | null> {
-  if (!Device.isDevice) {
-    console.warn('Push notifications only work on physical devices.');
-    return null;
-  }
-
-  // Check & request permission
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-
-  if (finalStatus !== 'granted') {
-    Alert.alert('Thông báo bị tắt', 'Hãy bật thông báo trong Cài đặt để nhận cập nhật đơn hàng.', [{ text: 'OK' }]);
-    return null;
-  }
-
-  // Android channel — zv-notify gửi channelId 'default'
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'Đơn hàng',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#59267C',
-      sound: 'default',
-    });
-  }
-
-  try {
-    const token = await Notifications.getExpoPushTokenAsync();
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
+    const token = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
     return token.data;
   } catch (e) {
-    // Thiếu projectId (chưa build EAS) hoặc không có Google Play Services → không có push, app vẫn chạy
-    console.warn('[push] getExpoPushTokenAsync failed', e);
+    // thiếu projectId (chưa build EAS) / không có Google Play Services → app vẫn chạy, chỉ không nhận push
+    console.warn('[push] không lấy được Expo push token', e);
     return null;
   }
+}
+
+// ---------------------------------------------------------------- bấm thông báo
+async function markRead(notificationId: string | null) {
+  if (!notificationId) return;
+  try {
+    await api('POST /v1/customer/notifications/:id/read', { params: { id: notificationId } });
+  } catch {
+    /* không quan trọng */
+  }
+}
+
+function hrefFor(data: PushData): Href {
+  if (data.orderId) return { pathname: '/booking/tracking', params: { orderId: data.orderId } };
+  if (data.bookingId) return { pathname: '/booking/intercity/ticket/[orderId]', params: { orderId: data.bookingId } };
+  if (data.tripId) return '/booking/intercity/tickets';
+  if (data.type === 'wallet') return '/wallet';
+  if (data.notificationId) return { pathname: '/inbox/[id]', params: { id: data.notificationId } };
+  return '/inbox';
+}
+
+async function handleOpen(raw: unknown) {
+  const data = readPushData(raw);
+  if (!data) return;
+  if (!(await hasSession())) return;
+  void markRead(data.notificationId);
+  router.push(hrefFor(data));
+}
+
+export function useNotifications() {
+  useEffect(() => {
+    let alive = true;
+    void ensureAndroidChannels().catch(() => undefined);
+
+    void obtainPushToken().then((token) => {
+      if (!alive) return;
+      pushToken = token;
+      void syncDevice();
+    });
+
+    // Expo đổi token (hiếm) → cập nhật lên server
+    const tokenSub = Platform.OS === 'web' ? null : Notifications.addPushTokenListener(() => {
+      void obtainPushToken().then((token) => {
+        pushToken = token;
+        void syncDevice();
+      });
+    });
+
+    const offSession = onSessionChange((event) => {
+      if (event === 'login') void syncDevice();
+      else registeredKey = null;
+    });
+
+    const receivedSub =
+      Platform.OS === 'web'
+        ? null
+        : Notifications.addNotificationReceivedListener((n) => {
+            const data = readPushData(n.request.content.data);
+            if (data?.orderId) emitOrderHint(data.orderId);
+          });
+
+    const responseSub =
+      Platform.OS === 'web'
+        ? null
+        : Notifications.addNotificationResponseReceivedListener((response) => {
+            void handleOpen(response.notification.request.content.data);
+          });
+
+    // mở app từ thông báo khi app đang tắt hẳn
+    if (Platform.OS !== 'web') {
+      Notifications.getLastNotificationResponseAsync()
+        .then((response) => {
+          if (response) void handleOpen(response.notification.request.content.data);
+        })
+        .catch(() => undefined);
+    }
+
+    return () => {
+      alive = false;
+      tokenSub?.remove();
+      offSession();
+      receivedSub?.remove();
+      responseSub?.remove();
+    };
+  }, []);
 }

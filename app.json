@@ -62,7 +62,8 @@
         {
           "cameraPermission": "Ứng dụng cần camera để quét mã QR của tài xế."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "router": {},
