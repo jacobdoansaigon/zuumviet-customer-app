@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppHeader, AppText, Screen } from '@/components/ui';
 import { PromoCard } from '@/components/home';
-import { MOCK_PROMOS } from '@/constants/mock';
+import { PROMOS } from '@/constants/content';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
 const GAP = Spacing.md;
@@ -22,7 +22,7 @@ export default function PromotionsScreen() {
           Nhập mã ở bước xác nhận đơn để áp dụng ưu đãi.
         </AppText>
         <View style={styles.grid}>
-          {MOCK_PROMOS.map((p) => (
+          {PROMOS.map((p) => (
             <PromoCard key={p.id} item={p} width={cardWidth} onPress={() => router.push(`/promotions/${p.id}`)} />
           ))}
         </View>

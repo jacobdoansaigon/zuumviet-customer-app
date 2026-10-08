@@ -7,11 +7,11 @@ import { View, ScrollView, StyleSheet, useWindowDimensions, type NativeSynthetic
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Palette, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { AppText, Icon, type IconName } from '@/components/ui';
-import { WHY_ZUUM, type WhyZuumItem } from '@/constants/mock';
+import { WHY_ZUUM, type WhyZuumItem } from '@/constants/content';
 
 const GAP = Spacing.md;
 
-/** [đậm, nhạt] theo id trong WHY_ZUUM (constants/mock.ts) — lặp vòng nếu sau này thêm thẻ mới */
+/** [đậm, nhạt] theo id trong WHY_ZUUM (constants/content.ts) — lặp vòng nếu sau này thêm thẻ mới */
 const CARD_GRADIENTS: [string, string][] = [
   [Palette.warning[700], Colors.warning], // w1 Cộng đồng chia sẻ thu nhập
   [Palette.success[700], Colors.success], // w2 Giá rõ ràng, không phụ phí ẩn

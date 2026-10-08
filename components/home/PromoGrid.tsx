@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { View, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { Spacing } from '@/constants/theme';
-import type { PromoItem } from '@/constants/mock';
+import type { PromoItem } from '@/constants/content';
 import { PromoCard } from './PromoCard';
 
 const GAP = Spacing.md;

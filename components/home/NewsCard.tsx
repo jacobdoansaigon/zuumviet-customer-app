@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, Pressable, Image } from 'react-native';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppText, Icon } from '@/components/ui';
-import type { NewsItem } from '@/constants/mock';
+import type { NewsItem } from '@/constants/content';
 
 interface NewsCardProps {
   item: NewsItem;

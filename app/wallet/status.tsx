@@ -12,8 +12,8 @@ import { useRealtime } from '@/hooks/useRealtime';
 import { DashedDivider } from '@/components/wallet/DashedDivider';
 import { LinkRow } from '@/components/wallet/LinkRow';
 import { formatVnd } from '@/components/wallet/walletUtils';
+import { SUPPORT_HOTLINE as SUPPORT_PHONE } from '@/constants/content';
 
-const SUPPORT_PHONE = '19001234';
 const POLL_MS = 3000;
 
 export default function TransactionStatusScreen() {

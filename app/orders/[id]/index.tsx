@@ -15,8 +15,8 @@ import { DriverRow } from '@/components/activity/DriverRow';
 import { PaymentSummary } from '@/components/activity/PaymentSummary';
 import { RatingStars } from '@/components/activity/RatingStars';
 import { Pill } from '@/components/activity/Pill';
+import { SUPPORT_HOTLINE as SUPPORT_PHONE } from '@/constants/content';
 
-const SUPPORT_PHONE = '19001234';
 
 const STOP_TONE: Record<StopStatus, RouteStop['statusTone']> = {
   pending: 'default',

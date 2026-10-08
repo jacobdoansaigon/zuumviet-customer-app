@@ -6,10 +6,10 @@ import { View, StyleSheet, Linking, Platform } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, AppHeader, Screen, ListRow, BottomSheet, Button, Icons } from '@/components/ui';
-import { MOCK_POLICIES, type PolicyItem } from '@/constants/mock';
+import { POLICIES, type PolicyItem } from '@/constants/content';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
+import { SUPPORT_HOTLINE as SUPPORT_PHONE } from '@/constants/content';
 
-const SUPPORT_PHONE = '19006868';
 
 export default function PoliciesScreen() {
   useStatusBarStyle('light');
@@ -19,7 +19,7 @@ export default function PoliciesScreen() {
   useEffect(() => {
     const key = Array.isArray(open) ? open[0] : open;
     if (key) {
-      const found = MOCK_POLICIES.find((p) => p.id === key);
+      const found = POLICIES.find((p) => p.id === key);
       if (found) setActive(found);
     }
   }, [open]);
@@ -41,8 +41,8 @@ export default function PoliciesScreen() {
   return (
     <Screen header={<AppHeader title="Chính sách ZuumViet" variant="dark" left="back" />}>
       <View style={styles.menu}>
-        {MOCK_POLICIES.map((p, i) => (
-          <ListRow key={p.id} icon={p.icon} label={p.label} onPress={() => setActive(p)} divider={i < MOCK_POLICIES.length - 1} />
+        {POLICIES.map((p, i) => (
+          <ListRow key={p.id} icon={p.icon} label={p.label} onPress={() => setActive(p)} divider={i < POLICIES.length - 1} />
         ))}
       </View>
       <AppText size={12} color={Colors.textDisabled} align="center" style={styles.note}>

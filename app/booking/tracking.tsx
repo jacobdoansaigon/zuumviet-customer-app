@@ -16,9 +16,9 @@ import { errorMessage, isApiError } from '@/services/zuum';
 import { useRealtime, useRealtimeRefetch } from '@/hooks/useRealtime';
 import { useOrderPushRefresh } from '@/hooks/useNotifications';
 import { BookingMap, RoundIconButton, TrackingSheet, type MapStop } from '@/components/booking';
+import { SUPPORT_HOTLINE as SUPPORT_PHONE } from '@/constants/content';
 
 const FALLBACK_POLL_MS = 30_000;
-const SUPPORT_PHONE = '19001234';
 
 type LatLng = { lat: number; lng: number };
 

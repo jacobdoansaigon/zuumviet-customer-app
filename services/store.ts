@@ -1,5 +1,5 @@
 // store — tiny module-state store + hook (useSyncExternalStore), không cần thư viện ngoài.
-// Dùng cho state mock chia sẻ giữa các màn (hộp thư, vị trí đã lưu, tài xế yêu thích, cộng đồng).
+// Dùng cho state chia sẻ giữa các màn (hồ sơ, catalog, ví, hộp thư, vị trí đã lưu, cộng đồng…).
 import { useSyncExternalStore } from 'react';
 
 export type Store<T> = {

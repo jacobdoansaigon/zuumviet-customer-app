@@ -1,8 +1,8 @@
-// useCurrentLocation — lấy GPS 1 lần trên native; web KHÔNG xin quyền (dùng toạ độ mẫu) để không chặn demo
+// useCurrentLocation — lấy GPS 1 lần trên native (điểm đón mặc định, gợi ý gần); web không xin quyền → null
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
-import type { LatLng } from '@/hooks/useLocation';
+export type LatLng = { latitude: number; longitude: number };
 
 export function useCurrentLocation(): LatLng | null {
   const [loc, setLoc] = useState<LatLng | null>(null);
@@ -17,7 +17,7 @@ export function useCurrentLocation(): LatLng | null {
         const pos = last ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
         if (!cancelled && pos) setLoc({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
       } catch {
-        /* không có GPS → giữ địa chỉ mẫu */
+        /* không có GPS → khách tự chọn địa điểm */
       }
     })();
     return () => {

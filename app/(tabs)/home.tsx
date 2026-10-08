@@ -29,7 +29,7 @@ import { listOrders } from '@/services/orders';
 import { ensureCatalog } from '@/services/catalog';
 import { useRealtime, useRealtimeRefetch } from '@/hooks/useRealtime';
 import { displayName, formatPhone, refreshProfile, restoreSession, useProfile } from '@/services/session';
-import { MOCK_PROMOS, getGreeting } from '@/constants/mock';
+import { PROMOS, getGreeting } from '@/constants/content';
 import { isMember, loadAffiliate, totalMembers, useAffiliate } from '@/services/affiliate';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
@@ -134,12 +134,12 @@ export default function HomeScreen() {
           <WhyZuumCarousel />
 
           <SectionHeader title="Dành cho bạn" actionLabel="Tất cả" onAction={() => router.push('/promotions')} style={styles.newsHeader} />
-          <PromoGrid items={MOCK_PROMOS} onPress={(p) => router.push(`/promotions/${p.id}`)} />
+          <PromoGrid items={PROMOS} onPress={(p) => router.push(`/promotions/${p.id}`)} />
 
           <SectionHeader title="Đối tác của ZuumViet" style={styles.newsHeader} />
           <PartnerBanner />
 
-          <AppFooter note="Ưu đãi & đối tác đang là dữ liệu mẫu (demo)" />
+          <AppFooter note="Ưu đãi & đối tác là nội dung giới thiệu, điều kiện áp dụng theo từng chương trình" />
         </View>
       </ScrollView>
 

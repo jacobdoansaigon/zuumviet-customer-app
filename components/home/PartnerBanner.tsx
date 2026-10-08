@@ -5,7 +5,7 @@ import { View, ScrollView, Pressable, Image, Linking, StyleSheet, useWindowDimen
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { AppText, Icon, Icons } from '@/components/ui';
-import { PARTNER_ADS, type PartnerAd } from '@/constants/mock';
+import { PARTNER_ADS, type PartnerAd } from '@/constants/content';
 
 const GAP = Spacing.md;
 

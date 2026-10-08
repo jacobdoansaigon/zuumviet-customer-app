@@ -4,7 +4,7 @@ import { View, Pressable, Linking, StyleSheet } from 'react-native';
 import Constants from 'expo-constants';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, Icon, Icons, LogoMark } from '@/components/ui';
-import { APP_FOOTER } from '@/constants/mock';
+import { APP_FOOTER } from '@/constants/content';
 
 interface AppFooterProps {
   /** dòng ghi chú nhỏ dưới cùng (vd: dữ liệu demo) */

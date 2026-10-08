@@ -6,7 +6,7 @@ import { View, StyleSheet, Pressable, type StyleProp, type ViewStyle } from 'rea
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { AppText, Icon } from '@/components/ui';
-import type { PromoItem } from '@/constants/mock';
+import type { PromoItem } from '@/constants/content';
 import { promoVisual } from './promoVisual';
 
 interface PromoCardProps {

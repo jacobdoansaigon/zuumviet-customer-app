@@ -9,7 +9,7 @@ import { Colors, Spacing } from '@/constants/theme';
 import { AppText, AppHeader, Screen, ListRow, Dialog, BottomSheet, Toast, Icons } from '@/components/ui';
 import { ProfileRow } from '@/components/profile';
 import { displayName, formatPhone, logout, refreshProfile, useProfile } from '@/services/session';
-import { formatMoney } from '@/constants/mock';
+import { formatMoney } from '@/constants/content';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
 import { loadSavedAddresses, useSavedAddresses } from '@/services/addresses';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';

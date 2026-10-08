@@ -7,7 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, AppHeader, Screen, EmptyState, Icon } from '@/components/ui';
 import { NewsCard } from '@/components/home';
-import { MOCK_NEWS } from '@/constants/mock';
+import { NEWS } from '@/constants/content';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
 export default function NewsDetailScreen() {
@@ -19,7 +19,7 @@ export default function NewsDetailScreen() {
     return (
       <Screen header={<AppHeader title="Tin tức" variant="light" left="back" />} background={Colors.white}>
         <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-          {MOCK_NEWS.map((n) => (
+          {NEWS.map((n) => (
             <NewsCard key={n.id} item={n} onPress={() => router.push(`/news/${n.id}`)} />
           ))}
         </ScrollView>
@@ -27,7 +27,7 @@ export default function NewsDetailScreen() {
     );
   }
 
-  const item = MOCK_NEWS.find((n) => n.id === id);
+  const item = NEWS.find((n) => n.id === id);
 
   if (!item) {
     return (

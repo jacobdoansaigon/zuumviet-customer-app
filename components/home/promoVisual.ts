@@ -4,7 +4,7 @@
 import { Colors, Palette } from '@/constants/theme';
 import { Icons, type IconName } from '@/components/ui';
 import { SERVICE_GROUPS, toServiceKey, type ServiceKey } from '@/constants/booking';
-import type { PromoItem } from '@/constants/mock';
+import type { PromoItem } from '@/constants/content';
 
 /** [đậm, nhạt] theo ServiceKey — tái dùng token màu đã có trong design system, không bịa màu mới */
 const SERVICE_GRADIENTS: Partial<Record<ServiceKey, [string, string]>> = {
@@ -19,7 +19,7 @@ const SERVICE_GRADIENTS: Partial<Record<ServiceKey, [string, string]>> = {
 };
 
 /** Ưu đãi "mời bạn bè" không thuộc dịch vụ cụ thể nào — dùng riêng icon chia sẻ + màu vàng giống hệt
- *  thẻ "Cộng đồng chia sẻ thu nhập" ở Trang chủ (constants/mock.ts WHY_ZUUM) cho nhất quán. */
+ *  thẻ "Cộng đồng chia sẻ thu nhập" ở Trang chủ (constants/content.ts WHY_ZUUM) cho nhất quán. */
 const REFERRAL_GRADIENT: [string, string] = [Palette.warning[700], Colors.warning];
 
 export function promoVisual(item: PromoItem): { icon: IconName; colors: [string, string] } {

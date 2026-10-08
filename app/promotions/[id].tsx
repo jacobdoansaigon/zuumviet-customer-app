@@ -7,14 +7,14 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppHeader, AppText, Button, EmptyState, Icon, Icons, Screen } from '@/components/ui';
 import { promoVisual } from '@/components/home';
-import { MOCK_PROMOS } from '@/constants/mock';
+import { PROMOS } from '@/constants/content';
 import { SERVICE_GROUPS, toServiceKey } from '@/constants/booking';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
 export default function PromotionDetailScreen() {
   useStatusBarStyle('dark');
   const { id } = useLocalSearchParams<{ id: string }>();
-  const item = MOCK_PROMOS.find((p) => p.id === id);
+  const item = PROMOS.find((p) => p.id === id);
 
   if (!item) {
     return (

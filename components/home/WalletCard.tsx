@@ -5,7 +5,7 @@ import { View, StyleSheet, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { AppText, Icon, Icons } from '@/components/ui';
-import { formatMoney } from '@/constants/mock';
+import { formatMoney } from '@/constants/content';
 
 interface WalletCardProps {
   balance: number;
