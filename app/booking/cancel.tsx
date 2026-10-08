@@ -1,9 +1,9 @@
 // app/booking/cancel.tsx — Huỷ 1.2.1 "Vui lòng chọn lý do": chọn MỘT lý do (GET /v1/public/cancel-reasons theo dịch vụ
 // của đơn) + ghi chú + ảnh bằng chứng khi lý do yêu cầu (tải lên purpose order_proof) → POST /orders/:id/cancel.
 // Phí huỷ: còn trong thời gian huỷ miễn phí (cancelFreeUntil) → đếm ngược; qua mốc → tải lại đơn, hiện phí
-// (cancelFeeIfNow). Ngay trước khi huỷ luôn đọc lại đơn — phí cao hơn số đang hiện thì hỏi lại. Chưa có tài xế: được huỷ
-// không cần lý do.
-import React, { useCallback, useEffect, useState } from 'react';
+// (cancelFeeIfNow). Gửi huỷ kèm maxFee = phí khách đang thấy (0 khi miễn phí): phí thật cao hơn → máy chủ trả 409
+// order.cancel_fee_changed (không huỷ) → hỏi lại với phí mới. Chưa có tài xế: được huỷ không cần lý do.
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Image, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Dialog, ErrorSheet, Icon, Icons, Radio, Screen, TextField } from '@/components/ui';
@@ -11,13 +11,20 @@ import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { cancelOrder, cancelReasons, getOrder, type CancelReason, type OrderDetail } from '@/services/orders';
 import { uploadFile } from '@/services/upload';
 import { formatVnd } from '@/services/bookingStore';
-import { errorMessage } from '@/services/zuum';
+import { errorMessage, isApiError } from '@/services/zuum';
 import { FlatFooter } from '@/components/booking';
 import { PhotoActionSheet } from '@/components/profile';
 import { useRealtime } from '@/hooks/useRealtime';
 import { cancelFeePending, mmss, useFreeCancelCountdown } from '@/hooks/useCancelCountdown';
 
 const hasPartnerNow = (o: OrderDetail | null) => o?.status === 'assigned' || o?.status === 'arrived_pickup';
+
+/** 409 order.cancel_fee_changed: details.fee = ["<phí mới>"] */
+const newFeeOf = (e: unknown): number | null => {
+  if (!isApiError(e, 'order.cancel_fee_changed')) return null;
+  const fee = Number(e.details?.fee?.[0]);
+  return Number.isFinite(fee) && fee > 0 ? fee : null;
+};
 
 export default function CancelScreen() {
   const { orderId } = useLocalSearchParams<{ orderId?: string }>();
@@ -31,13 +38,15 @@ export default function CancelScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feeConfirm, setFeeConfirm] = useState<number | null>(null);
+  /** ảnh bằng chứng đã tải lên (hỏi lại phí rồi gửi lại thì không tải lại ảnh) */
+  const uploaded = useRef<{ uri: string; fileId: string } | null>(null);
 
   const reload = useCallback(async () => {
     if (!orderId) return;
     try {
       setOrder(await getOrder(orderId));
     } catch {
-      /* giữ đơn đang có; lúc huỷ sẽ đọc lại */
+      /* giữ đơn đang có */
     }
   }, [orderId]);
 
@@ -77,37 +86,31 @@ export default function CancelScreen() {
   const fee = freeLeft != null ? 0 : (order?.cancelFeeIfNow ?? 0);
   const ready = !!order && canCancel && (!needsReason || !!reason) && (!needsProof || !!photo) && !submitting;
 
-  /** acceptedFee: phí khách đã đồng ý (mặc định = phí đang hiện trên nút) */
+  /** acceptedFee: phí khách đã đồng ý (mặc định = phí đang hiện trên nút) — gửi làm maxFee */
   const submit = async (acceptedFee: number = fee) => {
     if (!order || !ready) return;
     setFeeConfirm(null);
     setSubmitting(true);
     try {
-      // đọc lại đơn ngay trước khi huỷ: phí / trạng thái có thể đã đổi từ lúc mở màn
-      const fresh = await getOrder(order.id);
-      setOrder(fresh);
-      if (!fresh.allowedActions.includes('cancel')) {
-        setError('Đơn vừa chuyển trạng thái nên không thể tự huỷ nữa — vui lòng liên hệ tổng đài hỗ trợ.');
-        return;
+      let proofFileId: string | undefined;
+      if (needsProof && photo) {
+        if (uploaded.current?.uri !== photo.uri) {
+          uploaded.current = { uri: photo.uri, fileId: await uploadFile(photo.uri, 'order_proof', photo.mimeType) };
+        }
+        proofFileId = uploaded.current.fileId;
       }
-      if (hasPartnerNow(fresh) && !reason) {
-        setError('Tài xế vừa nhận đơn — vui lòng chọn lý do huỷ.');
-        return;
-      }
-      const freshFee = fresh.cancelFeeIfNow ?? 0;
-      if (freshFee > acceptedFee) {
-        setFeeConfirm(freshFee);
-        return;
-      }
-      const proofFileId = needsProof && photo ? await uploadFile(photo.uri, 'order_proof', photo.mimeType) : undefined;
       await cancelOrder(order.id, {
         ...(reason ? { reasonId: reason.id } : {}),
         ...(note.trim() ? { note: note.trim() } : {}),
         ...(proofFileId ? { proofFileId } : {}),
+        maxFee: acceptedFee,
       });
       router.replace({ pathname: '/booking/tracking', params: { orderId: order.id } });
     } catch (e) {
-      setError(errorMessage(e, 'Không huỷ được đơn hàng. Vui lòng thử lại.'));
+      void reload(); // phí / trạng thái / yêu cầu lý do có thể đã đổi
+      const newFee = newFeeOf(e);
+      if (newFee != null) setFeeConfirm(newFee);
+      else setError(errorMessage(e, 'Không huỷ được đơn hàng. Vui lòng thử lại.'));
     } finally {
       setSubmitting(false);
     }

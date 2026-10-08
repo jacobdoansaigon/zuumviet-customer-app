@@ -1,7 +1,7 @@
 // services/intercity.ts — Xe đường dài: tỉnh/thành + bến xe (GET /v1/public/intercity/cities), chuyến bán vé
 // (nhà xe: kind=bus, xe ghép: kind=carpool), giữ ghế 10 phút, xác nhận vé, vé của tôi, huỷ vé (trước giờ chạy ≥ 24h).
 import { createStore } from '@/services/store';
-import { api, type ZuumResponse, type ZuumRoutes } from '@/services/zuum';
+import { api, isApiError, type ZuumResponse, type ZuumRoutes } from '@/services/zuum';
 import { VN_OFFSET_MS, vnDateKey } from '@/services/vnTime';
 
 export { vnDateKey };
@@ -183,15 +183,23 @@ let pendingRelease: Promise<unknown> | null = null;
 
 const isLiveHold = (b: { status: string; heldUntil: string | null }) => b.status === 'held' && !!b.heldUntil && Date.parse(b.heldUntil) > Date.now();
 
+/** released: đã nhả (hoặc vé đã huỷ / hết hạn sẵn); already_confirmed: vé đã đặt thành công — mở vé; failed: lỗi mạng… */
+export type ReleaseResult = 'released' | 'already_confirmed' | 'failed';
+
 /**
- * Trả ghế đang giữ khi khách rời màn thanh toán. Đọc lại vé trước và CHỈ huỷ khi vé vẫn đang giữ chỗ — cùng endpoint
- * huỷ còn huỷ được vé đã xác nhận, nên tuyệt đối không gọi mù. Trả về vé mới nhất (null nếu không đọc được — giữ chỗ
- * tự hết hạn sau 10 phút).
+ * Nhả ghế đang giữ (POST …/bookings/:id/release): máy chủ CHỈ nhả vé còn đang giữ chỗ, vé đã đặt → 409
+ * intercity.already_confirmed và không đổi gì — an toàn cả khi lần xác nhận trước chưa rõ kết quả. Dùng thay /cancel
+ * cho mọi thao tác "huỷ giữ chỗ" (/cancel huỷ được cả vé đã đặt).
  */
-export function releaseHold(bookingId: string): Promise<IntercityBooking | null> {
-  const run = getBooking(bookingId)
-    .then((b) => (isLiveHold(b) ? cancelBooking(bookingId) : b))
-    .catch(() => null);
+export function releaseBooking(bookingId: string): Promise<IntercityBooking> {
+  return api('POST /v1/customer/intercity/bookings/:id/release', { params: { id: bookingId } });
+}
+
+/** Nhả ghế khi rời màn thanh toán / sơ đồ ghế chờ xong mới tải lại (xem settleHoldRelease) — không ném lỗi */
+export function releaseHold(bookingId: string): Promise<ReleaseResult> {
+  const run = releaseBooking(bookingId)
+    .then((): ReleaseResult => 'released')
+    .catch((e): ReleaseResult => (isApiError(e, 'intercity.already_confirmed') ? 'already_confirmed' : 'failed'));
   pendingRelease = run;
   void run.finally(() => {
     if (pendingRelease === run) pendingRelease = null;

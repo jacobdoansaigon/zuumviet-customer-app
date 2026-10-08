@@ -6,10 +6,10 @@ import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Button, Dialog, EmptyState, ErrorSheet, Icon, Icons, Screen, Toast } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { BOOKING_STATUS_LABEL, cancelBooking, getBooking, vnDateLabel, vnTime, type IntercityBooking } from '@/services/intercity';
+import { BOOKING_STATUS_LABEL, cancelBooking, getBooking, releaseBooking, vnDateLabel, vnTime, type IntercityBooking } from '@/services/intercity';
 import { formatVnd } from '@/services/bookingStore';
 import { formatPhone } from '@/services/session';
-import { errorMessage } from '@/services/zuum';
+import { errorMessage, isApiError } from '@/services/zuum';
 
 export default function IntercityTicketScreen() {
   const { orderId, done } = useLocalSearchParams<{ orderId: string; done?: string }>();
@@ -66,9 +66,16 @@ export default function IntercityTicketScreen() {
     setConfirmCancel(false);
     setCancelling(true);
     try {
-      setBooking(await cancelBooking(booking.id));
-      setToast(booking.paymentMethod === 'wallet' ? 'Đã huỷ vé — tiền đã hoàn về ví' : 'Đã huỷ vé');
+      if (confirmed) {
+        setBooking(await cancelBooking(booking.id));
+        setToast(booking.paymentMethod === 'wallet' ? 'Đã huỷ vé — tiền đã hoàn về ví' : 'Đã huỷ vé');
+      } else {
+        // đang giữ chỗ: nhả ghế bằng /release — vé vừa được đặt ở nơi khác thì máy chủ từ chối, không huỷ nhầm
+        setBooking(await releaseBooking(booking.id));
+        setToast('Đã huỷ giữ chỗ');
+      }
     } catch (e) {
+      if (isApiError(e, 'intercity.already_confirmed')) void getBooking(booking.id).then(setBooking).catch(() => undefined);
       setError(errorMessage(e, 'Không huỷ được vé'));
     } finally {
       setCancelling(false);

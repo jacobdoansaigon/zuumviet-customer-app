@@ -1,8 +1,8 @@
 // app/booking/intercity/checkout/[bookingId].tsx — Hoàn tất đặt vé sau khi giữ ghế: đếm ngược thời gian giữ chỗ (10 phút),
 // người đi (tên/SĐT), điểm đón/trả (bến xe hoặc tận nơi nếu chuyến nhận — kèm địa chỉ), hàng gửi kèm, thanh toán
-// (tiền mặt / ví) → POST /v1/customer/intercity/bookings/:id/confirm → vé điện tử. Huỷ giữ chỗ hoặc quay lại: trả ghế
-// ngay (chỉ khi vé còn đang giữ). Xác nhận mất phản hồi (lỗi mạng / not_held / hold_expired): đọc lại vé — đã đặt thì
-// mở vé, không bắt chọn lại ghế (tránh mua 2 lần).
+// (tiền mặt / ví) → POST /v1/customer/intercity/bookings/:id/confirm → vé điện tử. Huỷ giữ chỗ hoặc quay lại: nhả ghế
+// ngay (POST …/release — máy chủ chỉ nhả vé còn đang giữ; vé đã đặt → 409 intercity.already_confirmed → mở vé).
+// Xác nhận mất phản hồi (lỗi mạng / not_held / hold_expired): đọc lại vé — đã đặt thì mở vé, không bắt chọn lại ghế.
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -48,18 +48,23 @@ export default function TicketCheckoutScreen() {
   const [error, setError] = useState<string | null>(null);
   const left = useCountdown(booking?.status === 'held' ? booking.heldUntil : null);
   const navigation = useNavigation();
-  // settled: rời màn có chủ đích (đã đặt / đã trả ghế / hết hạn) → không trả ghế nữa.
-  // unsure: có lần xác nhận đang chạy hoặc chưa rõ kết quả → KHÔNG tự huỷ (vé có thể đã được đặt).
+  // settled: rời màn có chủ đích (đã đặt / đã nhả ghế / hết hạn) → không nhả ghế nữa.
+  // leftByBack: khách quay lại → việc nhả ghế (và mở vé nếu lần xác nhận đang chạy đã thành công) do beforeRemove lo;
+  // lần xác nhận còn dở trên màn này không điều hướng nữa.
   const settled = useRef(false);
-  const unsure = useRef(false);
+  const leftByBack = useRef(false);
   const heldRef = useRef(false);
   heldRef.current = booking?.status === 'held';
 
   useEffect(
     () =>
       navigation.addListener('beforeRemove', () => {
-        if (settled.current || unsure.current || !heldRef.current) return;
-        void releaseHold(id);
+        if (settled.current) return;
+        leftByBack.current = true;
+        if (!heldRef.current) return;
+        void releaseHold(id).then((r) => {
+          if (r === 'already_confirmed') router.push({ pathname: '/booking/intercity/ticket/[orderId]', params: { orderId: id, done: '1' } });
+        });
       }),
     [navigation, id],
   );
@@ -117,6 +122,7 @@ export default function TicketCheckoutScreen() {
     !submitting;
 
   const openTicket = (bookingId: string) => {
+    if (leftByBack.current) return;
     settled.current = true;
     router.replace({ pathname: '/booking/intercity/ticket/[orderId]', params: { orderId: bookingId, done: '1' } });
   };
@@ -124,7 +130,6 @@ export default function TicketCheckoutScreen() {
   const submit = async () => {
     if (!ready) return;
     setSubmitting(true);
-    unsure.current = true;
     try {
       const done = await confirmBooking(booking.id, {
         paymentMethod: payment,
@@ -140,7 +145,7 @@ export default function TicketCheckoutScreen() {
       const err = toZuumError(e);
       const maybeDone = err.status === 0 || err.status >= 500 || isApiError(err, 'intercity.hold_expired', 'intercity.not_held');
       if (!maybeDone) {
-        unsure.current = false; // lỗi nghiệp vụ rõ ràng (sai địa chỉ, ví không đủ…) → vé vẫn đang giữ
+        // lỗi nghiệp vụ rõ ràng (sai địa chỉ, ví không đủ…) → vé vẫn đang giữ
         setError(errorMessage(err, 'Không đặt được vé, vui lòng thử lại'));
         return;
       }
@@ -151,7 +156,6 @@ export default function TicketCheckoutScreen() {
         return;
       }
       if (latest) {
-        unsure.current = false;
         setBooking(latest);
         setError(errorMessage(err, 'Không đặt được vé, vui lòng thử lại'));
       } else {
@@ -165,9 +169,8 @@ export default function TicketCheckoutScreen() {
   const releaseNow = async () => {
     setConfirmCancel(false);
     settled.current = true;
-    const latest = await releaseHold(booking.id);
-    if (latest && (latest.status === 'confirmed' || latest.status === 'completed')) {
-      openTicket(latest.id);
+    if ((await releaseHold(booking.id)) === 'already_confirmed') {
+      openTicket(booking.id);
       return;
     }
     router.back();

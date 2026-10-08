@@ -648,6 +648,81 @@ export interface ZuumRoutes {
       createdAt: string;
     };
   };
+  /** Nhả ghế đang giữ — chỉ tác động khi vé còn "đang giữ chỗ"; vé đã đặt → 409 intercity.already_confirmed */
+  'POST /v1/customer/intercity/bookings/:id/release': {
+    params: { id: string };
+    response: {
+      trip: {
+        id: string;
+        kind: "bus" | "carpool";
+        status: "scheduled" | "completed" | "cancelled" | "departed";
+        operator: {
+          id: string;
+          code: string;
+          name: string;
+        };
+        from: {
+          id: string;
+          name: string;
+          station: string;
+          address: string;
+        };
+        to: {
+          id: string;
+          name: string;
+          station: string;
+          address: string;
+        };
+        departAt: string;
+        arriveAt: string;
+        pricePerSeat: number;
+        seatCount: number;
+        amenities: string[];
+        vehicle: {
+          type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+          name: null | string;
+          color: null | string;
+          plate: null | string;
+        };
+        cargoFee: null | number;
+        homePickupFee: null | number;
+        homeDropoffFee: null | number;
+        note: null | string;
+      };
+      id: string;
+      code: string;
+      status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+      seatIds: string[];
+      unitPrice: number;
+      price: null | {
+        seats: number;
+        cargo: number;
+        pickup: number;
+        dropoff: number;
+        total: number;
+      };
+      total: number;
+      paymentMethod: null | "cash" | "wallet";
+      withCargo: boolean;
+      cargoNote: null | string;
+      pickup: {
+        type: string;
+        address: null | string;
+      };
+      dropoff: {
+        type: string;
+        address: null | string;
+      };
+      contactName: null | string;
+      contactPhone: null | string;
+      heldUntil: null | string;
+      confirmedAt: null | string;
+      cancelledAt: null | string;
+      cancelReason: null | string;
+      canCancel: boolean;
+      createdAt: string;
+    };
+  };
   /** Giữ ghế 10 phút */
   'POST /v1/customer/intercity/trips/:id/holds': {
     params: { id: string };
@@ -1196,6 +1271,7 @@ export interface ZuumRoutes {
       reasonId?: string;
       note?: string;
       proofFileId?: string;
+      maxFee?: number;
     };
     response: {
       id: string;
