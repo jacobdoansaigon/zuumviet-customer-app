@@ -59,7 +59,8 @@ export default function EditProfileScreen() {
     }
     setSaving(true);
     try {
-      await customerApi.updateProfile(customer.id, { full_name: name, email: emailTrim });
+      // email rỗng → không gửi (BE validateEmail('') → 422), giữ email cũ trên BE
+      await customerApi.updateProfile(customer.id, emailTrim ? { full_name: name, email: emailTrim } : { full_name: name });
       await updateStoredCustomer({ full_name: name, fullname: name, email: emailTrim });
       router.replace({ pathname: '/account', params: { toast: 'profile' } });
     } catch (e) {

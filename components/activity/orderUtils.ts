@@ -26,6 +26,7 @@ export const ACTIVITY_FILTERS: { label: string; value: ActivityFilter }[] = [
 /** Nhãn chi tiết theo từng trạng thái BE (giữ nguyên mapping của màn Đơn hàng cũ) */
 export const STATUS_LABEL: Record<number, string> = {
   [ORDER_STATUS.NEW]: 'Mới',
+  [ORDER_STATUS.NEW_SCHEDULED]: 'Đã hẹn giờ',
   [ORDER_STATUS.ASSIGNING]: 'Đang tìm tài xế',
   [ORDER_STATUS.ACCEPTED]: 'Tài xế đã nhận',
   [ORDER_STATUS.BOARDED]: 'Đã đến lấy',
@@ -36,6 +37,7 @@ export const STATUS_LABEL: Record<number, string> = {
   [ORDER_STATUS.FAIL]: 'Thất bại',
   [ORDER_STATUS.CUSTOMER_CANCELLED]: 'Bạn đã huỷ',
   [ORDER_STATUS.DRIVER_CANCELLED]: 'Tài xế huỷ',
+  [ORDER_STATUS.STAFF_CANCELLED]: 'ZuumViet huỷ',
 };
 
 export function isActiveStatus(status: number) {
@@ -46,6 +48,7 @@ export function isCancelledStatus(status: number) {
   return (
     status === ORDER_STATUS.CUSTOMER_CANCELLED ||
     status === ORDER_STATUS.DRIVER_CANCELLED ||
+    status === ORDER_STATUS.STAFF_CANCELLED ||
     status === ORDER_STATUS.FAIL
   );
 }
@@ -56,6 +59,7 @@ export function isCompletedStatus(status: number) {
 
 /** Trạng thái tím 11px trên card "Đang trên đường" */
 export function activeStatusLabel(status: number) {
+  if (status === ORDER_STATUS.NEW_SCHEDULED) return 'Đã hẹn giờ, chờ tới giờ đón';
   if (status <= ORDER_STATUS.ASSIGNING) return 'Đang tìm tài xế';
   if (status <= ORDER_STATUS.BOARDED) return 'Tài xế đang đến';
   return 'Đang trong chuyến';
@@ -259,7 +263,7 @@ function mapDriver(raw: Raw): ActivityDriver | undefined {
     id: String(driverId),
     name,
     avatar: d ? str(d.avatar_url) ?? null : null,
-    rating: (d ? num(d.rating) : undefined) || 5,
+    rating: (d ? num(d.rating) : undefined) || 0,
     reviews: 0,
     plate: first(vehicle ? str(vehicle.license_plates) : undefined, d ? str(d.license_plate) : undefined) ?? '',
     vehicle: first(vehicle ? str(vehicle.name) : undefined, d ? str(d.vehicle_name) : undefined) ?? '',

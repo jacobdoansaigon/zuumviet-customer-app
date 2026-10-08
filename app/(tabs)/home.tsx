@@ -142,7 +142,7 @@ export default function HomeScreen() {
           <SectionHeader title="Đối tác của ZuumViet" style={styles.newsHeader} />
           <PartnerBanner />
 
-          <AppFooter note="Ưu đãi, đối tác & số dư ví đang là dữ liệu mẫu (demo)" />
+          <AppFooter note="Ưu đãi & đối tác đang là dữ liệu mẫu (demo)" />
         </View>
       </ScrollView>
 

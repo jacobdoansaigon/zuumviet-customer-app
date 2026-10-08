@@ -33,7 +33,9 @@ function pickString(o: Record<string, unknown>, keys: string[]): string {
 export function describeActiveOrder(o: DeliveryOrder): ActiveTripInfo {
   const status = Number(o.status);
   const statusLabel =
-    status === ORDER_STATUS.NEW || status === ORDER_STATUS.ASSIGNING
+    status === ORDER_STATUS.NEW_SCHEDULED
+      ? 'Đã hẹn giờ, chờ tới giờ đón'
+      : status === ORDER_STATUS.NEW || status === ORDER_STATUS.ASSIGNING
       ? 'Đang tìm chuyến xe'
       : status === ORDER_STATUS.ACCEPTED
         ? 'Tài xế đang đến lấy hàng'

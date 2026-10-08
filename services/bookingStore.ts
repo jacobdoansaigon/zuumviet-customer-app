@@ -586,8 +586,12 @@ export function buildOrderPayload(s: BookingState = state, serviceId: number = r
     pickup_long: pickup?.lng ?? 0,
     pickup_map_place_id: pickup?.placeId ?? '',
     payment_method: s.options.paymentMethod === 'wallet' ? 1 : 3, // PAYMENT_METHOD_WALLET=1, CASH=3
-    allow_driver_id_list: s.options.assignedDrivers,
-    coupon_code: s.options.promo?.code ?? '',
+    // "Tài xế chỉ định" hiện chọn từ danh sách MẪU (FAVORITE_DRIVERS id 101–104) — gửi lên BE sẽ loại mọi tài xế thật
+    // ("Not in Allow List"). Chỉ gửi khi có id tài xế thật (TODO: màn chọn tài xế yêu thích từ BE).
+    allow_driver_id_list: [] as number[],
+    // Mã khuyến mãi trong app là dữ liệu MẪU; BE từ chối mã không có trong zv-promotion (422 error_coupon_code_invalid)
+    // → không gửi cho tới khi có API mã giảm giá thật.
+    coupon_code: '',
     price_tip: s.options.tip * EXTRA_PRICES.tip,
     // Thuê nhân công / Dọn nhà / Gọi thợ: BE chưa có field riêng cho thời gian làm việc theo block,
     // số nhân công, tầng lầu/đóng gói/tháo lắp/đồ đặc biệt, hay mô tả sự cố/ảnh hiện trạng → ghi vào
@@ -827,7 +831,7 @@ export function advanceMockOrder(id: string): TrackedOrder | null {
 
 export const isTerminalStatus = (status: number) => status >= ORDER_STATUS.COMPLETED;
 
-export function getTrackingPhase(o: TrackedOrder): TrackingPhase {
+export function getTrackingPhase(o: TrackedOrder): TrackedPhase {
   const S = ORDER_STATUS;
   const s = o.status;
   if (s === S.COMPLETED) return 'completed';
@@ -835,22 +839,35 @@ export function getTrackingPhase(o: TrackedOrder): TrackingPhase {
   if (s >= S.CUSTOMER_CANCELLED) return 'cancelled';
   if (s >= S.PICKED) return 'delivering';
   if (s >= S.ACCEPTED || o.driver) return 'accepted';
-  if (s === 2 || (o.scheduledAt && s < S.ASSIGNING)) return 'scheduled';
+  if (s === S.NEW_SCHEDULED || (o.scheduledAt && s < S.ASSIGNING)) return 'scheduled';
   if (o.searchExpired) return 'notfound';
   return 'searching';
 }
+type TrackedPhase = TrackingPhase;
 
-/** Đồng bộ trạng thái đợt tìm tài xế của đơn thật từ GET /site/deliveryorderprocesses/last */
+/**
+ * Đồng bộ trạng thái đợt tìm tài xế của đơn thật từ GET /site/deliveryorderprocesses/last.
+ * Hết hạn = đợt gần nhất đã xong (COMPLETED/CANCELLED) hoặc kẹt (QUEUED/SCANNING quá date_expired — queue/worker chết),
+ * hoặc đơn còn NEW mà chưa có đợt nào (bước bắt đầu tìm đã lỗi) → màn theo dõi hiện "Không tìm thấy" + nút thử lại.
+ */
 export async function syncSearchState(orderId: string): Promise<void> {
   const cur = state.orders[orderId];
-  if (!cur || cur.driver || cur.status !== ORDER_STATUS.ASSIGNING) return;
+  if (!cur || cur.driver || (cur.status !== ORDER_STATUS.ASSIGNING && cur.status !== ORDER_STATUS.NEW)) return;
   try {
     const res = await orderApi.getLastProcess(orderId);
     const last = res.items?.[0];
-    if (!last) return;
     const now = Math.floor(Date.now() / 1000);
-    const finished = Number(last.status) === PROCESS_STATUS.COMPLETED || Number(last.status) === PROCESS_STATUS.CANCELLED;
-    const expired = finished && Number(last.date_expired) > 0 && Number(last.date_expired) < now;
+    let expired: boolean;
+    if (!last) {
+      expired = cur.status === ORDER_STATUS.NEW && !cur.scheduledAt;
+    } else {
+      const st = Number(last.status);
+      const dateExpired = Number(last.date_expired);
+      const finished = st === PROCESS_STATUS.COMPLETED || st === PROCESS_STATUS.CANCELLED;
+      // QUEUED/SCANNING quá hạn thêm 60s = worker không chạy → coi như không tìm thấy
+      const stuck = !finished && dateExpired > 0 && dateExpired + 60 < now;
+      expired = (finished && dateExpired > 0 && dateExpired < now) || stuck;
+    }
     if (expired !== !!cur.searchExpired) updateStoredOrder(orderId, { searchExpired: expired });
   } catch {
     /* giữ trạng thái cũ */
@@ -895,9 +912,8 @@ export function normalizeApiOrder(o: DeliveryOrder, base?: TrackedOrder | null):
   const id = String(o.id);
   const status = num(o.status) || base?.status || ORDER_STATUS.ASSIGNING;
   const pickupDate = num(o.pickup_date);
-  // total_distance BE lưu bằng mét
-  const rawDistance = num(o.total_distance);
-  const distanceKm = rawDistance > 500 ? Math.round(rawDistance / 100) / 10 : rawDistance;
+  // total_distance BE luôn lưu bằng mét
+  const distanceKm = Math.round(num(o.total_distance) / 100) / 10;
   const details = Array.isArray(o.details) ? (o.details as Record<string, unknown>[]) : null;
   const stops: TrackedStop[] =
     details && details.length
@@ -982,8 +998,10 @@ export async function submitBooking(): Promise<SubmitResult> {
       await orderApi.startDriverSearch(id);
       updateStoredOrder(id, { status: ORDER_STATUS.ASSIGNING });
     } catch (e) {
-      // Đơn đã tạo nhưng chưa tìm được tài xế → màn theo dõi sẽ thử lại (retrySearch)
+      // Đơn đã tạo nhưng chưa bắt đầu tìm được tài xế (vd BE: error_scanning_process_not_expired khi đang có đợt quét khác)
+      // → đánh dấu để màn theo dõi hiện "Không tìm thấy tài xế" + nút "Thử lại" thay vì quay vòng "Đang tìm" mãi
       error = e instanceof Error ? e.message : String(e);
+      updateStoredOrder(id, { searchExpired: true });
     }
   }
   return { orderId: id, mock: false, error };

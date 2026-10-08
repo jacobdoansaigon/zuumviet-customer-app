@@ -187,8 +187,8 @@ export type OrderProcess = {
   order?: { id: number; driver_account_id: number; status: number };
 };
 
-/** Các trạng thái đơn còn "đang chạy" (hiện banner chuyến đang đi trên Home) */
-export const ACTIVE_ORDER_STATUSES: readonly number[] = [1, 3, 5, 7, 9, 11, 13];
+/** Các trạng thái đơn còn "đang chạy" (hiện banner chuyến đang đi trên Home) — gồm cả NEW_SCHEDULED (2) */
+export const ACTIVE_ORDER_STATUSES: readonly number[] = [1, 2, 3, 5, 7, 9, 11, 13];
 
 export function isActiveOrder(o: DeliveryOrder): boolean {
   return ACTIVE_ORDER_STATUSES.includes(Number(o.status));
@@ -237,24 +237,26 @@ async function getToken(): Promise<string | null> {
 }
 
 export type SessionEvent = 'login' | 'logout';
-const sessionListeners = new Set<(event: SessionEvent) => void>();
+const sessionListeners = new Set<(event: SessionEvent) => void | Promise<void>>();
 
-/** Nghe đăng nhập/đăng xuất (vd hooks/useNotifications đăng ký/huỷ thiết bị push với BE) */
-export function addSessionListener(listener: (event: SessionEvent) => void): () => void {
+/** Nghe đăng nhập/đăng xuất (vd hooks/useNotifications đăng ký/huỷ thiết bị push với BE). Listener async được chờ. */
+export function addSessionListener(listener: (event: SessionEvent) => void | Promise<void>): () => void {
   sessionListeners.add(listener);
   return () => {
     sessionListeners.delete(listener);
   };
 }
 
-function notifySession(event: SessionEvent) {
-  sessionListeners.forEach((l) => {
-    try {
-      l(event);
-    } catch {
-      /* listener tự lo lỗi của mình */
-    }
-  });
+async function notifySession(event: SessionEvent): Promise<void> {
+  await Promise.all(
+    [...sessionListeners].map(async (l) => {
+      try {
+        await l(event);
+      } catch {
+        /* listener tự lo lỗi của mình */
+      }
+    }),
+  );
 }
 
 export async function saveSession(token: string, customer: CustomerProfile) {
@@ -269,12 +271,12 @@ export async function saveSession(token: string, customer: CustomerProfile) {
       /* ignore quota */
     }
   }
-  notifySession('login');
+  void notifySession('login');
 }
 
 export async function clearSession() {
-  // Báo trước khi xoá token để listener còn gọi được API huỷ thiết bị push (cần JWT)
-  notifySession('logout');
+  // Chờ listener huỷ thiết bị push XONG (cần JWT) rồi mới xoá token — nếu không BE vẫn đẩy thông báo về máy đã đăng xuất
+  await Promise.race([notifySession('logout'), new Promise<void>((resolve) => setTimeout(resolve, 4000))]);
   await AsyncStorage.removeItem(STORAGE_KEYS.token);
   await AsyncStorage.removeItem(STORAGE_KEYS.customer);
   await AsyncStorage.removeItem(STORAGE_KEYS.otpSession);
@@ -630,6 +632,7 @@ export const walletRemoteApi = {
 
 export const ORDER_STATUS = {
   NEW: 1,
+  NEW_SCHEDULED: 2,
   ASSIGNING: 3,
   ACCEPTED: 5,
   BOARDED: 7,
@@ -640,4 +643,5 @@ export const ORDER_STATUS = {
   FAIL: 17,
   CUSTOMER_CANCELLED: 19,
   DRIVER_CANCELLED: 21,
+  STAFF_CANCELLED: 23,
 } as const;
