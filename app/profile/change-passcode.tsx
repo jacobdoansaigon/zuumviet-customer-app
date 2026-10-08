@@ -1,29 +1,26 @@
 // Đổi mật khẩu — Figma ĐỔI MẬT KHẨU: header tím "Đổi mật khẩu"; "Mã bảo vệ tài khoản mới" + SĐT đậm;
 // 6 ô passcode; nút "Cập nhật mã bảo vệ" → Hồ sơ + toast "Cập nhật mật khẩu mới thành công".
-// BE (POST /site/customeraccounts/changepassword) bắt buộc mã cũ → thêm bước 1 "Nhập mã hiện tại" trước bước nhập mã mới.
-import React, { useEffect, useState, useCallback } from 'react';
+// POST /v1/customer/me/passcode {currentPasscode, newPasscode} — bước 1 nhập mã hiện tại, bước 2 mã mới (kiểm luật
+// passcode như server). Server thu hồi mọi phiên khác, giữ phiên đang dùng.
+import React, { useState, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, AppHeader, Screen, Button, CodeInput, Toast } from '@/components/ui';
-import { authApi, getStoredCustomer, formatPhoneDisplay, getErrorMessage } from '@/services/api';
+import { formatPhone, useProfile } from '@/services/session';
+import { PASSCODE_LENGTH, passcodeWeakness } from '@/services/passcode';
+import { api, errorMessage, isApiError } from '@/services/zuum';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
-
-const PASSCODE_LENGTH = 6;
 
 export default function ChangePasscodeScreen() {
   useStatusBarStyle('light');
-  const [phone, setPhone] = useState('');
+  const profile = useProfile();
   const [step, setStep] = useState<'current' | 'new'>('current');
   const [current, setCurrent] = useState('');
   const [code, setCode] = useState('');
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const hideToast = useCallback(() => setToast(null), []);
-
-  useEffect(() => {
-    getStoredCustomer().then((c) => setPhone(formatPhoneDisplay(c?.phone, c?.country_code || '84')));
-  }, []);
 
   const value = step === 'current' ? current : code;
   const canSubmit = value.length === PASSCODE_LENGTH && !saving;
@@ -34,6 +31,12 @@ export default function ChangePasscodeScreen() {
       setStep('new');
       return;
     }
+    const weakness = passcodeWeakness(code);
+    if (weakness) {
+      setCode('');
+      setToast(weakness);
+      return;
+    }
     if (code === current) {
       setCode('');
       setToast('Mã mới phải khác mã hiện tại');
@@ -41,19 +44,17 @@ export default function ChangePasscodeScreen() {
     }
     setSaving(true);
     try {
-      await authApi.changePassword(current, code);
+      await api('POST /v1/customer/me/passcode', { body: { currentPasscode: current, newPasscode: code } });
       router.replace({ pathname: '/account', params: { toast: 'passcode' } });
     } catch (e) {
-      const msg = getErrorMessage(e);
-      // BE: error_password_old_invalid / error_password_old_required → quay lại bước nhập mã cũ
-      if (/password_old/i.test(msg)) {
+      if (isApiError(e, 'auth.invalid_passcode')) {
         setStep('current');
         setCurrent('');
         setCode('');
         setToast('Mã hiện tại không đúng, vui lòng nhập lại');
       } else {
         setCode('');
-        setToast(msg);
+        setToast(errorMessage(e));
       }
     } finally {
       setSaving(false);
@@ -82,7 +83,7 @@ export default function ChangePasscodeScreen() {
         <AppText size={14} color={Colors.textSecondary} align="center" style={{ lineHeight: 21 }}>
           {step === 'current' ? 'Mã bảo vệ hiện tại của ' : 'Mã bảo vệ tài khoản mới '}
           <AppText size={14} weight="bold" color={Colors.text}>
-            {phone}
+            {formatPhone(profile?.phone)}
           </AppText>
         </AppText>
 
@@ -95,7 +96,9 @@ export default function ChangePasscodeScreen() {
         </View>
 
         <AppText size={12} color={Colors.textMuted} align="center" style={{ marginTop: Spacing.xl }}>
-          {step === 'current' ? 'Nhập mã passcode đang dùng để xác nhận là chính bạn.' : 'Mã passcode gồm 6 chữ số, dùng để đăng nhập bằng mật khẩu.'}
+          {step === 'current'
+            ? 'Nhập mã passcode đang dùng để xác nhận là chính bạn.'
+            : 'Mã passcode gồm 6 chữ số, không dùng 6 số giống nhau hoặc dãy liên tiếp (vd 123456).'}
         </AppText>
       </View>
       <Toast visible={!!toast} message={toast ?? ''} tone="error" onHide={hideToast} />

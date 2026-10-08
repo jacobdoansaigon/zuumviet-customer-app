@@ -1,28 +1,22 @@
 // Nhập mã passcode — Figma "passcode" (0-6957 / 1008-112): 6 ô bảo mật, "Nhập mã passcode của số điện thoại"
-// + SĐT đậm, link "Quên mã passcode" → OTP (intent reset → đặt passcode mới).
+// + SĐT đậm, link "Quên mã passcode" → OTP (purpose reset_passcode) → đặt passcode mới.
 import React, { useCallback, useRef, useState } from 'react';
 import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, AppHeader, CodeInput, Screen, ErrorSheet, Icon, Icons } from '@/components/ui';
-import {
-  authApi,
-  ApiError,
-  saveSession,
-  saveOtpSession,
-  normalizePhoneVn,
-  formatPhoneDisplay,
-} from '@/services/api';
+import { requestOtp } from '@/services/authFlow';
+import { completeLogin, formatPhone } from '@/services/session';
+import { PASSCODE_LENGTH } from '@/services/passcode';
+import { api, errorMessage, getDeviceId, isApiError } from '@/services/zuum';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
-const PASSCODE_LENGTH = 6;
-
-function paramStr(v: string | string[] | undefined, fallback = ''): string {
-  if (Array.isArray(v)) return String(v[0] ?? fallback);
-  return v != null && v !== '' ? String(v) : fallback;
+function paramStr(v: string | string[] | undefined): string {
+  if (Array.isArray(v)) return String(v[0] ?? '');
+  return v != null ? String(v) : '';
 }
 
-/** /home — web dùng location.assign để reset router state (giống luồng OTP cũ) */
+/** /home — web dùng location.assign để reset router state (giống luồng OTP) */
 function goHomeAfterLogin() {
   try {
     if (typeof window !== 'undefined' && typeof window.location?.assign === 'function') {
@@ -38,7 +32,7 @@ function goHomeAfterLogin() {
 export default function PasscodeScreen() {
   useStatusBarStyle('dark');
   const raw = useLocalSearchParams<{ phone?: string }>();
-  const phone = normalizePhoneVn(paramStr(raw.phone));
+  const phone = paramStr(raw.phone);
 
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -58,26 +52,21 @@ export default function PasscodeScreen() {
       setLoading(true);
       setWrong(false);
       try {
-        const res = await authApi.loginPassword(phone, passcode, '84');
-        if (!res || typeof res !== 'object' || !res.token) {
-          throw new ApiError(500, 'Đăng nhập không trả token');
-        }
-        await saveSession(res.token, res);
+        const tokens = await api('POST /v1/public/customer/auth/login/passcode', {
+          body: { phone, passcode, deviceId: await getDeviceId() },
+        });
+        await completeLogin(tokens);
         goHomeAfterLogin();
       } catch (e) {
         setCode('');
-        if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
-          // sai passcode / tài khoản không tồn tại
-          setWrong(true);
-        } else {
-          setSheetError(e instanceof ApiError ? e.message : 'Không đăng nhập được. Kiểm tra mạng / API.');
-        }
+        if (isApiError(e, 'auth.invalid_credentials')) setWrong(true);
+        else setSheetError(errorMessage(e, 'Không đăng nhập được, vui lòng thử lại'));
       } finally {
         submittingRef.current = false;
         setLoading(false);
       }
     },
-    [phone]
+    [phone],
   );
 
   const loginRef = useRef(login);
@@ -94,27 +83,10 @@ export default function PasscodeScreen() {
     }
     setSendingOtp(true);
     try {
-      const otp = await authApi.sendOtp(phone, 'otp_general', '84');
-      await saveOtpSession({
-        phone,
-        country_code: '84',
-        otp_group: 'otp_general',
-        otp_id: otp.id,
-        otp_debug: otp.otp_debug,
-        intent: 'login',
-      });
-      router.push({
-        pathname: '/(auth)/otp',
-        params: {
-          phone,
-          otpId: String(otp.id),
-          otpDebug: otp.otp_debug ?? '',
-          intent: 'reset',
-          otpGroup: 'otp_general',
-        },
-      });
+      await requestOtp(phone, 'reset');
+      router.push({ pathname: '/(auth)/otp', params: { phone } });
     } catch (e) {
-      setSheetError(e instanceof ApiError ? e.message : 'Không gửi được OTP. Kiểm tra mạng / API.');
+      setSheetError(errorMessage(e, 'Không gửi được mã OTP, vui lòng thử lại'));
     } finally {
       setSendingOtp(false);
     }
@@ -129,7 +101,7 @@ export default function PasscodeScreen() {
         <AppText size={14} color={Colors.textSecondary} align="center" style={styles.sub}>
           Nhập mã passcode của số điện thoại{' '}
           <AppText size={14} weight="bold" color={Colors.text}>
-            {formatPhoneDisplay(phone)}
+            {formatPhone(phone)}
           </AppText>
         </AppText>
 

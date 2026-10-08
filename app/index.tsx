@@ -1,5 +1,6 @@
 // Welcome — Figma [Customer] "Login" (0-6704): logo tím, minh hoạ, headline "Hãy cùng zuumviet",
-// CTA "Đăng nhập bằng số điện thoại", footer điều khoản. Tự chuyển /home nếu đã có phiên đăng nhập.
+// CTA "Đăng nhập bằng số điện thoại", footer điều khoản. Tự chuyển /home nếu còn phiên đăng nhập
+// (refresh token chưa hết hạn) — hồ sơ cache hiện ngay, /me làm mới nền.
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Pressable, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,7 +8,7 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, Button, Logo, Icon } from '@/components/ui';
-import { getStoredCustomer } from '@/services/api';
+import { refreshProfile, restoreSession } from '@/services/session';
 
 export default function WelcomeScreen() {
   const [checking, setChecking] = useState(true);
@@ -17,9 +18,10 @@ export default function WelcomeScreen() {
     let alive = true;
     (async () => {
       try {
-        const c = await getStoredCustomer();
+        const loggedIn = await restoreSession();
         if (!alive) return;
-        if (c) {
+        if (loggedIn) {
+          void refreshProfile().catch(() => undefined);
           router.replace('/home');
           return;
         }

@@ -1,64 +1,40 @@
-// Đăng ký tài khoản mới — Figma register 1.2.3 (0-7465…): "Họ và tên" (*) + "Email", nút flat
-// "Hoàn thành hồ sơ" → /set-passcode (passcode 6 số dùng làm mật khẩu khi gọi authApi.register).
-// Giữ logic cũ: khôi phục OTP session, SĐT đã tồn tại → chuyển đăng nhập.
+// Đăng ký tài khoản mới — Figma register 1.2.3 (0-7465…): "Họ và tên" (*) + "Email" + "Mã giới thiệu" (tuỳ chọn),
+// nút flat "Hoàn thành hồ sơ" → /set-passcode (đặt passcode 6 số rồi mới gọi POST /auth/register).
+// Chỉ tới được màn này sau OTP khi server báo SĐT chưa có tài khoản (needRegister) — dùng lại verificationToken.
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { Spacing, Colors } from '@/constants/theme';
 import { AppText, AppHeader, Button, TextField, Screen, ErrorSheet } from '@/components/ui';
-import { authApi, getOtpSession, normalizePhoneVn, formatPhoneDisplay, type OtpSessionData } from '@/services/api';
+import { getAuthFlow, hasValidVerification } from '@/services/authFlow';
+import { formatPhone } from '@/services/session';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
-function paramStr(v: string | string[] | undefined): string {
-  if (Array.isArray(v)) return String(v[0] ?? '');
-  return v != null ? String(v) : '';
-}
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const REFERRAL_RE = /^[A-Z0-9]{3,32}$/;
 
 type SheetState = { title: string; message: string; action: string; onAction: () => void } | null;
 
 export default function RegisterScreen() {
   useStatusBarStyle('dark');
-  const raw = useLocalSearchParams<{ phone?: string }>();
-  const [phone, setPhone] = useState(normalizePhoneVn(paramStr(raw.phone)));
+  const [phone, setPhone] = useState('');
   const [sessionReady, setSessionReady] = useState(false);
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
+  const [referral, setReferral] = useState('');
+  const [referralError, setReferralError] = useState('');
   const [sheet, setSheet] = useState<SheetState>(null);
 
-  const goLogin = () => router.replace({ pathname: '/(auth)/login', params: { intent: 'login' } });
+  const goLogin = () => router.replace('/(auth)/login');
 
   useEffect(() => {
-    (async () => {
-      const s = await getOtpSession<OtpSessionData>();
-      const phoneNorm = normalizePhoneVn(s?.phone || paramStr(raw.phone));
-      setPhone(phoneNorm);
-
-      // SĐT đã có tài khoản → không cần đăng ký lại
-      if (phoneNorm) {
-        try {
-          const exists = await authApi.checkExists(phoneNorm, '84');
-          if (exists?.id > 0) {
-            setSheet({
-              title: 'Đã có tài khoản',
-              message: 'Số điện thoại này đã đăng ký. Hãy đăng nhập bằng OTP hoặc mật khẩu.',
-              action: 'Đăng nhập',
-              onAction: goLogin,
-            });
-            return;
-          }
-        } catch {
-          // check API fail — vẫn cho thử đăng ký
-        }
-      }
-
-      if (!s?.otp_id || !s?.otp_auth_code) {
-        setSessionReady(false);
+    void getAuthFlow().then((flow) => {
+      if (flow?.phone) setPhone(flow.phone);
+      if (!hasValidVerification(flow) || flow.intent !== 'login') {
         setSheet({
-          title: 'Thiếu phiên OTP',
+          title: 'Phiên xác thực hết hạn',
           message: 'Vui lòng quay lại bước nhập số điện thoại và xác thực OTP.',
           action: 'Đồng ý',
           onAction: goLogin,
@@ -66,24 +42,29 @@ export default function RegisterScreen() {
         return;
       }
       setSessionReady(true);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    });
   }, []);
 
   const name = fullName.trim();
   const emailTrim = email.trim();
+  const referralCode = referral.trim().toUpperCase();
   const emailOk = emailTrim.length === 0 || EMAIL_RE.test(emailTrim);
-  const canContinue = sessionReady && name.length >= 2 && emailOk;
+  const referralOk = referralCode.length === 0 || REFERRAL_RE.test(referralCode);
+  const canContinue = sessionReady && name.length >= 2 && emailOk && referralOk;
 
   const handleContinue = () => {
-    if (!canContinue) return;
     if (emailTrim && !EMAIL_RE.test(emailTrim)) {
       setEmailError('Email không hợp lệ');
       return;
     }
+    if (referralCode && !REFERRAL_RE.test(referralCode)) {
+      setReferralError('Mã giới thiệu gồm chữ và số, vd KH000123');
+      return;
+    }
+    if (!canContinue) return;
     router.push({
       pathname: '/(auth)/set-passcode',
-      params: { mode: 'register', phone, name, email: emailTrim },
+      params: { mode: 'register', name, email: emailTrim, referralCode },
     });
   };
 
@@ -99,7 +80,7 @@ export default function RegisterScreen() {
           <AppText size={13} color={Colors.textSecondary} style={styles.phoneHint}>
             Số điện thoại{' '}
             <AppText size={13} weight="bold" color={Colors.text}>
-              {formatPhoneDisplay(phone)}
+              {formatPhone(phone)}
             </AppText>
           </AppText>
         ) : null}
@@ -132,6 +113,21 @@ export default function RegisterScreen() {
           autoCapitalize="none"
           autoComplete="email"
           textContentType="emailAddress"
+          returnKeyType="next"
+          containerStyle={styles.field}
+        />
+        <TextField
+          label="Mã giới thiệu"
+          value={referral}
+          onChangeText={(t) => {
+            setReferral(t.replace(/\s/g, '').toUpperCase());
+            if (referralError) setReferralError('');
+          }}
+          error={referralError || undefined}
+          helper={referralError ? undefined : 'Không bắt buộc — mã tài khoản của người giới thiệu bạn (vd KH000123)'}
+          placeholder="KH000123"
+          autoCapitalize="characters"
+          autoCorrect={false}
           returnKeyType="done"
           onSubmitEditing={handleContinue}
           containerStyle={styles.field}

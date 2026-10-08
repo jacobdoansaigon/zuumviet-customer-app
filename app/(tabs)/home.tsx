@@ -23,13 +23,8 @@ import {
   type HomeServiceKey,
   type ActiveTripInfo,
 } from '@/components/home';
-import {
-  getStoredCustomer,
-  orderApi,
-  isActiveOrder,
-  getDisplayName,
-  type CustomerProfile,
-} from '@/services/api';
+import { orderApi, isActiveOrder } from '@/services/api';
+import { displayName, formatPhone, refreshProfile, restoreSession, useProfile } from '@/services/session';
 import { MOCK_PROMOS, MOCK_COMMUNITY, getGreeting } from '@/constants/mock';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
 import { ensureServiceCatalog } from '@/services/serviceCatalog';
@@ -40,7 +35,7 @@ const HEADER_OVERLAP = 40;
 
 export default function HomeScreen() {
   useStatusBarStyle('light');
-  const [customer, setCustomer] = useState<CustomerProfile | null>(null);
+  const customer = useProfile();
   const [activeTrip, setActiveTrip] = useState<ActiveTripInfo | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [greeting, setGreeting] = useState(getGreeting());
@@ -61,20 +56,15 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    (async () => {
-      const c = await getStoredCustomer();
-      if (!c) {
-        router.replace('/');
-        return;
-      }
-      setCustomer(c);
-    })();
+    void restoreSession().then((ok) => {
+      if (!ok) router.replace('/');
+    });
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       setGreeting(getGreeting());
-      getStoredCustomer().then((c) => c && setCustomer(c));
+      void refreshProfile().catch(() => undefined);
       void loadOrders();
     }, [loadOrders])
   );
@@ -89,8 +79,8 @@ export default function HomeScreen() {
     router.push({ pathname: '/booking', params: { service: key } });
   };
 
-  const name = getDisplayName(customer, customer?.phone ? String(customer.phone) : 'bạn');
-  const avatarUri = localAvatar ?? (typeof customer?.avatar_url === 'string' ? customer.avatar_url : null);
+  const name = displayName(customer, customer?.phone ? formatPhone(customer.phone) : 'bạn');
+  const avatarUri = localAvatar ?? customer?.avatarUrl ?? null;
 
   return (
     <View style={styles.root}>
