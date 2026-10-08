@@ -1,44 +1,49 @@
-// Nạp tiền — Figma "Nạp tiền": chip số tiền, ô nhập + đ, Nguồn tiền nạp (Momo / Chuyển khoản), nút "Tiếp tục"
-import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+// Nạp tiền — Figma "Nạp tiền": chip số tiền, ô nhập + đ, cổng thanh toán, nút "Tiếp tục".
+// POST /v1/customer/wallet/topups {amount, provider} → mở paymentUrl (VNPay) trong trình duyệt → màn Trạng thái giao dịch
+// theo dõi kết quả (GET /wallet/topups/:id + realtime wallet.updated). Cổng "thử nghiệm" chỉ có ở môi trường dev.
+import React, { useEffect, useState } from 'react';
+import { View, ScrollView, StyleSheet, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppHeader, AppText, Button, Dialog, Icons, Screen, Toast } from '@/components/ui';
-import { AMOUNT_PRESETS, WALLET_LIMITS, walletApi, type TopupSource } from '@/services/wallet';
+import { AMOUNT_PRESETS, PROVIDER_LABEL, TOPUP_LIMITS, createTopup, refreshWallet, useWallet, type TopupProvider } from '@/services/wallet';
+import { errorMessage } from '@/services/zuum';
 import { AmountPicker } from '@/components/wallet/AmountPicker';
 import { SourceOption, IconBubble } from '@/components/wallet/SourceOption';
-import { MomoMark } from '@/components/wallet/MomoMark';
 import { formatVnd } from '@/components/wallet/walletUtils';
 
-const HELPER = `Số tiền Nạp tối thiểu là ${formatVnd(WALLET_LIMITS.min)}đ - tối đa là ${formatVnd(WALLET_LIMITS.max)}đ`;
+const HELPER = `Số tiền nạp tối thiểu là ${formatVnd(TOPUP_LIMITS.min)}đ - tối đa là ${formatVnd(TOPUP_LIMITS.max)}đ`;
 
 export default function TopupScreen() {
+  const wallet = useWallet();
+  const providers = wallet?.topupProviders ?? [];
   const [amount, setAmount] = useState(0);
-  const [source, setSource] = useState<TopupSource>('momo');
+  const [provider, setProvider] = useState<TopupProvider | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [infoVisible, setInfoVisible] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const invalid = amount > 0 && (amount < WALLET_LIMITS.min || amount > WALLET_LIMITS.max);
-  const canContinue = amount >= WALLET_LIMITS.min && amount <= WALLET_LIMITS.max;
+  useEffect(() => {
+    void refreshWallet().catch((e) => setToast(errorMessage(e)));
+  }, []);
+
+  // chọn sẵn cổng đầu tiên server bật (ưu tiên VNPay)
+  useEffect(() => {
+    if (!provider && providers.length) setProvider(providers.includes('vnpay') ? 'vnpay' : providers[0]!);
+  }, [providers, provider]);
+
+  const invalid = amount > 0 && (amount < TOPUP_LIMITS.min || amount > TOPUP_LIMITS.max);
+  const canContinue = !!provider && amount >= TOPUP_LIMITS.min && amount <= TOPUP_LIMITS.max;
 
   const submit = async () => {
-    if (!canContinue || submitting) return;
+    if (!canContinue || !provider || submitting) return;
     setSubmitting(true);
     try {
-      const res = await walletApi.topup({ amount, source });
-      router.replace({
-        pathname: '/wallet/status',
-        params: {
-          ok: res.ok ? '1' : '0',
-          amount: String(amount),
-          title: res.transaction.title,
-          message: res.message,
-          txId: res.transaction.id,
-        },
-      });
-    } catch {
-      setToast('Có lỗi xảy ra trong quá trình nạp tiền');
+      const t = await createTopup(amount, provider);
+      if (t.paymentUrl) await Linking.openURL(t.paymentUrl);
+      router.replace({ pathname: '/wallet/status', params: { topupId: t.id, amount: String(t.amount) } });
+    } catch (e) {
+      setToast(errorMessage(e, 'Không tạo được lần nạp tiền'));
     } finally {
       setSubmitting(false);
     }
@@ -46,21 +51,9 @@ export default function TopupScreen() {
 
   return (
     <Screen
-      header={
-        <AppHeader
-          variant="dark"
-          title="Nạp tiền"
-          right={{ icon: Icons.infoOutline, onPress: () => setInfoVisible(true), label: 'Thông tin nạp tiền' }}
-        />
-      }
+      header={<AppHeader variant="dark" title="Nạp tiền" right={{ icon: Icons.infoOutline, onPress: () => setInfoVisible(true), label: 'Thông tin nạp tiền' }} />}
       footer={
-        <Button
-          flat
-          title={canContinue ? 'Tiếp tục' : 'Lựa chọn số tiền để tiếp tục'}
-          disabled={!canContinue}
-          loading={submitting}
-          onPress={submit}
-        />
+        <Button flat title={canContinue ? 'Tiếp tục thanh toán' : 'Lựa chọn số tiền để tiếp tục'} disabled={!canContinue} loading={submitting} onPress={() => void submit()} />
       }
       footerPadded={false}
     >
@@ -75,16 +68,22 @@ export default function TopupScreen() {
         />
 
         <AppText weight="bold" size={15} style={styles.sectionTitle}>
-          Nguồn tiền nạp
+          Cổng thanh toán
         </AppText>
         <View style={styles.options}>
-          <SourceOption title="Momo" leading={<MomoMark />} selected={source === 'momo'} onPress={() => setSource('momo')} />
-          <SourceOption
-            title="Chuyển khoản ngân hàng"
-            subtitle="Sẽ hỗ trợ trong thời gian tới"
-            leading={<IconBubble icon="mci:bank-outline" />}
-            disabled
-          />
+          {providers.map((p) => (
+            <SourceOption
+              key={p}
+              title={PROVIDER_LABEL[p]}
+              subtitle={p === 'vnpay' ? 'Thẻ ATM, Internet Banking, QR ngân hàng' : 'Chỉ dùng khi thử nghiệm'}
+              leading={<IconBubble icon={p === 'vnpay' ? 'mci:bank-outline' : 'mci:flask-outline'} />}
+              selected={provider === p}
+              onPress={() => setProvider(p)}
+            />
+          ))}
+          {wallet && providers.length === 0 ? (
+            <SourceOption title="Cổng thanh toán chưa sẵn sàng" subtitle="Vui lòng thử lại sau" leading={<IconBubble icon="mci:bank-off-outline" />} disabled />
+          ) : null}
         </View>
       </ScrollView>
 
@@ -92,7 +91,7 @@ export default function TopupScreen() {
         visible={infoVisible}
         onClose={() => setInfoVisible(false)}
         title="Nạp tiền"
-        message={`Tiền nạp sẽ được cộng vào Tài khoản chính ngay sau khi giao dịch thành công. ${HELPER}.`}
+        message={`Sau khi thanh toán thành công trên trang của cổng thanh toán, tiền được cộng vào ví ZuumViet. ${HELPER}.`}
         actions={[{ label: 'Đồng ý', onPress: () => setInfoVisible(false) }]}
       />
       <Toast visible={!!toast} message={toast ?? ''} tone="error" onHide={() => setToast(null)} />

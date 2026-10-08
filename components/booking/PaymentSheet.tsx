@@ -1,20 +1,25 @@
-// PaymentSheet — "Hình thức thanh toán": Tiền mặt / Tài khoản (badge tím đ24.000) (Figma 1706-6791)
+// PaymentSheet — "Hình thức thanh toán": Tiền mặt / Ví ZuumViet (badge tím số dư khả dụng thật) (Figma 1706-6791)
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, Badge, BottomSheet, Icon, Icons } from '@/components/ui';
-import { WALLET_BALANCE } from '@/constants/mockBooking';
 import { formatVnd, type PaymentMethod } from '@/services/bookingStore';
+import { useWalletSummary } from '@/hooks/useWalletBalance';
 
 interface Props {
   visible: boolean;
   value: PaymentMethod;
   onClose: () => void;
   onSelect: (m: PaymentMethod) => void;
+  /** số tiền cần thanh toán — ví không đủ thì báo ngay dưới dòng Ví */
+  amount?: number;
 }
 
-export const PaymentSheet: React.FC<Props> = ({ visible, value, onClose, onSelect }) => {
-  const Row = ({ m, icon, label, right }: { m: PaymentMethod; icon: typeof Icons.cash; label: string; right?: React.ReactNode }) => {
+export const PaymentSheet: React.FC<Props> = ({ visible, value, onClose, onSelect, amount }) => {
+  const wallet = useWalletSummary();
+  const available = wallet?.available ?? null;
+  const short = available != null && amount != null && amount > available;
+  const Row = ({ m, icon, label, sub, right }: { m: PaymentMethod; icon: typeof Icons.cash; label: string; sub?: string; right?: React.ReactNode }) => {
     const on = value === m;
     return (
       <Pressable
@@ -25,9 +30,16 @@ export const PaymentSheet: React.FC<Props> = ({ visible, value, onClose, onSelec
         style={[styles.row, on && styles.rowOn]}
       >
         <Icon name={icon} size={24} color={Colors.primary} style={{ marginRight: Spacing.md }} />
-        <AppText size={15} weight={on ? 'bold' : 'medium'} style={{ flex: 1 }}>
-          {label}
-        </AppText>
+        <View style={{ flex: 1 }}>
+          <AppText size={15} weight={on ? 'bold' : 'medium'}>
+            {label}
+          </AppText>
+          {sub ? (
+            <AppText size={12} color={Colors.error} style={{ marginTop: 2 }}>
+              {sub}
+            </AppText>
+          ) : null}
+        </View>
         {right}
         {on ? <Icon name={Icons.checkCircle} size={20} color={Colors.primary} style={{ marginLeft: Spacing.sm }} /> : null}
       </Pressable>
@@ -37,7 +49,13 @@ export const PaymentSheet: React.FC<Props> = ({ visible, value, onClose, onSelec
     <BottomSheet visible={visible} onClose={onClose} title="Hình thức thanh toán" showClose showHandle={false} contentStyle={{ paddingHorizontal: 0 }}>
       <View style={{ paddingBottom: Spacing.sm }}>
         <Row m="cash" icon={Icons.cash} label="Tiền mặt" />
-        <Row m="wallet" icon={Icons.wallet} label="Tài khoản" right={<Badge label={formatVnd(WALLET_BALANCE)} size="sm" />} />
+        <Row
+          m="wallet"
+          icon={Icons.wallet}
+          label="Ví ZuumViet"
+          sub={short ? 'Số dư khả dụng không đủ — nạp thêm ở mục Tài khoản' : undefined}
+          right={available != null ? <Badge label={formatVnd(available)} size="sm" /> : undefined}
+        />
       </View>
     </BottomSheet>
   );

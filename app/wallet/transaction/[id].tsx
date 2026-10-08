@@ -1,95 +1,57 @@
-// Chi tiết giao dịch — Figma "Chi tiết GD": card viền, số tiền tím 30, các dòng key/value ngăn bằng kẻ đứt, "Yêu cầu hỗ trợ"
-import React, { useEffect, useState } from 'react';
-import { View, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
+// Chi tiết giao dịch — Figma "Chi tiết GD": card viền, số tiền tím 30, các dòng key/value ngăn bằng kẻ đứt, hỗ trợ.
+// Bút toán lấy từ danh sách đã tải ở Lịch sử giao dịch (API không có GET 1 bút toán).
+import React, { useState } from 'react';
+import { View, ScrollView, Linking, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppHeader, AppText, Dialog, EmptyState, Icons, Screen } from '@/components/ui';
-import { walletApi, type WalletTransaction } from '@/services/wallet';
+import { ENTRY_TYPE_LABEL, getCachedEntry } from '@/services/wallet';
 import { DashedDivider } from '@/components/wallet/DashedDivider';
 import { KeyValueRow } from '@/components/wallet/KeyValueRow';
 import { LinkRow } from '@/components/wallet/LinkRow';
-import { STATUS_TEXT } from '@/components/wallet/TransactionRow';
 import { formatDateTime, formatVndSigned } from '@/components/wallet/walletUtils';
+
+const SUPPORT_PHONE = '19001234';
 
 export default function TransactionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const txId = String(id ?? '');
-  const [tx, setTx] = useState<WalletTransaction | null>(null);
-  const [loading, setLoading] = useState(true);
+  const entry = getCachedEntry(String(id ?? ''));
   const [dialog, setDialog] = useState<'info' | 'support' | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    walletApi.getTransaction(txId).then((t) => {
-      if (!alive) return;
-      setTx(t);
-      setLoading(false);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [txId]);
+  const header = <AppHeader variant="dark" title="Chi tiết giao dịch" right={{ icon: Icons.infoOutline, onPress: () => setDialog('info'), label: 'Thông tin' }} />;
 
-  const header = (
-    <AppHeader
-      variant="dark"
-      title="Chi tiết giao dịch"
-      right={{ icon: Icons.infoOutline, onPress: () => setDialog('info'), label: 'Thông tin' }}
-    />
-  );
-
-  if (loading) {
+  if (!entry) {
     return (
       <Screen header={header}>
         <View style={styles.center}>
-          <ActivityIndicator color={Colors.primary} />
+          <EmptyState title="Không tìm thấy giao dịch" icon={Icons.wallet} actionLabel="Xem lịch sử giao dịch" onAction={() => router.replace('/wallet/history')} />
         </View>
       </Screen>
     );
   }
 
-  if (!tx) {
-    return (
-      <Screen header={header}>
-        <View style={styles.center}>
-          <EmptyState title="Không tìm thấy giao dịch" icon={Icons.wallet} actionLabel="Quay lại" onAction={() => router.back()} />
-        </View>
-      </Screen>
-    );
-  }
-
-  const status = STATUS_TEXT[tx.status];
+  const order = entry.order;
 
   return (
     <Screen header={header} keyboardAvoiding={false}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <AppText size={14} color={Colors.textSecondary} align="center">
-            {tx.description ?? tx.title}
+            {entry.description || ENTRY_TYPE_LABEL[entry.type]}
           </AppText>
           <AppText weight="bold" size={30} color={Colors.primary} align="center" style={styles.amount}>
-            {formatVndSigned(tx.amount)}
+            {formatVndSigned(entry.amount, { plus: true })}
           </AppText>
 
           <DashedDivider style={styles.dash} />
-          <KeyValueRow label="Trạng thái" value={status.label} valueColor={status.color} bold />
-          <KeyValueRow label="Mã giao dịch" value={tx.code} />
-          <KeyValueRow label="Thời gian" value={formatDateTime(tx.createdAt, ' - ')} />
-          <KeyValueRow label="Nguồn tiền" value={tx.source} />
-          <KeyValueRow label="Phí giao dịch" value={tx.fee} />
-          {tx.failReason ? <KeyValueRow label="Lý do" value={tx.failReason} valueColor={Colors.error} /> : null}
-
-          {tx.bank ? (
-            <>
-              <DashedDivider style={styles.dash} />
-              <KeyValueRow label="Ngân hàng" value={tx.bank.name} />
-              <KeyValueRow label="Số tài khoản" value={tx.bank.account} />
-              <KeyValueRow label="Chủ tài khoản" value={tx.bank.holder} />
-            </>
-          ) : null}
+          <KeyValueRow label="Loại giao dịch" value={ENTRY_TYPE_LABEL[entry.type]} bold />
+          <KeyValueRow label="Mã giao dịch" value={entry.transactionId.slice(0, 8).toUpperCase()} />
+          <KeyValueRow label="Thời gian" value={formatDateTime(Date.parse(entry.createdAt), ' - ')} />
+          <KeyValueRow label="Số dư sau giao dịch" value={formatVndSigned(entry.balanceAfter)} />
+          {order ? <KeyValueRow label="Đơn hàng" value={order.code} /> : null}
 
           <DashedDivider style={styles.dash} />
+          {order ? <LinkRow icon={Icons.doc} label="Xem đơn hàng" onPress={() => router.push({ pathname: '/orders/[id]', params: { id: order.id } })} /> : null}
           <LinkRow icon={Icons.headset} label="Yêu cầu hỗ trợ" onPress={() => setDialog('support')} />
         </View>
       </ScrollView>
@@ -98,15 +60,24 @@ export default function TransactionDetailScreen() {
         visible={dialog === 'info'}
         onClose={() => setDialog(null)}
         title="Chi tiết giao dịch"
-        message="Mọi thắc mắc về giao dịch, hãy chọn Yêu cầu hỗ trợ để tư vấn viên ZuumViet liên hệ với bạn."
+        message="Mỗi dòng là một lần số dư ví thay đổi: nạp tiền, giữ / thanh toán / hoàn tiền đơn hàng, phí huỷ, vé xe."
         actions={[{ label: 'Đồng ý', onPress: () => setDialog(null) }]}
       />
       <Dialog
         visible={dialog === 'support'}
         onClose={() => setDialog(null)}
         title="Yêu cầu hỗ trợ"
-        message={`Tư vấn viên ZuumViet sẽ liên hệ với bạn về giao dịch ${tx.code} trong thời gian sớm nhất.`}
-        actions={[{ label: 'Đồng ý', onPress: () => setDialog(null) }]}
+        message={`Gọi tổng đài ZuumViet ${SUPPORT_PHONE} và đọc mã giao dịch ${entry.transactionId.slice(0, 8).toUpperCase()} để được hỗ trợ.`}
+        actions={[
+          { label: 'Đóng', variant: 'secondary', onPress: () => setDialog(null) },
+          {
+            label: 'Gọi tổng đài',
+            onPress: () => {
+              setDialog(null);
+              void Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() => undefined);
+            },
+          },
+        ]}
       />
     </Screen>
   );

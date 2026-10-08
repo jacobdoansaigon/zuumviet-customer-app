@@ -1,41 +1,89 @@
-// Trạng thái giao dịch — Figma "Trạng thái GD": X header, check xanh / X đỏ, tiêu đề, số tiền tím 30, lời nhắn, link, nút Đóng
-// Params: ok=1|0, amount, title ("Nạp tiền (từ MoMo)"), message?, txId?
-import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+// Trạng thái giao dịch nạp tiền — Figma "Trạng thái GD": X header, biểu tượng theo trạng thái, số tiền tím 30, lời nhắn,
+// link, nút Đóng. Params: topupId, amount. Theo dõi GET /v1/customer/wallet/topups/:id (3 giây/lần khi đang chờ, khi quay
+// lại app từ trình duyệt, và khi có sự kiện realtime wallet.updated) tới khi thành công / thất bại / hết hạn.
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, StyleSheet, ActivityIndicator, AppState, Linking } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppHeader, AppText, Button, Dialog, Icon, Icons, Screen } from '@/components/ui';
+import { getTopup, paymentUrlOf, PROVIDER_LABEL, refreshWallet, type Topup } from '@/services/wallet';
+import { errorMessage } from '@/services/zuum';
+import { useRealtime } from '@/hooks/useRealtime';
 import { DashedDivider } from '@/components/wallet/DashedDivider';
 import { LinkRow } from '@/components/wallet/LinkRow';
 import { formatVnd } from '@/components/wallet/walletUtils';
 
+const SUPPORT_PHONE = '19001234';
+const POLL_MS = 3000;
+
 export default function TransactionStatusScreen() {
-  const params = useLocalSearchParams<{ ok?: string; amount?: string; title?: string; message?: string; txId?: string }>();
+  const params = useLocalSearchParams<{ topupId?: string; amount?: string }>();
+  const topupId = typeof params.topupId === 'string' ? params.topupId : '';
+  const [topup, setTopup] = useState<Topup | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [supportVisible, setSupportVisible] = useState(false);
 
-  const ok = params.ok === '1' || params.ok === 'true';
-  const amount = Number(params.amount) || 0;
-  const title = params.title || 'Giao dịch';
-  const heading = `${title} ${ok ? 'thành công' : 'thất bại'}`;
-  const message =
-    params.message ||
-    (ok
-      ? 'Cám ơn bạn. Bạn đã nạp thành công từ ví MoMo. Chúc bạn có chuyến đi vui vẻ!'
-      : 'Rất tiếc, giao dịch không thành công. Vui lòng thử lại hoặc liên hệ hỗ trợ.');
+  const load = useCallback(async () => {
+    if (!topupId) return;
+    try {
+      const t = await getTopup(topupId);
+      setTopup(t);
+      setError(null);
+      if (t.status === 'succeeded') void refreshWallet().catch(() => undefined);
+    } catch (e) {
+      setError(errorMessage(e, 'Không kiểm tra được trạng thái giao dịch'));
+    }
+  }, [topupId]);
+
+  const status = topup?.status ?? 'pending';
+  const pending = status === 'pending' && (!topup || Date.parse(topup.expiresAt) > Date.now());
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!pending) return;
+    const t = setInterval(() => void load(), POLL_MS);
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') void load();
+    });
+    return () => {
+      clearInterval(t);
+      sub.remove();
+    };
+  }, [pending, load]);
+
+  useRealtime('wallet.updated', () => void load(), pending);
+
+  const amount = topup?.amount ?? (Number(params.amount) || 0);
+  const ok = status === 'succeeded';
+  const failed = !pending && !ok;
+  const heading = ok ? 'Nạp tiền thành công' : pending ? 'Đang chờ thanh toán' : status === 'failed' ? 'Nạp tiền thất bại' : 'Giao dịch đã hết hạn';
+  const message = ok
+    ? 'Cám ơn bạn. Tiền đã được cộng vào ví ZuumViet. Chúc bạn có chuyến đi vui vẻ!'
+    : pending
+      ? `Hoàn tất thanh toán trên trang ${topup ? PROVIDER_LABEL[topup.provider] : 'cổng thanh toán'} rồi quay lại ứng dụng — trạng thái sẽ tự cập nhật.`
+      : 'Rất tiếc, giao dịch không thành công. Bạn chưa bị trừ tiền vào ví — vui lòng thử lại.';
+  const payUrl = topupId ? paymentUrlOf(topupId) : null;
 
   const close = () => router.navigate('/wallet');
 
   return (
     <Screen
       header={<AppHeader variant="dark" left="close" onLeftPress={close} title="Trạng thái giao dịch" />}
-      footer={<Button title="Đóng" onPress={close} />}
+      footer={failed ? <Button title="Nạp lại" onPress={() => router.replace('/wallet/topup')} /> : <Button title="Đóng" onPress={close} />}
       keyboardAvoiding={false}
     >
       <View style={styles.content}>
         <View style={styles.card}>
-          <View style={[styles.iconCircle, { backgroundColor: ok ? Colors.green : Colors.error }]}>
-            <Icon name={ok ? Icons.check : Icons.close} size={30} color={Colors.white} />
-          </View>
+          {pending ? (
+            <ActivityIndicator color={Colors.primary} size="large" style={{ alignSelf: 'center' }} />
+          ) : (
+            <View style={[styles.iconCircle, { backgroundColor: ok ? Colors.green : Colors.error }]}>
+              <Icon name={ok ? Icons.check : Icons.close} size={30} color={Colors.white} />
+            </View>
+          )}
           <AppText size={14} color={Colors.textSecondary} align="center" style={{ marginTop: Spacing.md }}>
             {heading}
           </AppText>
@@ -45,12 +93,20 @@ export default function TransactionStatusScreen() {
           <AppText size={14} color={Colors.textSecondary} align="center" style={styles.body}>
             {message}
           </AppText>
+          {error ? (
+            <AppText size={13} color={Colors.error} align="center" style={{ marginTop: Spacing.sm }}>
+              {error}
+            </AppText>
+          ) : null}
+          {topup ? (
+            <AppText size={12} color={Colors.textMuted} align="center" style={{ marginTop: Spacing.sm }}>
+              Mã giao dịch {topup.reference}
+            </AppText>
+          ) : null}
 
           <DashedDivider style={styles.dash} />
-          <LinkRow
-            label="Chi tiết giao dịch"
-            onPress={() => router.push(params.txId ? `/wallet/transaction/${params.txId}` : '/wallet/history')}
-          />
+          {pending && payUrl ? <LinkRow label="Mở lại trang thanh toán" onPress={() => void Linking.openURL(payUrl).catch(() => undefined)} /> : null}
+          <LinkRow label="Lịch sử giao dịch" onPress={() => router.push('/wallet/history')} />
           <LinkRow label="Yêu cầu hỗ trợ" onPress={() => setSupportVisible(true)} />
         </View>
       </View>
@@ -59,8 +115,17 @@ export default function TransactionStatusScreen() {
         visible={supportVisible}
         onClose={() => setSupportVisible(false)}
         title="Yêu cầu hỗ trợ"
-        message="Tư vấn viên ZuumViet sẽ liên hệ với bạn về giao dịch này trong thời gian sớm nhất."
-        actions={[{ label: 'Đồng ý', onPress: () => setSupportVisible(false) }]}
+        message={`Gọi tổng đài ZuumViet ${SUPPORT_PHONE}${topup ? ` và đọc mã giao dịch ${topup.reference}` : ''} để được hỗ trợ.`}
+        actions={[
+          { label: 'Đóng', variant: 'secondary', onPress: () => setSupportVisible(false) },
+          {
+            label: 'Gọi tổng đài',
+            onPress: () => {
+              setSupportVisible(false);
+              void Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() => undefined);
+            },
+          },
+        ]}
       />
     </Screen>
   );
