@@ -1,16 +1,18 @@
 // app/booking/intercity/checkout/[bookingId].tsx — Hoàn tất đặt vé sau khi giữ ghế: đếm ngược thời gian giữ chỗ (10 phút),
 // người đi (tên/SĐT), điểm đón/trả (bến xe hoặc tận nơi nếu chuyến nhận — kèm địa chỉ), hàng gửi kèm, thanh toán
-// (tiền mặt / ví) → POST /v1/customer/intercity/bookings/:id/confirm → vé điện tử. Huỷ giữ chỗ: trả ghế ngay.
-import React, { useEffect, useState } from 'react';
+// (tiền mặt / ví) → POST /v1/customer/intercity/bookings/:id/confirm → vé điện tử. Huỷ giữ chỗ hoặc quay lại: trả ghế
+// ngay (chỉ khi vé còn đang giữ). Xác nhận mất phản hồi (lỗi mạng / not_held / hold_expired): đọc lại vé — đã đặt thì
+// mở vé, không bắt chọn lại ghế (tránh mua 2 lần).
+import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { AppHeader, AppText, Button, Dialog, EmptyState, ErrorSheet, Icon, Icons, Radio, Screen, SwitchRow, TextField } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { PaymentSheet } from '@/components/booking';
-import { cancelBooking, confirmBooking, getBooking, vnDateLabel, vnTime, type IntercityBooking } from '@/services/intercity';
+import { confirmBooking, getBooking, releaseHold, vnDateLabel, vnTime, type IntercityBooking } from '@/services/intercity';
 import { formatVnd, isValidPhoneVn, type PaymentMethod } from '@/services/bookingStore';
 import { getProfile, localPhone } from '@/services/session';
-import { errorMessage, isApiError } from '@/services/zuum';
+import { errorMessage, isApiError, toZuumError } from '@/services/zuum';
 
 type Where = 'station' | 'home';
 
@@ -45,6 +47,22 @@ export default function TicketCheckoutScreen() {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const left = useCountdown(booking?.status === 'held' ? booking.heldUntil : null);
+  const navigation = useNavigation();
+  // settled: rời màn có chủ đích (đã đặt / đã trả ghế / hết hạn) → không trả ghế nữa.
+  // unsure: có lần xác nhận đang chạy hoặc chưa rõ kết quả → KHÔNG tự huỷ (vé có thể đã được đặt).
+  const settled = useRef(false);
+  const unsure = useRef(false);
+  const heldRef = useRef(false);
+  heldRef.current = booking?.status === 'held';
+
+  useEffect(
+    () =>
+      navigation.addListener('beforeRemove', () => {
+        if (settled.current || unsure.current || !heldRef.current) return;
+        void releaseHold(id);
+      }),
+    [navigation, id],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -52,7 +70,10 @@ export default function TicketCheckoutScreen() {
       .then((b) => {
         if (!alive) return;
         setBooking(b);
-        if (b.status !== 'held') router.replace({ pathname: '/booking/intercity/ticket/[orderId]', params: { orderId: b.id } });
+        if (b.status !== 'held') {
+          settled.current = true;
+          router.replace({ pathname: '/booking/intercity/ticket/[orderId]', params: { orderId: b.id } });
+        }
       })
       .catch((e) => alive && setLoadError(errorMessage(e, 'Không tải được vé')));
     void getProfile().then((p) => {
@@ -95,9 +116,15 @@ export default function TicketCheckoutScreen() {
     (dropoff === 'station' || dropoffAddress.trim().length >= 5) &&
     !submitting;
 
+  const openTicket = (bookingId: string) => {
+    settled.current = true;
+    router.replace({ pathname: '/booking/intercity/ticket/[orderId]', params: { orderId: bookingId, done: '1' } });
+  };
+
   const submit = async () => {
     if (!ready) return;
     setSubmitting(true);
+    unsure.current = true;
     try {
       const done = await confirmBooking(booking.id, {
         paymentMethod: payment,
@@ -108,25 +135,48 @@ export default function TicketCheckoutScreen() {
         pickup: pickup === 'home' ? { type: 'home', address: pickupAddress.trim() } : { type: 'station' },
         dropoff: dropoff === 'home' ? { type: 'home', address: dropoffAddress.trim() } : { type: 'station' },
       });
-      router.replace({ pathname: '/booking/intercity/ticket/[orderId]', params: { orderId: done.id, done: '1' } });
+      openTicket(done.id);
     } catch (e) {
-      if (isApiError(e, 'intercity.hold_expired', 'intercity.not_held')) {
-        setBooking({ ...booking, heldUntil: new Date(0).toISOString() });
+      const err = toZuumError(e);
+      const maybeDone = err.status === 0 || err.status >= 500 || isApiError(err, 'intercity.hold_expired', 'intercity.not_held');
+      if (!maybeDone) {
+        unsure.current = false; // lỗi nghiệp vụ rõ ràng (sai địa chỉ, ví không đủ…) → vé vẫn đang giữ
+        setError(errorMessage(err, 'Không đặt được vé, vui lòng thử lại'));
+        return;
       }
-      setError(errorMessage(e, 'Không đặt được vé, vui lòng thử lại'));
+      // lần xác nhận trước có thể đã thành công mà mất phản hồi → đọc lại vé trước khi bắt chọn lại ghế
+      const latest = await getBooking(booking.id).catch(() => null);
+      if (latest && (latest.status === 'confirmed' || latest.status === 'completed')) {
+        openTicket(latest.id);
+        return;
+      }
+      if (latest) {
+        unsure.current = false;
+        setBooking(latest);
+        setError(errorMessage(err, 'Không đặt được vé, vui lòng thử lại'));
+      } else {
+        setError('Chưa rõ vé đã được đặt hay chưa do mất kết nối. Vui lòng kiểm tra mạng rồi bấm "Đặt vé" lại — nếu vé đã đặt, ứng dụng sẽ mở vé cho bạn.');
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
-  const releaseHold = async () => {
+  const releaseNow = async () => {
     setConfirmCancel(false);
-    try {
-      await cancelBooking(booking.id);
-    } catch {
-      /* hết hạn cũng tự trả ghế */
+    settled.current = true;
+    const latest = await releaseHold(booking.id);
+    if (latest && (latest.status === 'confirmed' || latest.status === 'completed')) {
+      openTicket(latest.id);
+      return;
     }
     router.back();
+  };
+
+  const pickSeatsAgain = () => {
+    settled.current = true;
+    if (router.canGoBack()) router.back();
+    else router.replace({ pathname: '/booking/intercity/bus/[id]', params: { id: trip.id } });
   };
 
   const whereBlock = (title: string, value: Where, onChange: (w: Where) => void, fee: number | null, station: string, address: string, setAddress: (t: string) => void) => (
@@ -158,7 +208,7 @@ export default function TicketCheckoutScreen() {
       scroll
       footer={
         expired ? (
-          <Button title="Chọn lại ghế" onPress={() => router.replace({ pathname: '/booking/intercity/bus/[id]', params: { id: trip.id } })} />
+          <Button title="Chọn lại ghế" onPress={pickSeatsAgain} />
         ) : (
           <Button title={`Đặt vé · ${formatVnd(total)}`} disabled={!ready} loading={submitting} onPress={() => void submit()} />
         )
@@ -274,7 +324,7 @@ export default function TicketCheckoutScreen() {
         message={`Ghế ${booking.seatIds.join(', ')} sẽ được trả lại cho người khác đặt.`}
         actions={[
           { label: 'Giữ ghế', variant: 'secondary', onPress: () => setConfirmCancel(false) },
-          { label: 'Huỷ giữ chỗ', variant: 'danger', onPress: () => void releaseHold() },
+          { label: 'Huỷ giữ chỗ', variant: 'danger', onPress: () => void releaseNow() },
         ]}
       />
       <ErrorSheet visible={!!error} title="Chưa đặt được vé" message={error ?? ''} actionLabel="Đóng" onAction={() => setError(null)} onClose={() => setError(null)} />

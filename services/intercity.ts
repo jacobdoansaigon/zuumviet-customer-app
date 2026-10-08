@@ -2,6 +2,9 @@
 // (nhà xe: kind=bus, xe ghép: kind=carpool), giữ ghế 10 phút, xác nhận vé, vé của tôi, huỷ vé (trước giờ chạy ≥ 24h).
 import { createStore } from '@/services/store';
 import { api, type ZuumResponse, type ZuumRoutes } from '@/services/zuum';
+import { VN_OFFSET_MS, vnDateKey } from '@/services/vnTime';
+
+export { vnDateKey };
 
 export type IntercityCity = ZuumResponse<'GET /v1/public/intercity/cities'>[number];
 export type IntercityTrip = ZuumResponse<'GET /v1/public/intercity/trips'>[number];
@@ -79,14 +82,8 @@ export function nearestCity(point: { lat: number; lng: number }, list: Intercity
 }
 
 // ---------------------------------------------------------------- ngày / giờ theo giờ Việt Nam
-const VN_OFFSET_MS = 7 * 3600 * 1000;
 const DOW_SHORT = ['CN', 'Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6', 'Th 7'];
 const two = (n: number) => String(n).padStart(2, '0');
-
-/** "YYYY-MM-DD" theo giờ VN của thời điểm `ms` */
-export function vnDateKey(ms: number = Date.now()): string {
-  return new Date(ms + VN_OFFSET_MS).toISOString().slice(0, 10);
-}
 
 export interface DateOption {
   /** YYYY-MM-DD (giờ VN) — tham số `date` của API */
@@ -180,6 +177,37 @@ export function getBooking(bookingId: string): Promise<IntercityBooking> {
 
 export function listBookings(page = 1, pageSize = 20) {
   return api('GET /v1/customer/intercity/bookings', { query: { page, pageSize } });
+}
+
+let pendingRelease: Promise<unknown> | null = null;
+
+const isLiveHold = (b: { status: string; heldUntil: string | null }) => b.status === 'held' && !!b.heldUntil && Date.parse(b.heldUntil) > Date.now();
+
+/**
+ * Trả ghế đang giữ khi khách rời màn thanh toán. Đọc lại vé trước và CHỈ huỷ khi vé vẫn đang giữ chỗ — cùng endpoint
+ * huỷ còn huỷ được vé đã xác nhận, nên tuyệt đối không gọi mù. Trả về vé mới nhất (null nếu không đọc được — giữ chỗ
+ * tự hết hạn sau 10 phút).
+ */
+export function releaseHold(bookingId: string): Promise<IntercityBooking | null> {
+  const run = getBooking(bookingId)
+    .then((b) => (isLiveHold(b) ? cancelBooking(bookingId) : b))
+    .catch(() => null);
+  pendingRelease = run;
+  void run.finally(() => {
+    if (pendingRelease === run) pendingRelease = null;
+  });
+  return run;
+}
+
+/** Chờ lần trả ghế đang chạy (nếu có) — màn sơ đồ ghế gọi trước khi tải lại để không thấy ghế của chính mình là "đã có người" */
+export async function settleHoldRelease(): Promise<void> {
+  await pendingRelease;
+}
+
+/** Chỗ khách đang giữ (còn hạn) trên chuyến này — để quay lại thanh toán tiếp thay vì giữ chỗ lần nữa */
+export async function findActiveHold(tripId: string) {
+  const page = await listBookings(1, 20);
+  return page.items.find((b) => b.trip.id === tripId && isLiveHold(b)) ?? null;
 }
 
 export const BOOKING_STATUS_LABEL: Record<IntercityBooking['status'], string> = {

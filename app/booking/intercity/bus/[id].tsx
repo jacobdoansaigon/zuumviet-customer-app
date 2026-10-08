@@ -1,18 +1,31 @@
 // app/booking/intercity/bus/[id].tsx — Chi tiết chuyến (vé xe hoặc xe ghép): nhà xe / tài xế, giờ đi–đến, xe, tiện ích,
 // phụ phí (hàng gửi, đón/trả tận nơi) và sơ đồ ghế thật (GET /v1/public/intercity/trips/:id) → "Giữ chỗ" (POST holds,
 // giữ 10 phút) → màn điền thông tin & thanh toán. Ghế vừa bị người khác lấy (409 intercity.seats_taken) → đánh dấu
-// đúng các ghế đó, bỏ khỏi lựa chọn và tải lại sơ đồ.
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+// đúng các ghế đó, bỏ khỏi lựa chọn và tải lại sơ đồ. Mỗi lần quay lại màn này (vd từ màn thanh toán — đã trả ghế) sơ
+// đồ được tải lại; khách còn đang giữ chỗ trên chuyến → hiện "Tiếp tục đặt vé" thay vì giữ thêm lần nữa.
+import React, { useCallback, useMemo, useState } from 'react';
+import { View, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Button, Chip, EmptyState, Icon, Icons, Screen, Toast } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { SeatPicker } from '@/components/booking';
-import { durationLabel, getTrip, holdSeats, TRIP_KIND_LABEL, vnDateLabel, vnTime, type IntercityTripDetail } from '@/services/intercity';
+import {
+  durationLabel,
+  findActiveHold,
+  getTrip,
+  holdSeats,
+  settleHoldRelease,
+  TRIP_KIND_LABEL,
+  vnDateLabel,
+  vnTime,
+  type IntercityTripDetail,
+} from '@/services/intercity';
 import { formatVnd } from '@/services/bookingStore';
 import { errorMessage, isApiError } from '@/services/zuum';
 
 const MAX_SEATS = 6;
+
+type ActiveHold = NonNullable<Awaited<ReturnType<typeof findActiveHold>>>;
 
 export default function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,9 +37,14 @@ export default function TripDetailScreen() {
   const [lostSeats, setLostSeats] = useState<string[]>([]);
   const [holding, setHolding] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [myHold, setMyHold] = useState<ActiveHold | null>(null);
 
   const load = useCallback(async () => {
     try {
+      await settleHoldRelease(); // vừa rời màn thanh toán → chờ trả ghế xong mới đọc sơ đồ
+      void findActiveHold(tripId)
+        .then(setMyHold)
+        .catch(() => setMyHold(null));
       const t = await getTrip(tripId);
       setTrip(t);
       setLoadError(null);
@@ -37,9 +55,12 @@ export default function TripDetailScreen() {
     }
   }, [tripId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      setLostSeats([]);
+      void load();
+    }, [load]),
+  );
 
   const decks = useMemo(() => Array.from(new Set((trip?.seats ?? []).map((s) => s.deck))).sort(), [trip]);
   const seats = useMemo(
@@ -65,19 +86,28 @@ export default function TripDetailScreen() {
     setSelected((cur) => (cur.includes(seatId) ? cur.filter((s) => s !== seatId) : cur.length < MAX_SEATS ? [...cur, seatId] : cur));
   };
 
+  const continueHold = (bookingId: string) => router.push({ pathname: '/booking/intercity/checkout/[bookingId]', params: { bookingId } });
+
   const hold = async () => {
     if (!selected.length || holding) return;
     setHolding(true);
     try {
       const booking = await holdSeats(trip.id, selected);
-      setSelected([]);
-      router.push({ pathname: '/booking/intercity/checkout/[bookingId]', params: { bookingId: booking.id } });
+      continueHold(booking.id); // giữ nguyên lựa chọn: quay lại (ghế đã được trả) thì ghế vẫn đang chọn
     } catch (e) {
       if (isApiError(e, 'intercity.seats_taken')) {
         const taken = e.details?.seats ?? [];
         setLostSeats((cur) => [...new Set([...cur, ...taken])]);
         setSelected((cur) => cur.filter((s) => !taken.includes(s)));
         void load();
+      }
+      if (isApiError(e, 'intercity.seats_taken', 'intercity.too_many_holds')) {
+        const mine = await findActiveHold(trip.id).catch(() => null);
+        if (mine) {
+          setMyHold(mine);
+          setToast(`Bạn đang giữ ghế ${mine.seatIds.join(', ')} trên chuyến này — bấm "Tiếp tục đặt vé" để hoàn tất`);
+          return;
+        }
       }
       setToast(errorMessage(e, 'Không giữ được ghế, vui lòng thử lại'));
     } finally {
@@ -129,6 +159,21 @@ export default function TripDetailScreen() {
         <AppText size={13} color={Colors.textSecondary}>
           Trả: {trip.to.station} — {trip.to.address}
         </AppText>
+
+        {myHold ? (
+          <Pressable style={styles.holdBanner} onPress={() => continueHold(myHold.id)}>
+            <Icon name={Icons.clock} size={18} color={Colors.primary} />
+            <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+              <AppText size={13} weight="semiBold" color={Colors.primary}>
+                Bạn đang giữ ghế {myHold.seatIds.join(', ')} đến {myHold.heldUntil ? vnTime(myHold.heldUntil) : ''}
+              </AppText>
+              <AppText size={12} color={Colors.textSecondary}>
+                Tiếp tục đặt vé
+              </AppText>
+            </View>
+            <Icon name={Icons.chevronRight} size={18} color={Colors.primary} />
+          </Pressable>
+        ) : null}
 
         <View style={styles.sectionHead}>
           <AppText size={15} weight="bold">
@@ -209,6 +254,7 @@ const styles = StyleSheet.create({
   },
   operatorLogo: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
   routeCard: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
+  holdBanner: { flexDirection: 'row', alignItems: 'center', marginTop: Spacing.md, padding: Spacing.md, borderRadius: BorderRadius.md, backgroundColor: Colors.primaryBg },
   sectionHead: { marginTop: Spacing.xl, marginBottom: Spacing.sm },
   sectionTitle: { marginTop: Spacing.xl, marginBottom: Spacing.sm },
   deckRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm },
