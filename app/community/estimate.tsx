@@ -1,12 +1,13 @@
-// Ước tính tiền thưởng — Figma Ước tính 1.1/1.2: header X + info; "Nhập số tiền (*)" ô xám
-// placeholder "5,000,000" + "đ"; lỗi đỏ "Vui lòng nhập số tiền lớn hơn 100,000 đ"; mô tả xám;
-// box kết quả "đ5.100.000" bold 32 tím; nút đáy "Xong".
-import React, { useMemo, useState } from 'react';
+// Ước tính tiền thưởng — Figma Ước tính 1.1/1.2: header X + info; ô nhập tổng giá trị đơn hoàn tất trong tháng của
+// thành viên F1 / F2 / F3 + "đ"; kết quả = từng phần × tỉ lệ hoa hồng của chính sách đang áp (GET /v1/customer/affiliate
+// policy.commissionBps); nút đáy "Xong". Chỉ mang tính tham khảo (chưa trừ điều kiện nhận thưởng).
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppText, AppHeader, Screen, Button, TextField, Dialog, Icons } from '@/components/ui';
-import { MOCK_COMMUNITY, formatMoney } from '@/constants/mock';
+import { bpsLabel, isMember, loadAffiliate, useAffiliate } from '@/services/affiliate';
+import { formatVnd } from '@/services/bookingStore';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
 function digitsOnly(s: string) {
@@ -17,55 +18,53 @@ function withCommas(digits: string) {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
+const TIERS = [0, 1, 2] as const;
+
 export default function CommunityEstimateScreen() {
   useStatusBarStyle('dark');
-  const r = MOCK_COMMUNITY.rewards;
-  const [raw, setRaw] = useState('');
-  const [touched, setTouched] = useState(false);
+  const aff = useAffiliate();
+  const [raw, setRaw] = useState<[string, string, string]>(['', '', '']);
   const [info, setInfo] = useState(false);
 
-  const amount = Number(raw || 0);
-  const tooSmall = touched && raw.length > 0 && amount <= r.minEstimate;
-  const bonus = useMemo(() => (amount > r.minEstimate ? Math.round(amount * r.ratio) : 0), [amount, r.ratio, r.minEstimate]);
+  useEffect(() => {
+    if (!aff) void loadAffiliate().catch(() => undefined);
+  }, [aff]);
+
+  const bps = isMember(aff) ? aff.policy.commissionBps : [];
+  const bonus = TIERS.reduce<number>((sum, i) => sum + Math.floor((Number(raw[i] || 0) * (bps[i] ?? 0)) / 10_000), 0);
 
   return (
     <Screen
-      header={
-        <AppHeader
-          title="Ước tính tiền thưởng"
-          variant="light"
-          left="close"
-          right={{ icon: Icons.infoOutline, onPress: () => setInfo(true), label: 'Thông tin' }}
-        />
-      }
+      header={<AppHeader title="Ước tính tiền thưởng" variant="light" left="close" right={{ icon: Icons.infoOutline, onPress: () => setInfo(true), label: 'Thông tin' }} />}
       footer={<Button title="Xong" flat onPress={() => router.back()} />}
       footerPadded={false}
       scroll
     >
       <View style={styles.body}>
-        <TextField
-          label="Nhập số tiền"
-          required
-          value={withCommas(raw)}
-          onChangeText={(t) => {
-            setRaw(digitsOnly(t));
-            setTouched(true);
-          }}
-          onBlur={() => setTouched(true)}
-          placeholder="5,000,000"
-          keyboardType="number-pad"
-          suffix="đ"
-          bold
-          error={tooSmall ? 'Vui lòng nhập số tiền lớn hơn 100,000 đ' : undefined}
-        />
+        <AppText size={14} color={Colors.textSecondary} style={{ lineHeight: 21 }}>
+          Nhập tổng giá trị đơn hoàn tất trong tháng của các thành viên theo từng tầng
+        </AppText>
+        {TIERS.map((i) => (
+          <TextField
+            key={i}
+            label={`Thành viên F${i + 1}${bps[i] != null ? ` (thưởng ${bpsLabel(bps[i]!)})` : ''}`}
+            value={withCommas(raw[i])}
+            onChangeText={(t) => setRaw((cur) => cur.map((v, j) => (j === i ? digitsOnly(t) : v)) as [string, string, string])}
+            placeholder="5,000,000"
+            keyboardType="number-pad"
+            suffix="đ"
+            bold
+            containerStyle={{ marginTop: Spacing.lg }}
+          />
+        ))}
 
         <AppText size={14} color={Colors.textSecondary} align="center" style={styles.desc}>
-          Nếu tất cả thành viên trong cộng đồng của bạn đạt được mục tiêu này thì tiền thưởng của bạn sẽ là
+          Tiền thưởng tạm tính của bạn sẽ là
         </AppText>
 
         <View style={styles.result}>
           <AppText weight="bold" size={32} color={Colors.primary} align="center" style={{ lineHeight: 40 }}>
-            {formatMoney(bonus)}
+            {formatVnd(bonus)}
           </AppText>
         </View>
       </View>
@@ -74,9 +73,7 @@ export default function CommunityEstimateScreen() {
         visible={info}
         onClose={() => setInfo(false)}
         title="Ước tính tiền thưởng"
-        message={`Tiền thưởng ước tính = doanh thu mục tiêu × ${(r.ratio * 100).toFixed(0)}%. Số tiền tối thiểu để ước tính là ${withCommas(
-          String(r.minEstimate)
-        )} đ. Kết quả chỉ mang tính tham khảo.`}
+        message={`Thưởng = giá trị đơn của F1 × ${bpsLabel(bps[0] ?? 0)} + F2 × ${bpsLabel(bps[1] ?? 0)} + F3 × ${bpsLabel(bps[2] ?? 0)} theo chính sách đang áp. Kết quả chỉ mang tính tham khảo — thưởng chỉ được trả khi bạn đủ điều kiện nhận thưởng của tháng.`}
         actions={[{ label: 'Đồng ý', onPress: () => setInfo(false) }]}
       />
     </Screen>

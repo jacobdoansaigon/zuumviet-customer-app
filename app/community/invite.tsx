@@ -1,22 +1,30 @@
 // Mời thành viên tham gia — Figma Hệ thống 1.4: "Yêu cầu Thành viên nhập mã giới thiệu để kết nối với bạn",
-// mã lớn "345678" bold 28, "hoặc quét mã QR Code", ảnh QR, nút "Chia sẻ".
-import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Share, Platform } from 'react-native';
+// mã lớn (mã tài khoản KH… của tôi, GET /v1/customer/affiliate) bold 28, nút "Chia sẻ".
+// Mã QR: chưa có thư viện QR thật trong app → không hiện ảnh QR giả.
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, StyleSheet, Share, Platform, ActivityIndicator } from 'react-native';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppText, AppHeader, Screen, Button, Toast, Icons } from '@/components/ui';
-import { FakeQrCode } from '@/components/community';
-import { MOCK_COMMUNITY } from '@/constants/mock';
+import { isMember, loadAffiliate, useAffiliate } from '@/services/affiliate';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
 export default function CommunityInviteScreen() {
   useStatusBarStyle('dark');
-  const code = MOCK_COMMUNITY.myInviteCode;
+  const aff = useAffiliate();
+  const code = isMember(aff) ? aff.code : null;
   const [toast, setToast] = useState<string | null>(null);
   const hideToast = useCallback(() => setToast(null), []);
 
-  const message = `Tham gia cộng đồng ZuumViet cùng tôi! Nhập mã giới thiệu ${code} trong ứng dụng ZuumViet (Cộng đồng → Tham gia cộng đồng).`;
+  useEffect(() => {
+    if (!aff) void loadAffiliate().catch(() => undefined);
+  }, [aff]);
+
+  const message = code
+    ? `Tham gia cộng đồng ZuumViet cùng tôi! Khi đăng ký ứng dụng ZuumViet, nhập mã giới thiệu ${code} (hoặc vào Cộng đồng → Nhập mã người giới thiệu).`
+    : '';
 
   const handleShare = async () => {
+    if (!code) return;
     try {
       if (Platform.OS === 'web') {
         const nav = typeof navigator !== 'undefined' ? (navigator as Navigator & { share?: (d: { text: string }) => Promise<void> }) : undefined;
@@ -41,7 +49,7 @@ export default function CommunityInviteScreen() {
   return (
     <Screen
       header={<AppHeader title="Mời thành viên tham gia" variant="light" left="back" />}
-      footer={<Button title="Chia sẻ" flat onPress={handleShare} iconLeft={Icons.share} />}
+      footer={<Button title="Chia sẻ" flat onPress={() => void handleShare()} iconLeft={Icons.share} disabled={!code} />}
       footerPadded={false}
       scroll
     >
@@ -51,21 +59,23 @@ export default function CommunityInviteScreen() {
         </AppText>
 
         <View style={styles.codeBox}>
-          <AppText weight="bold" size={28} color={Colors.primary} align="center" style={{ letterSpacing: 6 }}>
-            {code}
+          {code ? (
+            <AppText weight="bold" size={28} color={Colors.primary} align="center" style={{ letterSpacing: 4 }}>
+              {code}
+            </AppText>
+          ) : (
+            <ActivityIndicator color={Colors.primary} />
+          )}
+        </View>
+
+        {isMember(aff) ? (
+          <AppText size={13} color={Colors.textSecondary} align="center" style={{ marginTop: Spacing.lg }}>
+            Thành viên cấp 1 hiện có: {aff.counts.f1}/{aff.policy.maxF1}
           </AppText>
-        </View>
-
-        <AppText size={14} color={Colors.textSecondary} align="center" style={{ marginTop: Spacing.xl }}>
-          hoặc quét mã QR Code
-        </AppText>
-
-        <View style={styles.qr}>
-          <FakeQrCode value={`zuumviet://community/join?code=${code}`} size={200} />
-        </View>
+        ) : null}
 
         <AppText size={12} color={Colors.textDisabled} align="center" style={{ marginTop: Spacing.lg }}>
-          Người được mời mở ZuumViet → Cộng đồng → Tham gia cộng đồng và nhập mã
+          Người được mời nhập mã khi đăng ký tài khoản ZuumViet, hoặc trong Cộng đồng → Nhập mã người giới thiệu
         </AppText>
       </View>
       <Toast visible={!!toast} message={toast ?? ''} tone="success" onHide={hideToast} />
@@ -82,6 +92,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryBg,
     borderRadius: BorderRadius.md,
     alignSelf: 'center',
+    minWidth: 180,
   },
-  qr: { marginTop: Spacing.base },
 });

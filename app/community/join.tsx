@@ -1,53 +1,74 @@
-// Tham gia cộng đồng — Figma Hệ thống OTP 0.2..0.6: header + icon QR, "Nhập mã giới thiệu" bold, 6 ô,
-// link "Tôi không có mã giới thiệu ?", nút "Tiếp tục"; lỗi toast đỏ "Mã giới thiệu không hợp lệ...";
-// thành công: card avatar "Nguyễn Văn A" / "MS: 298-595-3904" / "Thành viên: 576/1728" + "Đồng ý".
-import React, { useState, useCallback } from 'react';
+// Nhập mã người giới thiệu — Figma Hệ thống OTP 0.2..0.6: "Nhập mã giới thiệu" bold, ô mã (mã tài khoản KH… của
+// người giới thiệu), link "Tôi không có mã giới thiệu ?", nút "Tiếp tục" → xem trước người giới thiệu
+// (GET /affiliate/referrer-preview: tên, cấp, số F1, đã đủ chưa) → "Đồng ý" → POST /affiliate/referrer.
+// Chỉ nhập được khi canSetReferrer (chưa có người giới thiệu, còn trong thời hạn chính sách).
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
-import { AppText, AppHeader, Screen, Button, CodeInput, Dialog, Avatar, Toast, Icons } from '@/components/ui';
-import { communityActions, isValidJoinCode } from '@/services/communityStore';
-import { MOCK_COMMUNITY } from '@/constants/mock';
+import { AppText, AppHeader, Screen, Button, Dialog, Avatar, Toast, TextField } from '@/components/ui';
+import { isMember, loadAffiliate, previewReferrer, setReferrer, useAffiliate, type ReferrerPreview } from '@/services/affiliate';
+import { errorMessage } from '@/services/zuum';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
 export default function CommunityJoinScreen() {
   useStatusBarStyle('dark');
+  const aff = useAffiliate();
   const [code, setCode] = useState('');
-  const [invalid, setInvalid] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; tone: 'error' | 'success' | 'info' } | null>(null);
-  const hideToast = useCallback(() => setToast(null), []);
-  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState<ReferrerPreview | null>(null);
   const [noCode, setNoCode] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const hideToast = useCallback(() => setToast(null), []);
 
-  const leader = MOCK_COMMUNITY.leader;
+  useEffect(() => {
+    if (!aff) void loadAffiliate().catch(() => undefined);
+  }, [aff]);
 
-  const submit = () => {
-    if (code.length !== 6) return;
-    if (!isValidJoinCode(code)) {
-      setInvalid(true);
-      setToast({ msg: 'Mã giới thiệu không hợp lệ. Vui lòng kiểm tra lại mã 6 số từ người giới thiệu.', tone: 'error' });
+  const allowed = isMember(aff) && aff.canSetReferrer && !aff.referrer;
+  const normalized = code.trim().toUpperCase();
+  const ownCode = isMember(aff) && normalized === aff.code;
+
+  const submit = async () => {
+    if (normalized.length < 3 || checking) return;
+    if (ownCode) {
+      setError('Không thể nhập mã của chính bạn');
       return;
     }
-    setSuccess(true);
+    setChecking(true);
+    setError(null);
+    try {
+      const p = await previewReferrer(normalized);
+      if (p.full) setError(`${p.fullName} đã đủ thành viên cấp 1 — vui lòng dùng mã khác`);
+      else setPreview(p);
+    } catch (e) {
+      setError(errorMessage(e, 'Mã giới thiệu không hợp lệ'));
+    } finally {
+      setChecking(false);
+    }
   };
 
-  const confirmJoin = () => {
-    communityActions.join();
-    setSuccess(false);
-    router.replace('/community');
+  const confirmJoin = async () => {
+    if (!preview || saving) return;
+    setSaving(true);
+    try {
+      await setReferrer(preview.code);
+      setPreview(null);
+      router.replace('/community');
+    } catch (e) {
+      setPreview(null);
+      setToast(errorMessage(e, 'Không nhập được mã giới thiệu'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <Screen
-      header={
-        <AppHeader
-          title="Tham gia cộng đồng"
-          variant="light"
-          left="back"
-          right={{ icon: Icons.qr, onPress: () => setToast({ msg: 'Quét mã QR (ZuumScan) sẽ sớm ra mắt', tone: 'info' }), label: 'Quét QR' }}
-        />
-      }
-      footer={<Button title="Tiếp tục" flat onPress={submit} disabled={code.length !== 6} />}
+      header={<AppHeader title="Nhập mã giới thiệu" variant="light" left="back" />}
+      footer={<Button title="Tiếp tục" flat onPress={() => void submit()} disabled={!allowed || normalized.length < 3} loading={checking} />}
       footerPadded={false}
     >
       <View style={styles.body}>
@@ -55,64 +76,81 @@ export default function CommunityJoinScreen() {
           Nhập mã giới thiệu
         </AppText>
         <AppText size={14} color={Colors.textSecondary} align="center" style={styles.sub}>
-          Nhập mã 6 số do người giới thiệu cung cấp để kết nối vào cộng đồng của họ
+          Nhập mã tài khoản của người giới thiệu (vd KH000123) để kết nối vào cộng đồng của họ
         </AppText>
 
-        <View style={styles.codes}>
-          <CodeInput
-            value={code}
-            onChangeText={(v) => {
-              setCode(v);
-              if (invalid) setInvalid(false);
-            }}
-            length={6}
-            autoFocus
-            error={invalid}
-          />
-        </View>
+        <TextField
+          value={code}
+          onChangeText={(t) => {
+            setCode(t.replace(/\s/g, '').toUpperCase());
+            if (error) setError(null);
+          }}
+          placeholder="KH000123"
+          autoCapitalize="characters"
+          autoCorrect={false}
+          autoFocus
+          bold
+          error={error ?? undefined}
+          editable={allowed}
+          containerStyle={styles.codes}
+          returnKeyType="done"
+          onSubmitEditing={() => void submit()}
+        />
+
+        {aff && !allowed ? (
+          <AppText size={13} color={Colors.error} align="center" style={{ marginTop: Spacing.md }}>
+            {isMember(aff) && aff.referrer ? `Bạn đã có người giới thiệu: ${aff.referrer.fullName}` : 'Đã hết thời hạn nhập mã người giới thiệu'}
+          </AppText>
+        ) : null}
 
         <Pressable onPress={() => setNoCode(true)} hitSlop={8} style={styles.link}>
           <AppText size={14} color={Colors.textSecondary} align="center">
             Tôi không có mã giới thiệu ?
           </AppText>
         </Pressable>
-
-        <AppText size={11} color={Colors.textDisabled} align="center" style={{ marginTop: Spacing['2xl'] }}>
-          Demo: mã hợp lệ {MOCK_COMMUNITY.validJoinCodes.join(' hoặc ')}
-        </AppText>
       </View>
 
-      {/* Thành công (OTP 0.5) */}
-      <Dialog visible={success} onClose={() => setSuccess(false)} dismissable={false} actions={[{ label: 'Đồng ý', onPress: confirmJoin }]} actionsRow={false}>
-        <View style={styles.successCard}>
-          <Avatar name={leader.name} size={72} />
-          <AppText weight="bold" size={20} color={Colors.text} align="center" style={{ marginTop: Spacing.md }}>
-            {leader.name}
-          </AppText>
-          <AppText size={14} color={Colors.textSecondary} align="center" style={{ marginTop: 4 }}>
-            {leader.code}
-          </AppText>
-          <AppText size={14} color={Colors.textSecondary} align="center" style={{ marginTop: 2 }}>
-            Thành viên:{' '}
-            <AppText size={14} weight="bold" color={Colors.text}>
-              {leader.members}/{leader.memberCapacity}
+      {/* Xem trước người giới thiệu (OTP 0.5) */}
+      <Dialog
+        visible={!!preview}
+        onClose={() => setPreview(null)}
+        dismissable={!saving}
+        actions={[
+          { label: 'Huỷ', variant: 'secondary', onPress: () => setPreview(null) },
+          { label: saving ? 'Đang lưu…' : 'Đồng ý', onPress: () => void confirmJoin() },
+        ]}
+      >
+        {preview ? (
+          <View style={styles.successCard}>
+            <Avatar name={preview.fullName} size={72} />
+            <AppText weight="bold" size={20} color={Colors.text} align="center" style={{ marginTop: Spacing.md }}>
+              {preview.fullName}
             </AppText>
-          </AppText>
-          <AppText size={13} color={Colors.textSecondary} align="center" style={{ marginTop: Spacing.md, lineHeight: 19 }}>
-            Bạn sẽ trở thành thành viên trong cộng đồng của {leader.name}.
-          </AppText>
-        </View>
+            <AppText size={14} color={Colors.textSecondary} align="center" style={{ marginTop: 4 }}>
+              MS: {preview.code} · Thành viên {preview.level.name}
+            </AppText>
+            <AppText size={14} color={Colors.textSecondary} align="center" style={{ marginTop: 2 }}>
+              Thành viên cấp 1:{' '}
+              <AppText size={14} weight="bold" color={Colors.text}>
+                {preview.f1Count}
+              </AppText>
+            </AppText>
+            <AppText size={13} color={Colors.textSecondary} align="center" style={{ marginTop: Spacing.md, lineHeight: 19 }}>
+              Bạn sẽ trở thành thành viên trong cộng đồng của {preview.fullName}. Không đổi được người giới thiệu sau khi xác nhận.
+            </AppText>
+          </View>
+        ) : null}
       </Dialog>
 
       <Dialog
         visible={noCode}
         onClose={() => setNoCode(false)}
         title="Không có mã giới thiệu?"
-        message="Hãy nhờ người dùng ZuumViet gửi mã giới thiệu 6 số hoặc mã QR của họ. Không có mã, bạn vẫn có thể sử dụng đầy đủ dịch vụ ZuumViet."
+        message="Hãy nhờ người dùng ZuumViet gửi mã tài khoản (mã giới thiệu) của họ. Không có mã, bạn vẫn sử dụng đầy đủ dịch vụ ZuumViet."
         actions={[{ label: 'Đã hiểu', onPress: () => setNoCode(false) }]}
       />
 
-      <Toast visible={!!toast} message={toast?.msg ?? ''} tone={toast?.tone ?? 'error'} onHide={hideToast} />
+      <Toast visible={!!toast} message={toast ?? ''} tone="error" onHide={hideToast} />
     </Screen>
   );
 }

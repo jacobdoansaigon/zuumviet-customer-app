@@ -33,6 +33,8 @@ export interface PushData {
   orderId: string | null;
   bookingId: string | null;
   tripId: string | null;
+  /** màn đích gợi ý: community | wallet | profile */
+  screen: string | null;
 }
 
 function readPushData(raw: unknown): PushData | null {
@@ -40,7 +42,7 @@ function readPushData(raw: unknown): PushData | null {
   const d = raw as Record<string, unknown>;
   if (typeof d.type !== 'string') return null;
   const s = (v: unknown) => (typeof v === 'string' && v ? v : null);
-  return { type: d.type, notificationId: s(d.notificationId), orderId: s(d.orderId), bookingId: s(d.bookingId), tripId: s(d.tripId) };
+  return { type: d.type, notificationId: s(d.notificationId), orderId: s(d.orderId), bookingId: s(d.bookingId), tripId: s(d.tripId), screen: s(d.screen) };
 }
 
 /** Tick tăng mỗi khi có push về đơn `orderId` lúc app đang mở — đưa vào deps của effect tải lại đơn */
@@ -137,7 +139,9 @@ function hrefFor(data: PushData): Href {
   if (data.orderId) return { pathname: '/booking/tracking', params: { orderId: data.orderId } };
   if (data.bookingId) return { pathname: '/booking/intercity/ticket/[orderId]', params: { orderId: data.bookingId } };
   if (data.tripId) return '/booking/intercity/tickets';
-  if (data.type === 'wallet') return '/wallet';
+  if (data.type === 'wallet' || data.screen === 'wallet') return '/wallet';
+  if (data.screen === 'community') return '/community';
+  if (data.screen === 'profile') return '/account';
   if (data.notificationId) return { pathname: '/inbox/[id]', params: { id: data.notificationId } };
   return '/inbox';
 }

@@ -1,12 +1,12 @@
 // Bottom tabs — Figma: 5 tab, nền trắng, viền trên mảnh, active tím, inactive #8C8C8C, label 11
-// Trang Chủ | Hoạt Động | Cộng đồng | Hộp Thư (badge đỏ số chưa đọc) | Hồ Sơ
-import React from 'react';
-import { Platform } from 'react-native';
+// Trang Chủ | Hoạt Động | Cộng đồng | Hộp Thư (badge đỏ số chưa đọc — GET /notifications/unread-count) | Hồ Sơ
+import React, { useEffect } from 'react';
+import { AppState, Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Fonts, Sizes } from '@/constants/theme';
 import { Icon, Icons, type IconName } from '@/components/ui';
-import { useUnreadCount } from '@/services/inboxStore';
+import { refreshUnread, useUnreadCount } from '@/services/inbox';
 
 type TabDef = {
   name: string;
@@ -26,6 +26,15 @@ const TABS: TabDef[] = [
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const unread = useUnreadCount();
+
+  // badge Hộp thư: tải số chưa đọc khi vào tab bar và mỗi lần quay lại app (thông báo mới đến qua realtime)
+  useEffect(() => {
+    void refreshUnread().catch(() => undefined);
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') void refreshUnread().catch(() => undefined);
+    });
+    return () => sub.remove();
+  }, []);
   const bottomPad = Math.max(insets.bottom, Platform.OS === 'web' ? 6 : 8);
 
   return (

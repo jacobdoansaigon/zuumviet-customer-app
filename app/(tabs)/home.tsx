@@ -29,7 +29,8 @@ import { listOrders } from '@/services/orders';
 import { ensureCatalog } from '@/services/catalog';
 import { useRealtime, useRealtimeRefetch } from '@/hooks/useRealtime';
 import { displayName, formatPhone, refreshProfile, restoreSession, useProfile } from '@/services/session';
-import { MOCK_PROMOS, MOCK_COMMUNITY, getGreeting } from '@/constants/mock';
+import { MOCK_PROMOS, getGreeting } from '@/constants/mock';
+import { isMember, loadAffiliate, totalMembers, useAffiliate } from '@/services/affiliate';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
@@ -43,6 +44,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [greeting, setGreeting] = useState(getGreeting());
   const walletBalance = useWalletBalance();
+  const affiliate = useAffiliate();
 
   const loadOrders = useCallback(async () => {
     await ensureCatalog().catch(() => null);
@@ -70,6 +72,7 @@ export default function HomeScreen() {
     useCallback(() => {
       setGreeting(getGreeting());
       void refreshProfile().catch(() => undefined);
+      void loadAffiliate().catch(() => undefined);
       void loadOrders();
     }, [loadOrders])
   );
@@ -111,7 +114,8 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <WalletCard
               balance={walletBalance}
-              members={MOCK_COMMUNITY.homeStats.members}
+              label="Số dư ví ZuumViet"
+              members={isMember(affiliate) ? totalMembers(affiliate) : undefined}
               onPress={() => router.push('/wallet')}
               onMembersPress={() => router.push('/community')}
             />

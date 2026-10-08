@@ -1,20 +1,20 @@
-// CommunityProfile — khối hồ sơ nhóm trưởng (Figma Cộng đồng 1.1a): avatar 56, tên bold 20,
-// "Nhóm trưởng" tím 15, dòng "MS: ..." | "Doanh thu: đ 1.000.000" bold
+// CommunityProfile — khối hồ sơ trong cộng đồng (Figma Cộng đồng 1.1a): avatar 56, tên bold 20,
+// cấp thành viên tím 15, dòng "MS: <mã giới thiệu>" | <chỉ số> bold
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, Avatar } from '@/components/ui';
-import { formatMoney } from '@/constants/mock';
 
 interface CommunityProfileProps {
   name: string;
   role: string;
   code: string;
-  revenue: number;
+  /** chỉ số bên phải mã, vd { label: 'Đã nhận', value: 'đ 120.000' } */
+  stat?: { label: string; value: string };
   avatarUri?: string | null;
 }
 
-export const CommunityProfile: React.FC<CommunityProfileProps> = ({ name, role, code, revenue, avatarUri }) => (
+export const CommunityProfile: React.FC<CommunityProfileProps> = ({ name, role, code, stat, avatarUri }) => (
   <View style={styles.wrap}>
     <View style={styles.top}>
       <Avatar uri={avatarUri} name={name} size={56} />
@@ -31,16 +31,20 @@ export const CommunityProfile: React.FC<CommunityProfileProps> = ({ name, role, 
       <AppText size={14} color={Colors.textSecondary}>
         MS:{' '}
         <AppText size={14} weight="semiBold" color={Colors.text}>
-          {code.replace(/^MS:\s*/, '')}
+          {code}
         </AppText>
       </AppText>
-      <View style={styles.sep} />
-      <AppText size={14} color={Colors.textSecondary}>
-        Doanh thu:{' '}
-        <AppText size={14} weight="bold" color={Colors.text}>
-          {formatMoney(revenue, true)}
-        </AppText>
-      </AppText>
+      {stat ? (
+        <>
+          <View style={styles.sep} />
+          <AppText size={14} color={Colors.textSecondary}>
+            {stat.label}:{' '}
+            <AppText size={14} weight="bold" color={Colors.text}>
+              {stat.value}
+            </AppText>
+          </AppText>
+        </>
+      ) : null}
     </View>
   </View>
 );
