@@ -1,10 +1,12 @@
 // app/booking/cancel.tsx — Huỷ 1.2.1 "Vui lòng chọn lý do": chọn MỘT lý do (GET /v1/public/cancel-reasons theo dịch vụ
 // của đơn) + ghi chú + ảnh bằng chứng khi lý do yêu cầu (tải lên purpose order_proof) → POST /orders/:id/cancel.
-// Hiện phí huỷ nếu huỷ ngay bây giờ (cancelFeeIfNow). Chưa có tài xế: được huỷ không cần lý do.
-import React, { useEffect, useState } from 'react';
+// Phí huỷ: còn trong thời gian huỷ miễn phí (cancelFreeUntil) → đếm ngược; qua mốc → tải lại đơn, hiện phí
+// (cancelFeeIfNow). Ngay trước khi huỷ luôn đọc lại đơn — phí cao hơn số đang hiện thì hỏi lại. Chưa có tài xế: được huỷ
+// không cần lý do.
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Image, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AppHeader, AppText, ErrorSheet, Icon, Icons, Radio, Screen, TextField } from '@/components/ui';
+import { AppHeader, AppText, Dialog, ErrorSheet, Icon, Icons, Radio, Screen, TextField } from '@/components/ui';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { cancelOrder, cancelReasons, getOrder, type CancelReason, type OrderDetail } from '@/services/orders';
 import { uploadFile } from '@/services/upload';
@@ -12,6 +14,10 @@ import { formatVnd } from '@/services/bookingStore';
 import { errorMessage } from '@/services/zuum';
 import { FlatFooter } from '@/components/booking';
 import { PhotoActionSheet } from '@/components/profile';
+import { useRealtime } from '@/hooks/useRealtime';
+import { cancelFeePending, mmss, useFreeCancelCountdown } from '@/hooks/useCancelCountdown';
+
+const hasPartnerNow = (o: OrderDetail | null) => o?.status === 'assigned' || o?.status === 'arrived_pickup';
 
 export default function CancelScreen() {
   const { orderId } = useLocalSearchParams<{ orderId?: string }>();
@@ -24,6 +30,16 @@ export default function CancelScreen() {
   const [photoSheet, setPhotoSheet] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [feeConfirm, setFeeConfirm] = useState<number | null>(null);
+
+  const reload = useCallback(async () => {
+    if (!orderId) return;
+    try {
+      setOrder(await getOrder(orderId));
+    } catch {
+      /* giữ đơn đang có; lúc huỷ sẽ đọc lại */
+    }
+  }, [orderId]);
 
   useEffect(() => {
     if (!orderId) return;
@@ -46,18 +62,43 @@ export default function CancelScreen() {
     };
   }, [orderId]);
 
+  // tài xế vừa nhận / đơn đổi trạng thái trong lúc đang chọn lý do → cập nhật
+  useRealtime('order.updated', (p) => {
+    if (p.orderId === orderId) void reload();
+  });
+  const freeLeft = useFreeCancelCountdown(order?.cancelFreeUntil, () => void reload());
+
   const reason = reasons.find((r) => r.id === selected) ?? null;
-  const hasPartner = order?.status === 'assigned' || order?.status === 'arrived_pickup';
+  const hasPartner = hasPartnerNow(order);
   const needsReason = hasPartner;
   const needsProof = !!reason?.requiresProof;
   const canCancel = !!order?.allowedActions.includes('cancel');
-  const fee = order?.cancelFeeIfNow ?? 0;
+  const feePending = !!order && cancelFeePending(order, freeLeft);
+  const fee = freeLeft != null ? 0 : (order?.cancelFeeIfNow ?? 0);
   const ready = !!order && canCancel && (!needsReason || !!reason) && (!needsProof || !!photo) && !submitting;
 
-  const submit = async () => {
+  /** acceptedFee: phí khách đã đồng ý (mặc định = phí đang hiện trên nút) */
+  const submit = async (acceptedFee: number = fee) => {
     if (!order || !ready) return;
+    setFeeConfirm(null);
     setSubmitting(true);
     try {
+      // đọc lại đơn ngay trước khi huỷ: phí / trạng thái có thể đã đổi từ lúc mở màn
+      const fresh = await getOrder(order.id);
+      setOrder(fresh);
+      if (!fresh.allowedActions.includes('cancel')) {
+        setError('Đơn vừa chuyển trạng thái nên không thể tự huỷ nữa — vui lòng liên hệ tổng đài hỗ trợ.');
+        return;
+      }
+      if (hasPartnerNow(fresh) && !reason) {
+        setError('Tài xế vừa nhận đơn — vui lòng chọn lý do huỷ.');
+        return;
+      }
+      const freshFee = fresh.cancelFeeIfNow ?? 0;
+      if (freshFee > acceptedFee) {
+        setFeeConfirm(freshFee);
+        return;
+      }
       const proofFileId = needsProof && photo ? await uploadFile(photo.uri, 'order_proof', photo.mimeType) : undefined;
       await cancelOrder(order.id, {
         ...(reason ? { reasonId: reason.id } : {}),
@@ -72,13 +113,15 @@ export default function CancelScreen() {
     }
   };
 
+  const footerTitle = fee > 0 ? `Huỷ đơn · phí ${formatVnd(fee)}` : feePending ? 'Huỷ đơn · có phí huỷ' : 'Gửi';
+
   return (
     <Screen
       header={<AppHeader variant="dark" title="Vui lòng chọn lý do" left="close" />}
       scroll
       edges={['left', 'right']}
       footerPadded={false}
-      footer={<FlatFooter title={fee > 0 ? `Huỷ đơn · phí ${formatVnd(fee)}` : 'Gửi'} disabled={!ready} loading={submitting} onPress={submit} />}
+      footer={<FlatFooter title={footerTitle} disabled={!ready} loading={submitting} onPress={() => void submit()} />}
     >
       <View style={styles.list}>
         {loading ? (
@@ -95,11 +138,21 @@ export default function CancelScreen() {
                 Đơn ở trạng thái này không thể tự huỷ — vui lòng liên hệ tổng đài hỗ trợ.
               </AppText>
             ) : null}
-            {fee > 0 ? (
+            {canCancel && freeLeft != null ? (
+              <View style={[styles.feeBox, styles.freeBox]}>
+                <Icon name={Icons.clock} size={18} color={Colors.primary} />
+                <AppText size={13} style={{ flex: 1, marginLeft: Spacing.sm }}>
+                  Còn <AppText size={13} weight="bold" color={Colors.primary}>{mmss(freeLeft)}</AppText> để huỷ miễn phí. Sau thời
+                  gian này, huỷ đơn sẽ mất phí huỷ.
+                </AppText>
+              </View>
+            ) : canCancel && (fee > 0 || feePending) ? (
               <View style={styles.feeBox}>
                 <Icon name={Icons.alert} size={18} color={Colors.error} />
                 <AppText size={13} style={{ flex: 1, marginLeft: Spacing.sm }}>
-                  Tài xế đã nhận đơn quá thời gian huỷ miễn phí — huỷ bây giờ sẽ mất phí {formatVnd(fee)}.
+                  {fee > 0
+                    ? `Đã quá thời gian huỷ miễn phí — huỷ bây giờ sẽ mất phí ${formatVnd(fee)}.`
+                    : 'Đã quá thời gian huỷ miễn phí — đang cập nhật phí huỷ...'}
                 </AppText>
               </View>
             ) : null}
@@ -146,6 +199,16 @@ export default function CancelScreen() {
         onPicked={(uri, mimeType) => setPhoto({ uri, mimeType: mimeType ?? null })}
         onError={setError}
       />
+      <Dialog
+        visible={feeConfirm != null}
+        onClose={() => setFeeConfirm(null)}
+        title="Phí huỷ đã thay đổi"
+        message={`Đã quá thời gian huỷ miễn phí — huỷ bây giờ sẽ mất phí ${formatVnd(feeConfirm ?? 0)}. Bạn vẫn muốn huỷ đơn?`}
+        actions={[
+          { label: 'Không huỷ', variant: 'secondary', onPress: () => setFeeConfirm(null) },
+          { label: 'Vẫn huỷ', variant: 'danger', onPress: () => void submit(feeConfirm ?? 0) },
+        ]}
+      />
       <ErrorSheet visible={!!error} title="Không huỷ được đơn" message={error ?? ''} actionLabel="Đóng" onAction={() => setError(null)} onClose={() => setError(null)} />
     </Screen>
   );
@@ -159,6 +222,7 @@ const styles = StyleSheet.create({
   loading: { alignItems: 'center', paddingVertical: Spacing['2xl'] },
   notice: { paddingVertical: Spacing.md },
   feeBox: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, marginVertical: Spacing.sm, borderRadius: BorderRadius.md, backgroundColor: Colors.errorBg },
+  freeBox: { backgroundColor: Colors.primaryBg },
   thumbWrap: { width: THUMB, height: THUMB },
   thumb: { width: THUMB, height: THUMB, borderRadius: BorderRadius.md, backgroundColor: Colors.surfaceAlt },
   removeBtn: {

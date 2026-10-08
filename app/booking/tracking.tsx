@@ -15,6 +15,7 @@ import { ensureCatalog } from '@/services/catalog';
 import { errorMessage, isApiError } from '@/services/zuum';
 import { useRealtime, useRealtimeRefetch } from '@/hooks/useRealtime';
 import { useOrderPushRefresh } from '@/hooks/useNotifications';
+import { cancelFeePending, mmss, useFreeCancelCountdown } from '@/hooks/useCancelCountdown';
 import { BookingMap, RoundIconButton, TrackingSheet, type MapStop } from '@/components/booking';
 import { SUPPORT_HOTLINE as SUPPORT_PHONE } from '@/constants/content';
 
@@ -129,6 +130,17 @@ export default function TrackingScreen() {
   };
 
   const cancellable = !!order?.allowedActions.includes('cancel');
+  // menu đang mở: đếm ngược huỷ miễn phí; qua mốc → tải lại đơn để hiện phí mới
+  const freeLeft = useFreeCancelCountdown(menu && cancellable ? order?.cancelFreeUntil : null, () => void load());
+  const cancelFee = freeLeft != null ? 0 : (order?.cancelFeeIfNow ?? 0);
+  const cancelSublabel =
+    freeLeft != null
+      ? `Miễn phí huỷ trong ${mmss(freeLeft)}`
+      : cancelFee > 0
+        ? `Phí huỷ nếu huỷ bây giờ: ${cancelFee.toLocaleString('vi-VN')}đ`
+        : order && cancelFeePending(order, freeLeft)
+          ? 'Đã hết thời gian huỷ miễn phí'
+          : 'Miễn phí huỷ lúc này';
 
   return (
     <View style={styles.root}>
@@ -175,7 +187,7 @@ export default function TrackingScreen() {
             icon={Icons.closeCircle}
             iconColor={Colors.error}
             label="Huỷ đơn hàng"
-            sublabel={order.cancelFeeIfNow ? `Phí huỷ nếu huỷ bây giờ: ${order.cancelFeeIfNow.toLocaleString('vi-VN')}đ` : 'Miễn phí huỷ lúc này'}
+            sublabel={cancelSublabel}
             onPress={() => {
               setMenu(false);
               router.push({ pathname: '/booking/cancel', params: { orderId: order.id } });
