@@ -7,7 +7,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, TextInput, Pressable, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AppHeader, AppText, Chip, Icon, Icons, Screen, StopMarker, fontStyle } from '@/components/ui';
+import { AppHeader, AppText, Chip, Icon, Icons, Screen, StopMarker, fontStyle, useBlurOnLeave } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Sizes, NO_WEB_OUTLINE } from '@/constants/theme';
 import { SERVICE_GROUPS } from '@/constants/booking';
 import { useBooking, setSenderPlace, setReceiverPlace, updateReceiver, type Place } from '@/services/bookingStore';
@@ -44,6 +44,8 @@ export default function LocationScreen() {
   const [resolving, setResolving] = useState<string | null>(null);
   const [zaloPaste, setZaloPaste] = useState(false);
   const reqSeq = useRef(0);
+  const searchRef = useRef<TextInput>(null);
+  useBlurOnLeave(searchRef);
   const near = state.sender.place ?? (gps ? { lat: gps.latitude, lng: gps.longitude } : null);
 
   useEffect(() => {
@@ -158,6 +160,7 @@ export default function LocationScreen() {
         <View style={styles.searchBox}>
           <StopMarker type={isReceiver ? 'dropoff' : 'pickup'} size={16} />
           <TextInput
+            ref={searchRef}
             value={query}
             onChangeText={setQuery}
             placeholder={isReceiver ? labels.receiverLocationPlaceholder : labels.senderLocationPlaceholder}

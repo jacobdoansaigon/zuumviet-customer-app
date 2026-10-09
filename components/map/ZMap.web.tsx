@@ -3,15 +3,15 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { View, StyleSheet } from 'react-native';
-import { Map as MapLibreMap, Marker, type GeoJSONSource } from 'maplibre-gl';
+import { Map as MapLibreMap, Marker, type FilterSpecification, type GeoJSONSource, type LineLayerSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { goongStyleUrl } from '@/services/maps';
-import { addInsets, boundsOf, circleFeature, lineFeature, type ZMapHandle, type ZMapProps } from './types';
+import { addInsets, boundsOf, circleFeature, LINE_LAYERS, linesFeature, type ZMapHandle, type ZMapProps } from './types';
 
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
-  ({ style, initialCenter, initialZoom = 14, markers = [], line, circle, insets, fit, interactive = true, onRegionChangeComplete }, ref) => {
+  ({ style, initialCenter, initialZoom = 14, markers = [], lines, circle, insets, fit, interactive = true, onRegionChangeComplete }, ref) => {
     const hostRef = useRef<View>(null);
     const mapRef = useRef<MapLibreMap | null>(null);
     const markerRefs = useRef(new Map<string, Marker>());
@@ -45,8 +45,17 @@ export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
         map.addSource('zmap-circle', { type: 'geojson', data: EMPTY });
         map.addLayer({ id: 'zmap-circle-fill', type: 'fill', source: 'zmap-circle', paint: { 'fill-color': 'rgba(0,0,0,0)' } });
         map.addLayer({ id: 'zmap-circle-line', type: 'line', source: 'zmap-circle', paint: { 'line-color': 'rgba(0,0,0,0)', 'line-width': 1 } });
-        map.addSource('zmap-line', { type: 'geojson', data: EMPTY });
-        map.addLayer({ id: 'zmap-line', type: 'line', source: 'zmap-line', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#000', 'line-width': 4 } });
+        map.addSource('zmap-lines', { type: 'geojson', data: EMPTY });
+        (['casing', 'solid', 'dashed'] as const).forEach((k) =>
+          map.addLayer({
+            id: `zmap-lines-${k}`,
+            type: 'line',
+            source: 'zmap-lines',
+            filter: LINE_LAYERS[k].filter as FilterSpecification,
+            layout: LINE_LAYERS[k].layout as LineLayerSpecification['layout'],
+            paint: LINE_LAYERS[k].paint as LineLayerSpecification['paint'],
+          }),
+        );
         setReady(true);
       });
       map.on('moveend', () => {
@@ -70,19 +79,14 @@ export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [paddingKey]);
 
-    // đường nối + vòng tròn
-    const lineKey = line ? `${line.color}|${line.width}|${line.dashed}|${line.coords.map((c) => `${c.lat},${c.lng}`).join(';')}` : '';
+    // đường nối / tuyến đường + vòng tròn
+    const linesKey = (lines ?? []).map((l) => `${l.id}|${l.color}|${l.width}|${l.dashed}|${l.coords.map((c) => `${c.lat},${c.lng}`).join(';')}`).join('#');
     useEffect(() => {
       const map = mapRef.current;
       if (!map || !ready) return;
-      (map.getSource('zmap-line') as GeoJSONSource).setData(line && line.coords.length >= 2 ? lineFeature(line.coords) : EMPTY);
-      if (line) {
-        map.setPaintProperty('zmap-line', 'line-color', line.color);
-        map.setPaintProperty('zmap-line', 'line-width', line.width ?? 4);
-        map.setPaintProperty('zmap-line', 'line-dasharray', line.dashed ? [2, 1.5] : undefined);
-      }
+      (map.getSource('zmap-lines') as GeoJSONSource).setData(linesFeature(lines));
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ready, lineKey]);
+    }, [ready, linesKey]);
     const circleKey = circle ? `${circle.center.lat},${circle.center.lng},${circle.radiusMeters},${circle.fill},${circle.stroke}` : '';
     useEffect(() => {
       const map = mapRef.current;

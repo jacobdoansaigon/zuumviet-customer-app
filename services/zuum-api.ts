@@ -1002,6 +1002,7 @@ export interface ZuumRoutes {
       }>;
       distanceMeters: number;
       durationSeconds: null | number;
+      routePolyline: null | string;
       price: {
         lines: Array<{
           code: string;
@@ -1161,6 +1162,7 @@ export interface ZuumRoutes {
       }>;
       distanceMeters: number;
       durationSeconds: null | number;
+      routePolyline: null | string;
       price: {
         lines: Array<{
           code: string;
@@ -1326,6 +1328,7 @@ export interface ZuumRoutes {
       }>;
       distanceMeters: number;
       durationSeconds: null | number;
+      routePolyline: null | string;
       price: {
         lines: Array<{
           code: string;
@@ -1500,6 +1503,7 @@ export interface ZuumRoutes {
       }>;
       distanceMeters: number;
       durationSeconds: null | number;
+      routePolyline: null | string;
       price: {
         lines: Array<{
           code: string;
@@ -1685,6 +1689,7 @@ export interface ZuumRoutes {
       distanceMeters: number;
       durationSeconds: null | number;
       distanceSource: "none" | "goong" | "estimate";
+      routePolyline: null | string;
       price: {
         lines: Array<{
           code: string;
@@ -1721,6 +1726,7 @@ export interface ZuumRoutes {
       distanceMeters: number;
       durationSeconds: null | number;
       distanceSource: "none" | "goong" | "estimate";
+      routePolyline: null | string;
       price: {
         lines: Array<{
           code: string;
@@ -3049,6 +3055,7 @@ export interface ZuumRoutes {
       }>;
       distanceMeters: number;
       durationSeconds: null | number;
+      routePolyline: null | string;
       price: {
         lines: Array<{
           code: string;
@@ -3259,6 +3266,7 @@ export interface ZuumRoutes {
       }>;
       distanceMeters: number;
       durationSeconds: null | number;
+      routePolyline: null | string;
       price: {
         lines: Array<{
           code: string;
@@ -3422,6 +3430,7 @@ export interface ZuumRoutes {
       }>;
       distanceMeters: number;
       durationSeconds: null | number;
+      routePolyline: null | string;
       price: {
         lines: Array<{
           code: string;
@@ -3581,6 +3590,7 @@ export interface ZuumRoutes {
       }>;
       distanceMeters: number;
       durationSeconds: null | number;
+      routePolyline: null | string;
       price: {
         lines: Array<{
           code: string;
@@ -3743,6 +3753,7 @@ export interface ZuumRoutes {
       }>;
       distanceMeters: number;
       durationSeconds: null | number;
+      routePolyline: null | string;
       price: {
         lines: Array<{
           code: string;
@@ -3914,6 +3925,7 @@ export interface ZuumRoutes {
       }>;
       distanceMeters: number;
       durationSeconds: null | number;
+      routePolyline: null | string;
       price: {
         lines: Array<{
           code: string;
@@ -4078,6 +4090,7 @@ export interface ZuumRoutes {
       }>;
       distanceMeters: number;
       durationSeconds: null | number;
+      routePolyline: null | string;
       price: {
         lines: Array<{
           code: string;
@@ -4236,6 +4249,7 @@ export interface ZuumRoutes {
       }>;
       distanceMeters: number;
       durationSeconds: null | number;
+      routePolyline: null | string;
       price: {
         lines: Array<{
           code: string;

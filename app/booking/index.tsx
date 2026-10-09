@@ -29,8 +29,11 @@ import {
   estimateFor,
   formatVnd,
   pickupFromGps,
+  refreshQuote,
+  buildQuoteRequest,
   type Place,
 } from '@/services/bookingStore';
+import { decodePolyline } from '@/components/map/polyline';
 import { ensureCatalog, optionsFor, useCatalog, type ServiceOptionView } from '@/services/catalog';
 import { ensureIntercityCities, matchIntercityCity, nearestCity, useIntercityCities } from '@/services/intercity';
 import { getOrder } from '@/services/orders';
@@ -137,6 +140,21 @@ export default function BookingScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.sender.place, state.receivers, labels, maxStops]);
 
+  // Tuyến theo đường: đủ điểm thì lấy báo giá ngầm cho bản nháp (có hình dạng tuyến) — màn xác nhận dùng lại nếu còn hạn
+  const quoteKey = useMemo(() => {
+    const req = isIntercity ? null : buildQuoteRequest(state);
+    return req ? JSON.stringify(req) : '';
+  }, [state, isIntercity]);
+  useEffect(() => {
+    if (!quoteKey) return;
+    const t = setTimeout(() => void refreshQuote(), 600);
+    return () => clearTimeout(t);
+  }, [quoteKey]);
+  const routePath = useMemo(() => {
+    const q = state.quote;
+    return q.status === 'ready' && q.key === quoteKey && q.quote?.routePolyline ? decodePolyline(q.quote.routePolyline) : null;
+  }, [state.quote, quoteKey]);
+
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/home'));
   const openSender = () => router.push('/booking/sender');
   const openReceiver = (index: number) => router.push({ pathname: '/booking/receiver', params: { index: String(index) } });
@@ -219,7 +237,7 @@ export default function BookingScreen() {
 
   return (
     <View style={styles.root}>
-      <BookingMap stops={stops} bottomPadding={sheetH} />
+      <BookingMap stops={stops} routePath={routePath} bottomPadding={sheetH} />
       <RoundIconButton icon={Icons.back} onPress={goBack} style={[styles.back, { top: insets.top + Spacing.md }]} accessibilityLabel="Quay lại" />
 
       <View style={styles.sheet} onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}>

@@ -4,10 +4,10 @@
 // Giá ở footer là giá server báo (POST /v1/customer/quotes) — trong lúc chờ chỉ hiện ước tính "~" và KHÔNG cho xác nhận.
 // Chỉ tạo đơn với đúng giá đang hiện: báo giá tự làm mới trước khi hết hạn; phải báo giá lại mà giá khác → hiện giá mới,
 // khách bấm xác nhận lần nữa. Trả tiền mặt mà còn nợ phí huỷ đơn trước → báo trước khoản tài xế sẽ thu thêm.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { AppHeader, AppText, BottomSheet, Checkbox, ErrorSheet, Icon, Icons, Screen, Stepper, fontStyle } from '@/components/ui';
+import { AppHeader, AppText, BottomSheet, Checkbox, ErrorSheet, Icon, Icons, Screen, Stepper, fontStyle, useBlurOnLeave } from '@/components/ui';
 import { Colors, Spacing, NO_WEB_OUTLINE } from '@/constants/theme';
 import { SERVICE_GROUPS, TIP_STEP } from '@/constants/booking';
 import {
@@ -58,6 +58,8 @@ export default function ConfirmScreen() {
   const svc = getSelectedService(state);
   const price = effectivePrice(state);
   const quote = state.quote;
+  const noteRef = useRef<TextInput>(null);
+  useBlurOnLeave(noteRef);
   const [timeSheet, setTimeSheet] = useState(false);
   const [paySheet, setPaySheet] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -249,6 +251,7 @@ export default function ConfirmScreen() {
           <Icon name={Icons.note} size={22} color={Colors.primary} />
         </View>
         <TextInput
+          ref={noteRef}
           value={opt.note}
           onChangeText={(t) => setOptions({ note: t })}
           placeholder="Ghi chú"

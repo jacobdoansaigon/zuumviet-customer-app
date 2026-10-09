@@ -23,13 +23,23 @@ export interface ZMapMarker {
   children: ReactElement;
 }
 
+export interface ZMapLine {
+  id: string;
+  coords: LatLng[];
+  color: string;
+  width?: number;
+  /** nét đứt (vd đoạn từ vị trí tài xế tới điểm kế) — nét liền có viền trắng để nổi trên nền bản đồ */
+  dashed?: boolean;
+}
+
 export interface ZMapProps {
   style?: StyleProp<ViewStyle>;
   initialCenter: LatLng;
   initialZoom?: number;
-  markers?: ZMapMarker[];
   /** marker vẽ theo thứ tự mảng — phần tử sau nằm trên */
-  line?: { coords: LatLng[]; color: string; width?: number; dashed?: boolean } | null;
+  markers?: ZMapMarker[];
+  /** đường nối / tuyến đường (vẽ dưới marker) */
+  lines?: ZMapLine[];
   circle?: { center: LatLng; radiusMeters: number; fill: string; stroke: string } | null;
   /** phần khung bị che (bottom sheet…) — tâm bản đồ / canh khung tính theo phần còn nhìn thấy */
   insets?: Insets;
@@ -62,11 +72,42 @@ export const boundsOf = (points: LatLng[]): [number, number, number, number] => 
   Math.max(...points.map((p) => p.lat)),
 ];
 
-export const lineFeature = (coords: LatLng[]): GeoJSON.Feature<GeoJSON.LineString> => ({
-  type: 'Feature',
-  properties: {},
-  geometry: { type: 'LineString', coordinates: coords.map((c) => [c.lng, c.lat]) },
+/** các đường → một FeatureCollection; màu / độ dày / nét đứt nằm trong properties (lớp vẽ đọc bằng biểu thức) */
+export const linesFeature = (lines: ZMapLine[] = []): GeoJSON.FeatureCollection<GeoJSON.LineString> => ({
+  type: 'FeatureCollection',
+  features: lines
+    .filter((l) => l.coords.length >= 2)
+    .map((l) => ({
+      type: 'Feature',
+      properties: { id: l.id, color: l.color, width: l.width ?? 4, dashed: !!l.dashed },
+      geometry: { type: 'LineString', coordinates: l.coords.map((c) => [c.lng, c.lat]) },
+    })),
 });
+
+interface LineLayerStyle {
+  filter: unknown[];
+  layout: Record<string, unknown>;
+  paint: Record<string, unknown>;
+}
+
+/** lớp vẽ đường dùng chung native / web: viền trắng + nét liền, nét đứt riêng (line-dasharray không đọc theo từng đường được) */
+export const LINE_LAYERS: Record<'casing' | 'solid' | 'dashed', LineLayerStyle> = {
+  casing: {
+    filter: ['!', ['get', 'dashed']],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#FFFFFF', 'line-width': ['+', ['get', 'width'], 3] },
+  },
+  solid: {
+    filter: ['!', ['get', 'dashed']],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'] },
+  },
+  dashed: {
+    filter: ['==', ['get', 'dashed'], true],
+    layout: { 'line-cap': 'butt', 'line-join': 'round' },
+    paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'], 'line-dasharray': [2, 1.5] },
+  },
+};
 
 /** vòng tròn bán kính theo mét → đa giác 64 cạnh (đủ mịn ở mức phóng thành phố) */
 export function circleFeature(center: LatLng, radiusMeters: number): GeoJSON.Feature<GeoJSON.Polygon> {

@@ -1,9 +1,10 @@
 // PhoneInput — ô nhập SĐT theo Figma (icon điện thoại, placeholder 077 996 3333, nút xoá)
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, TextInput, Pressable, StyleSheet } from 'react-native';
 import { Colors, Spacing, BorderRadius, Sizes, NO_WEB_OUTLINE } from '@/constants/theme';
 import { fontStyle } from './Text';
 import { Icon, Icons } from './Icon';
+import { useBlurOnLeave } from './useBlurOnLeave';
 
 interface PhoneInputProps {
   value: string;
@@ -27,12 +28,15 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   autoFocus,
 }) => {
   const [focused, setFocused] = useState(false);
+  const ref = useRef<TextInput>(null);
+  useBlurOnLeave(ref);
   const handleChange = (text: string) => onChangeText(text.replace(/\D/g, '').slice(0, 11));
 
   return (
     <View style={[styles.container, focused && styles.containerFocused]}>
       <Icon name="mci:phone-outgoing-outline" size={22} color={Colors.primary} style={styles.icon} />
       <TextInput
+        ref={ref}
         style={[styles.input, fontStyle('semiBold')]}
         value={formatPhoneVn(value)}
         onChangeText={handleChange}

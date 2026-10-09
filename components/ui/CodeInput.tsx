@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, TextInput, Pressable, StyleSheet } from 'react-native';
 import { Colors, BorderRadius, Sizes, Spacing } from '@/constants/theme';
 import { AppText } from './Text';
+import { useBlurOnLeave } from './useBlurOnLeave';
 
 interface CodeInputProps {
   value: string;
@@ -26,6 +27,7 @@ export const CodeInput: React.FC<CodeInputProps> = ({
 }) => {
   const ref = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
+  useBlurOnLeave(ref);
 
   useEffect(() => {
     if (value.length === length) onFilled?.(value);

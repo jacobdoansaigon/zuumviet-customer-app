@@ -17,6 +17,8 @@ export interface BookingMapProps {
   showsUserLocation?: boolean;
   /** vẽ đường nối điểm lấy → các điểm giao */
   showRoute?: boolean;
+  /** tuyến theo đường (giải mã từ routePolyline của báo giá / đơn); không có → nối thẳng các điểm */
+  routePath?: { lat: number; lng: number }[] | null;
   /** phần đáy bị bottom sheet che (px) để canh khung nhìn */
   bottomPadding?: number;
   style?: StyleProp<ViewStyle>;

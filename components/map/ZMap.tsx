@@ -2,13 +2,23 @@
 // chưa có key thì màn hình dùng bản đồ thay thế (vẽ giả) — xem BookingMap / DriverMap / TripMap.
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import { Camera, GeoJSONSource, Layer, Map, UserLocation, ViewAnnotation, type CameraRef } from '@maplibre/maplibre-react-native';
+import {
+  Camera,
+  GeoJSONSource,
+  Layer,
+  Map,
+  UserLocation,
+  ViewAnnotation,
+  type CameraRef,
+  type FilterSpecification,
+  type LineLayerSpecification,
+} from '@maplibre/maplibre-react-native';
 import { goongStyleUrl } from '@/services/maps';
-import { addInsets, boundsOf, circleFeature, lineFeature, type ZMapHandle, type ZMapProps } from './types';
+import { addInsets, boundsOf, circleFeature, LINE_LAYERS, linesFeature, type ZMapHandle, type ZMapProps } from './types';
 
 export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
   (
-    { style, initialCenter, initialZoom = 14, markers = [], line, circle, insets, fit, showsUserLocation = false, interactive = true, onRegionChangeComplete },
+    { style, initialCenter, initialZoom = 14, markers = [], lines, circle, insets, fit, showsUserLocation = false, interactive = true, onRegionChangeComplete },
     ref,
   ) => {
     const camera = useRef<CameraRef>(null);
@@ -58,16 +68,18 @@ export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
             <Layer id="zmap-circle-line" type="line" paint={{ 'line-color': circle.stroke, 'line-width': 1 }} />
           </GeoJSONSource>
         ) : null}
-        {line && line.coords.length >= 2 ? (
-          <GeoJSONSource id="zmap-line" data={lineFeature(line.coords)}>
+        <GeoJSONSource id="zmap-lines" data={linesFeature(lines)}>
+          {(['casing', 'solid', 'dashed'] as const).map((k) => (
             <Layer
-              id="zmap-line"
+              key={k}
+              id={`zmap-lines-${k}`}
               type="line"
-              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-              paint={{ 'line-color': line.color, 'line-width': line.width ?? 4, ...(line.dashed ? { 'line-dasharray': [2, 1.5] } : {}) }}
+              filter={LINE_LAYERS[k].filter as FilterSpecification}
+              layout={LINE_LAYERS[k].layout as LineLayerSpecification['layout']}
+              paint={LINE_LAYERS[k].paint as LineLayerSpecification['paint']}
             />
-          </GeoJSONSource>
-        ) : null}
+          ))}
+        </GeoJSONSource>
         {markers.map((m) => (
           <ViewAnnotation key={m.id} id={m.id} lngLat={[m.at.lng, m.at.lat]} anchor={m.anchor ?? 'center'} title={m.title}>
             {m.children}

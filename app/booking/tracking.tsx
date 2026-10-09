@@ -18,6 +18,7 @@ import { useOrderPushRefresh } from '@/hooks/useNotifications';
 import { cancelFeePending, mmss, useFreeCancelCountdown } from '@/hooks/useCancelCountdown';
 import { BookingMap, RoundIconButton, TrackingSheet, type MapStop } from '@/components/booking';
 import { SUPPORT_HOTLINE as SUPPORT_PHONE } from '@/constants/content';
+import { decodePolyline } from '@/components/map/polyline';
 
 const FALLBACK_POLL_MS = 30_000;
 
@@ -99,6 +100,8 @@ export default function TrackingScreen() {
     if (showPartner && partnerLoc) list.push({ id: 'driver', lat: partnerLoc.lat, lng: partnerLoc.lng, type: 'driver', label: order.partner?.fullName });
     return list;
   }, [order, partnerLoc, showPartner]);
+  // tuyến đã báo giá (theo đường) — đơn cũ không có thì nối thẳng
+  const routePath = useMemo(() => decodePolyline(order?.routePolyline), [order?.routePolyline]);
 
   const goHome = () => {
     try {
@@ -144,7 +147,7 @@ export default function TrackingScreen() {
 
   return (
     <View style={styles.root}>
-      <BookingMap stops={stops} bottomPadding={sheetH} />
+      <BookingMap stops={stops} routePath={routePath} bottomPadding={sheetH} />
       <RoundIconButton icon={Icons.close} onPress={close} style={[styles.close, { top: insets.top + Spacing.md }]} accessibilityLabel="Đóng" />
 
       <View style={styles.sheet} onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}>

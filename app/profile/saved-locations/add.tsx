@@ -6,7 +6,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, TextInput, Pressable, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, BorderRadius, NO_WEB_OUTLINE } from '@/constants/theme';
-import { AppText, AppHeader, Screen, Button, Chip, TextField, StopMarker, Dialog, ErrorSheet, Icon, Icons, fontStyle } from '@/components/ui';
+import { AppText, AppHeader, Screen, Button, Chip, TextField, StopMarker, Dialog, ErrorSheet, Icon, Icons, fontStyle, useBlurOnLeave } from '@/components/ui';
 import {
   createSavedAddress,
   deleteSavedAddress,
@@ -55,6 +55,8 @@ export default function AddSavedLocationScreen() {
   const [error, setError] = useState<string | null>(null);
   const seq = useRef(0);
   const filledFor = useRef<string | null>(null);
+  const queryRef = useRef<TextInput>(null);
+  useBlurOnLeave(queryRef);
 
   useEffect(() => {
     if (list === null) void loadSavedAddresses().catch(() => undefined);
@@ -215,6 +217,7 @@ export default function AddSavedLocationScreen() {
             <View style={styles.addressRow}>
               <StopMarker type="pickup" size={16} />
               <TextInput
+                ref={queryRef}
                 value={query}
                 onChangeText={setQuery}
                 placeholder="Nhập địa điểm bạn thêm"

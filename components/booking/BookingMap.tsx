@@ -13,13 +13,15 @@ import type { BookingMapProps } from './mapTypes';
 
 const FIT_MARGIN = { top: 140, right: 60, bottom: 80, left: 60 };
 
-const GoongBookingMap: React.FC<BookingMapProps> = ({ stops, center, showsUserLocation = true, showRoute = true, bottomPadding = 0, style, onRegionChangeComplete }) => {
+const GoongBookingMap: React.FC<BookingMapProps> = ({ stops, center, showsUserLocation = true, showRoute = true, routePath, bottomPadding = 0, style, onRegionChangeComplete }) => {
   const first = stops[0];
   const initial = center ?? (first ? { lat: first.lat, lng: first.lng } : HCM_CENTER);
-  const stopsKey = stops.map((s) => `${s.id}:${s.type}:${s.lat.toFixed(5)},${s.lng.toFixed(5)}`).join('|');
+  const road = routePath && routePath.length >= 2 ? routePath : null;
+  // canh lại khung khi điểm đổi hoặc vừa có tuyến theo đường (tuyến có thể vòng ra ngoài khung các điểm)
+  const stopsKey = stops.map((s) => `${s.id}:${s.type}:${s.lat.toFixed(5)},${s.lng.toFixed(5)}`).join('|') + (road ? `|road:${road.length}:${road[0]!.lat},${road[0]!.lng}:${road[road.length - 1]!.lat},${road[road.length - 1]!.lng}` : '');
 
   const { markers, route, points } = useMemo(() => {
-    const pts = stops.map((s) => ({ lat: s.lat, lng: s.lng }));
+    const pts = [...stops.map((s) => ({ lat: s.lat, lng: s.lng })), ...(road ?? [])];
     const mk: ZMapMarker[] = stops.map((s) => ({
       id: s.id,
       at: { lat: s.lat, lng: s.lng },
@@ -27,7 +29,7 @@ const GoongBookingMap: React.FC<BookingMapProps> = ({ stops, center, showsUserLo
       title: s.label,
       children: <MapMarkerView type={s.type} />,
     }));
-    return { markers: mk, points: pts, route: stops.filter((s) => s.type !== 'driver').map((s) => ({ lat: s.lat, lng: s.lng })) };
+    return { markers: mk, points: pts, route: road ?? stops.filter((s) => s.type !== 'driver').map((s) => ({ lat: s.lat, lng: s.lng })) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopsKey]);
 
@@ -37,7 +39,7 @@ const GoongBookingMap: React.FC<BookingMapProps> = ({ stops, center, showsUserLo
       initialCenter={initial}
       initialZoom={stops.length === 1 ? 15 : 14}
       markers={markers}
-      line={showRoute && route.length >= 2 ? { coords: route, color: Colors.primary, width: 4 } : null}
+      lines={showRoute && route.length >= 2 ? [{ id: 'route', coords: route, color: Colors.primary, width: 4 }] : []}
       insets={{ bottom: bottomPadding }}
       // "Chọn trên bản đồ": khách tự kéo — không canh lại khung (giữ mức phóng khách đang xem)
       fit={!onRegionChangeComplete && points.length ? { key: stopsKey, points, margin: FIT_MARGIN } : null}

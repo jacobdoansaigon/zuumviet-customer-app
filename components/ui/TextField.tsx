@@ -1,6 +1,6 @@
 // TextField — input theo Figma Form Components: nền xám #F2F2F2 bo 8, focus → nền trắng + viền lavender,
 // label trên + dấu (*) đỏ bên phải, nút xoá, suffix/icon phải, helper/error.
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   TextInput,
@@ -13,6 +13,7 @@ import {
 import { Colors, Spacing, BorderRadius, Sizes, NO_WEB_OUTLINE } from '@/constants/theme';
 import { AppText, fontStyle } from './Text';
 import { Icon, Icons, type IconName } from './Icon';
+import { useBlurOnLeave } from './useBlurOnLeave';
 
 export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   label?: string;
@@ -57,6 +58,8 @@ export const TextField: React.FC<TextFieldProps> = ({
   ...rest
 }) => {
   const [focused, setFocused] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+  useBlurOnLeave(inputRef);
   const hasValue = !!value && value.length > 0;
   const showClear = clearable && hasValue && focused && !disabled && !dropdown;
 
@@ -73,6 +76,7 @@ export const TextField: React.FC<TextFieldProps> = ({
       {iconLeft ? <Icon name={iconLeft} size={20} color={Colors.primary} style={styles.iconLeft} /> : null}
       <TextInput
         {...rest}
+        ref={inputRef}
         value={value}
         onChangeText={onChangeText}
         editable={editable ?? (!disabled && !dropdown)}
