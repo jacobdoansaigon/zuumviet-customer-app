@@ -11,7 +11,7 @@ import { addInsets, boundsOf, circleFeature, LINE_LAYERS, linesFeature, type ZMa
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
-  ({ style, initialCenter, initialZoom = 14, markers = [], lines, circle, insets, fit, interactive = true, onRegionChangeComplete }, ref) => {
+  ({ style, initialCenter, initialZoom = 14, markers = [], lines, circle, insets, fit, interactive = true, onRegionChangeComplete, onPress }, ref) => {
     const hostRef = useRef<View>(null);
     const mapRef = useRef<MapLibreMap | null>(null);
     const markerRefs = useRef(new Map<string, Marker>());
@@ -19,11 +19,13 @@ export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
     const [elements, setElements] = useState<Record<string, HTMLElement>>({});
     const onMoveEnd = useRef(onRegionChangeComplete);
     onMoveEnd.current = onRegionChangeComplete;
+    const onTap = useRef(onPress);
+    onTap.current = onPress;
     const padding = addInsets(insets);
     const paddingKey = `${padding.top},${padding.right},${padding.bottom},${padding.left}`;
 
     useImperativeHandle(ref, () => ({
-      flyTo: (c, zoom = 15) => mapRef.current?.easeTo({ center: [c.lng, c.lat], zoom, padding, duration: 500 }),
+      flyTo: (c, zoom) => mapRef.current?.easeTo({ center: [c.lng, c.lat], ...(zoom !== undefined ? { zoom } : {}), padding, duration: 500 }),
     }));
 
     // tạo bản đồ một lần
@@ -58,10 +60,13 @@ export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
         );
         setReady(true);
       });
-      map.on('moveend', () => {
+      // chỉ báo khi người dùng kéo / phóng (originalEvent) — setPadding / easeTo của chính bản đồ cũng phát moveend
+      map.on('moveend', (e) => {
+        if (!e.originalEvent) return;
         const c = map.getCenter();
         onMoveEnd.current?.({ lat: c.lat, lng: c.lng });
       });
+      map.on('click', (e) => onTap.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }));
       mapRef.current = map;
       const markersNow = markerRefs.current;
       return () => {

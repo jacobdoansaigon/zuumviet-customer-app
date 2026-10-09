@@ -48,11 +48,14 @@ export interface ZMapProps {
   showsUserLocation?: boolean;
   /** false = chỉ xem (không kéo / phóng) */
   interactive?: boolean;
-  /** kéo / phóng xong → toạ độ tâm phần nhìn thấy */
+  /** người dùng kéo / phóng xong → toạ độ tâm phần nhìn thấy (bản đồ tự di chuyển thì không báo — tránh vòng lặp) */
   onRegionChangeComplete?: (center: LatLng) => void;
+  /** chạm một điểm trên bản đồ */
+  onPress?: (point: LatLng) => void;
 }
 
 export interface ZMapHandle {
+  /** trượt tới điểm (zoom bỏ trống = giữ mức phóng hiện tại) */
   flyTo: (center: LatLng, zoom?: number) => void;
 }
 

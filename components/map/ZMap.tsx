@@ -18,7 +18,7 @@ import { addInsets, boundsOf, circleFeature, LINE_LAYERS, linesFeature, type ZMa
 
 export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
   (
-    { style, initialCenter, initialZoom = 14, markers = [], lines, circle, insets, fit, showsUserLocation = false, interactive = true, onRegionChangeComplete },
+    { style, initialCenter, initialZoom = 14, markers = [], lines, circle, insets, fit, showsUserLocation = false, interactive = true, onRegionChangeComplete, onPress },
     ref,
   ) => {
     const camera = useRef<CameraRef>(null);
@@ -27,8 +27,14 @@ export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
     const paddingKey = `${padding.top},${padding.right},${padding.bottom},${padding.left}`;
 
     useImperativeHandle(ref, () => ({
-      flyTo: (c, zoom = 15) => camera.current?.easeTo({ center: [c.lng, c.lat], zoom, padding, duration: 500 }),
+      flyTo: (c, zoom) => camera.current?.easeTo({ center: [c.lng, c.lat], ...(zoom !== undefined ? { zoom } : {}), padding, duration: 500 }),
     }));
+
+    // phần bị che đổi (vd khung thông tin cao lên) → tâm bản đồ vẫn là tâm phần nhìn thấy
+    useEffect(() => {
+      if (ready && !fit) void camera.current?.setStop({ padding, duration: 0 });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ready, paddingKey]);
 
     useEffect(() => {
       const cam = camera.current;
@@ -58,7 +64,14 @@ export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
         doubleTapHoldZoom={interactive}
         attributionPosition={{ bottom: padding.bottom + 4, left: 8 }}
         onDidFinishLoadingMap={() => setReady(true)}
-        onRegionDidChange={onRegionChangeComplete ? (e) => onRegionChangeComplete({ lng: e.nativeEvent.center[0], lat: e.nativeEvent.center[1] }) : undefined}
+        onRegionDidChange={
+          onRegionChangeComplete
+            ? (e) => {
+                if (e.nativeEvent.userInteraction) onRegionChangeComplete({ lng: e.nativeEvent.center[0], lat: e.nativeEvent.center[1] });
+              }
+            : undefined
+        }
+        onPress={onPress ? (e) => onPress({ lng: e.nativeEvent.lngLat[0], lat: e.nativeEvent.lngLat[1] }) : undefined}
       >
         <Camera ref={camera} initialViewState={{ center: [initialCenter.lng, initialCenter.lat], zoom: initialZoom, padding }} />
         {showsUserLocation ? <UserLocation /> : null}

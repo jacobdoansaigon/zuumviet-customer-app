@@ -1,7 +1,7 @@
-// app/booking/pick-on-map.tsx — "Chọn trên bản đồ": kéo bản đồ để ghim đúng vị trí (native: bản đồ tương tác thật,
-// tâm khung hình là vị trí đang chọn; web: bản đồ xem trước). Toạ độ ghim → địa chỉ chữ qua API
-// (GET /v1/customer/places/reverse) — toạ độ giữ nguyên như ghim, không "hút" về địa điểm mẫu.
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+// app/booking/pick-on-map.tsx — "Chọn trên bản đồ" (bản đồ Goong): ghim đứng yên giữa phần bản đồ nhìn thấy, kéo bản đồ
+// hoặc chạm vào một điểm để chọn vị trí. Toạ độ ghim → địa chỉ chữ qua API (GET /v1/customer/places/reverse) — toạ độ giữ
+// nguyên như ghim, không "hút" về địa điểm gần nhất. Chưa có Maptiles key → bản đồ minh hoạ (chọn bằng ô tìm kiếm).
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -13,6 +13,9 @@ import { reversePlace, type PlaceDetail } from '@/services/places';
 import { destinationCities, getIntercityCities } from '@/services/intercity';
 import { errorMessage } from '@/services/zuum';
 import { BookingMap, RoundIconButton, FlatFooter, type MapStop } from '@/components/booking';
+import { MapMarkerView, MARKER_SIZE } from '@/components/booking/MapMarkerView';
+import { ZMap } from '@/components/map/ZMap';
+import type { LatLng, ZMapHandle } from '@/components/map/types';
 import { mapsAvailable } from '@/services/maps';
 
 export default function PickOnMapScreen() {
@@ -36,6 +39,18 @@ export default function PickOnMapScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [pin, setPin] = useState(initialPin);
+  const mapRef = useRef<ZMapHandle>(null);
+  const [rootH, setRootH] = useState(0);
+  // bỏ qua "dời" < ~0,1 m (bản đồ báo lại đúng chỗ cũ) — không gọi đổi địa chỉ lặp lại
+  const movePin = useCallback((c: LatLng) => setPin((p) => (Math.abs(p.lat - c.lat) < 1e-6 && Math.abs(p.lng - c.lng) < 1e-6 ? p : c)), []);
+  // chạm một điểm → bản đồ trượt tới đó (ghim giữa khung) và chọn luôn điểm đó
+  const tapAt = useCallback(
+    (c: LatLng) => {
+      movePin(c);
+      mapRef.current?.flyTo(c);
+    },
+    [movePin],
+  );
   const [resolved, setResolved] = useState<PlaceDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,15 +109,39 @@ export default function PickOnMapScreen() {
     }
   };
 
+  const pinType = isReceiver ? 'dropoff' : 'pickup';
+  // tâm phần bản đồ nhìn thấy (trên khung thông tin) — ghim pin neo đáy, vòng tròn neo tâm
+  const centerY = (rootH - sheetH) / 2;
+
   return (
-    <View style={styles.root}>
-      <BookingMap stops={stops} center={pin} bottomPadding={sheetH} onRegionChangeComplete={setPin} />
+    <View style={styles.root} onLayout={(e) => setRootH(e.nativeEvent.layout.height)}>
+      {mapsAvailable ? (
+        <>
+          <ZMap
+            ref={mapRef}
+            style={StyleSheet.absoluteFill}
+            initialCenter={initialPin}
+            initialZoom={16}
+            insets={{ bottom: sheetH }}
+            showsUserLocation
+            onRegionChangeComplete={movePin}
+            onPress={tapAt}
+          />
+          {rootH > 0 ? (
+            <View pointerEvents="none" style={[styles.centerPin, { top: centerY - (pinType === 'dropoff' ? MARKER_SIZE : MARKER_SIZE / 2) }]}>
+              <MapMarkerView type={pinType} />
+            </View>
+          ) : null}
+        </>
+      ) : (
+        <BookingMap stops={stops} center={pin} bottomPadding={sheetH} />
+      )}
       <RoundIconButton icon={Icons.close} onPress={close} style={[styles.close, { top: insets.top + Spacing.md }]} accessibilityLabel="Đóng" />
 
       <View style={styles.sheet} onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}>
         <View style={styles.pinRow}>
           <Icon name={Icons.locationFilled} size={22} color={Colors.primary} />
-          <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+          <View style={styles.pinText}>
             <AppText size={15} weight="bold" numberOfLines={1}>
               {resolved?.name ?? 'Vị trí trên bản đồ'}
             </AppText>
@@ -127,7 +166,7 @@ export default function PickOnMapScreen() {
           </View>
         </View>
         <AppText size={11} color={Colors.textMuted} style={styles.hint}>
-          {mapsAvailable ? 'Kéo bản đồ để tinh chỉnh đúng vị trí — ghim luôn ở giữa khung hình' : 'Bản đồ minh hoạ — chọn địa chỉ bằng ô tìm kiếm để chính xác hơn'}
+          {mapsAvailable ? 'Kéo bản đồ hoặc chạm vào một điểm để chọn — ghim luôn ở giữa khung hình' : 'Bản đồ minh hoạ — chọn địa chỉ bằng ô tìm kiếm để chính xác hơn'}
         </AppText>
         <FlatFooter title="Chọn vị trí này" disabled={!resolved || loading} onPress={confirm} />
       </View>
@@ -148,6 +187,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: BorderRadius.xl,
     ...Shadow.lg,
   },
+  centerPin: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   pinRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: Spacing.screen, paddingTop: Spacing.md },
+  // cao cố định (tên + 2 dòng địa chỉ): khung không đổi chiều cao khi "đang xác định" ↔ địa chỉ → bản đồ không giật
+  pinText: { flex: 1, marginLeft: Spacing.sm, minHeight: 60 },
   hint: { paddingHorizontal: Spacing.screen, paddingTop: Spacing.sm, paddingBottom: Spacing.sm },
 });
