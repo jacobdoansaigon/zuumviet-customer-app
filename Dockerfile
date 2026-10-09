@@ -4,7 +4,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-ARG EXPO_PUBLIC_API_URL=https://zuumviet-api-production.up.railway.app
+# địa chỉ API (bắt buộc) — Railway truyền từ biến của service; staging: https://api-staging-f33d.up.railway.app
+ARG EXPO_PUBLIC_API_URL
 ENV EXPO_PUBLIC_API_URL=$EXPO_PUBLIC_API_URL
 RUN npx expo export -p web
 
