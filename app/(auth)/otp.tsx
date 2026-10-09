@@ -210,10 +210,10 @@ export default function OtpScreen() {
         </View>
 
         {flow?.debugCode ? (
-          // Bản dev: server trả debugCode — chạm để điền nhanh
+          // Dev/staging: server trả debugCode — chạm để điền nhanh
           <Pressable onPress={() => setOtp(flow.debugCode ?? '')} style={styles.debug} hitSlop={6}>
             <AppText size={12} color={Colors.textMuted} align="center">
-              Mã OTP (debug): {flow.debugCode}
+              Mã OTP thử nghiệm: {flow.debugCode} (chạm để điền)
             </AppText>
           </Pressable>
         ) : null}

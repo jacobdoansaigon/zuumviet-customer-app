@@ -96,7 +96,8 @@ export async function requestOtp(phone: string, intent: AuthIntent): Promise<Aut
     intent,
     challengeId: res.challengeId,
     resendAfter: res.resendAfter,
-    debugCode: __DEV__ && res.debugCode ? res.debugCode : null,
+    // server chỉ trả debugCode ở dev/staging (production không bao giờ) → APK thử trên staging đăng nhập được khi chưa có SMS
+    debugCode: res.debugCode ?? null,
     verificationToken: null,
     verificationExpiresAt: null,
   });
