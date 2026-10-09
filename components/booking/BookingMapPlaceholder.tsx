@@ -1,5 +1,5 @@
-// BookingMap (web) — react-native-maps không chạy trên web → vẽ nền bản đồ giả (Colors.mapBg + đường phố)
-// và chiếu toạ độ các điểm vào khung để vẫn thấy lộ trình khi demo trên trình duyệt.
+// BookingMapPlaceholder — chưa có Maptiles key Goong (bản build chưa cấu hình bản đồ): vẽ nền bản đồ giả
+// (Colors.mapBg + đường phố) và chiếu toạ độ các điểm vào khung để vẫn thấy lộ trình.
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, type LayoutChangeEvent } from 'react-native';
 import { Colors, Spacing } from '@/constants/theme';
@@ -58,7 +58,7 @@ function routeDots(pts: Pt[]): { x: number; y: number; k: string }[] {
   return dots;
 }
 
-export const BookingMap: React.FC<BookingMapProps> = ({ stops, showRoute = true, bottomPadding = 0, style }) => {
+export const BookingMapPlaceholder: React.FC<BookingMapProps> = ({ stops, showRoute = true, bottomPadding = 0, style }) => {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const onLayout = (e: LayoutChangeEvent) => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height });
   const pts = useMemo(() => project(stops, size.w, size.h, bottomPadding), [stops, size.w, size.h, bottomPadding]);
@@ -88,7 +88,7 @@ export const BookingMap: React.FC<BookingMapProps> = ({ stops, showRoute = true,
       ))}
       <View style={[styles.note, { bottom: bottomPadding + Spacing.sm }]}>
         <AppText size={11} color={Colors.textMuted}>
-          Bản đồ tương tác hiển thị trên ứng dụng di động
+          Bản đồ minh hoạ — chưa bật bản đồ Goong
         </AppText>
       </View>
     </View>
@@ -104,4 +104,4 @@ const styles = StyleSheet.create({
   note: { position: 'absolute', left: Spacing.screen, backgroundColor: 'rgba(255,255,255,0.8)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
 });
 
-export default BookingMap;
+export default BookingMapPlaceholder;

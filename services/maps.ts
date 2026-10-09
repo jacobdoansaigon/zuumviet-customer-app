@@ -1,9 +1,11 @@
-// services/maps.ts — bản đồ native có dùng được không.
-// Android: react-native-maps chạy trên Google Maps SDK — APK build thiếu API key (android.config.googleMaps.apiKey,
-// đưa vào lúc build từ biến GOOGLE_MAPS_ANDROID_API_KEY trong app.config.ts → cờ extra.hasGoogleMapsKey) thì MapView làm app THOÁT ngay khi mở bản đồ.
-// Khi chưa có key → các màn dùng bản đồ thay thế (giống bản web) để app không thoát. iOS dùng Apple Maps, không cần key.
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+// Bản đồ Goong: nền bản đồ cần Maptiles key (key hiển thị, nằm trong app nên coi là công khai) — đưa vào lúc build qua
+// EXPO_PUBLIC_GOONG_MAPTILES_KEY (EAS env của project / biến build Railway / .env khi chạy dev).
+// Chưa có key → các màn bản đồ dùng bản đồ thay thế (vẽ giả), app vẫn chạy bình thường.
+const KEY = process.env.EXPO_PUBLIC_GOONG_MAPTILES_KEY ?? '';
+// chỉ để thử khi chưa có key Goong (vd style OpenFreeMap) — bản phát hành không đặt biến này
+const STYLE_OVERRIDE = process.env.EXPO_PUBLIC_MAP_STYLE_URL ?? '';
 
-// cờ do app.config.ts đặt (android.config chứa khoá bị Expo loại khỏi cấu hình đọc được lúc chạy)
-export const nativeMapsAvailable: boolean = Platform.OS !== 'android' || Constants.expoConfig?.extra?.hasGoogleMapsKey === true;
+export const goongStyleUrl: string | null =
+  STYLE_OVERRIDE || (KEY ? `https://tiles.goong.io/assets/goong_map_web.json?api_key=${encodeURIComponent(KEY)}` : null);
+
+export const mapsAvailable = goongStyleUrl !== null;

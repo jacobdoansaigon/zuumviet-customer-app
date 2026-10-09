@@ -7,6 +7,8 @@ COPY . .
 # địa chỉ API (bắt buộc) — Railway truyền từ biến của service; staging: https://api-staging-f33d.up.railway.app
 ARG EXPO_PUBLIC_API_URL
 ENV EXPO_PUBLIC_API_URL=$EXPO_PUBLIC_API_URL
+ARG EXPO_PUBLIC_GOONG_MAPTILES_KEY
+ENV EXPO_PUBLIC_GOONG_MAPTILES_KEY=$EXPO_PUBLIC_GOONG_MAPTILES_KEY
 RUN npx expo export -p web
 
 FROM node:22-alpine

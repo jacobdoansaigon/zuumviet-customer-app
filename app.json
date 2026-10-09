@@ -64,7 +64,8 @@
           "cameraPermission": "Ứng dụng cần camera để quét mã QR của tài xế."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@maplibre/maplibre-react-native"
     ],
     "extra": {
       "router": {},

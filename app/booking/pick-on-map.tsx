@@ -13,6 +13,7 @@ import { reversePlace, type PlaceDetail } from '@/services/places';
 import { destinationCities, getIntercityCities } from '@/services/intercity';
 import { errorMessage } from '@/services/zuum';
 import { BookingMap, RoundIconButton, FlatFooter, type MapStop } from '@/components/booking';
+import { mapsAvailable } from '@/services/maps';
 
 export default function PickOnMapScreen() {
   const { target, index: indexParam, back } = useLocalSearchParams<{ target?: string; index?: string; back?: string }>();
@@ -126,7 +127,7 @@ export default function PickOnMapScreen() {
           </View>
         </View>
         <AppText size={11} color={Colors.textMuted} style={styles.hint}>
-          Trên ứng dụng di động: kéo bản đồ để tinh chỉnh đúng vị trí — ghim luôn ở giữa khung hình
+          {mapsAvailable ? 'Kéo bản đồ để tinh chỉnh đúng vị trí — ghim luôn ở giữa khung hình' : 'Bản đồ minh hoạ — chọn địa chỉ bằng ô tìm kiếm để chính xác hơn'}
         </AppText>
         <FlatFooter title="Chọn vị trí này" disabled={!resolved || loading} onPress={confirm} />
       </View>

@@ -1684,7 +1684,7 @@ export interface ZuumRoutes {
       scheduledAt: null | string;
       distanceMeters: number;
       durationSeconds: null | number;
-      distanceSource: "none" | "google" | "estimate";
+      distanceSource: "none" | "goong" | "estimate";
       price: {
         lines: Array<{
           code: string;
@@ -1720,7 +1720,7 @@ export interface ZuumRoutes {
       scheduledAt: null | string;
       distanceMeters: number;
       durationSeconds: null | number;
-      distanceSource: "none" | "google" | "estimate";
+      distanceSource: "none" | "goong" | "estimate";
       price: {
         lines: Array<{
           code: string;
