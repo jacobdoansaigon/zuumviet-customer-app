@@ -14,8 +14,9 @@
     "android": {
       "package": "vn.zuumviet.customer",
       "adaptiveIcon": {
-        "backgroundColor": "#6B35D4",
-        "foregroundImage": "./assets/icon.png"
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png",
+        "backgroundColor": "#602C81"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -46,8 +47,8 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
-          "color": "#6B35D4"
+          "icon": "./assets/notification-icon.png",
+          "color": "#602C81"
         }
       ],
       [

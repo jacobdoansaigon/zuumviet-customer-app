@@ -1,8 +1,16 @@
-// Logo — biểu tượng ZuumViet (pin định vị chứa chữ Z) + wordmark. Vẽ bằng View để không cần asset.
+// Logo — logo ZuumViet chính thức (ghim định vị chứa chữ Z + ngôi sao, lấy từ trang quản trị cũ) + wordmark.
+// Ảnh gốc: assets/logo.png (tím #602C81) và assets/logo-white.png (trắng, dùng trên nền tím).
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { Image, View, StyleSheet } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { AppText } from './Text';
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const LOGO = require('../../assets/logo.png');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const LOGO_WHITE = require('../../assets/logo-white.png');
+/** cao / rộng của logo gốc (1212 × 1004 px) */
+const RATIO = 1212 / 1004;
 
 interface LogoProps {
   size?: number;
@@ -12,34 +20,15 @@ interface LogoProps {
   wordmark?: string;
 }
 
-export const LogoMark: React.FC<{ size?: number; tone?: 'purple' | 'white' }> = ({ size = 72, tone = 'purple' }) => {
-  const fill = tone === 'purple' ? Colors.primary : Colors.white;
-  const inner = tone === 'purple' ? Colors.white : Colors.primary;
-  return (
-    <View style={{ width: size, height: size * 1.2, alignItems: 'center' }}>
-      <View style={[styles.head, { width: size, height: size, borderRadius: size / 2, backgroundColor: fill }]}>
-        <View style={[styles.innerCircle, { width: size * 0.72, height: size * 0.72, borderRadius: size * 0.36, backgroundColor: inner }]}>
-          <AppText weight="black" size={size * 0.46} color={fill} style={{ lineHeight: size * 0.52, fontStyle: 'italic' }}>
-            Z
-          </AppText>
-        </View>
-        <View style={[styles.spark, { top: size * 0.16, right: size * 0.16, width: size * 0.12, height: size * 0.12, backgroundColor: inner }]} />
-      </View>
-      <View
-        style={[
-          styles.tail,
-          {
-            width: size * 0.5,
-            height: size * 0.5,
-            backgroundColor: fill,
-            marginTop: -size * 0.32,
-            borderBottomRightRadius: size * 0.1,
-          },
-        ]}
-      />
-    </View>
-  );
-};
+/** Riêng biểu tượng: rộng `size`, cao ≈ 1,2 × size */
+export const LogoMark: React.FC<{ size?: number; tone?: 'purple' | 'white' }> = ({ size = 72, tone = 'purple' }) => (
+  <Image
+    source={tone === 'white' ? LOGO_WHITE : LOGO}
+    style={{ width: size, height: size * RATIO }}
+    resizeMode="contain"
+    accessibilityLabel="ZuumViet"
+  />
+);
 
 export const Logo: React.FC<LogoProps> = ({ size = 72, tone = 'purple', showWordmark = true, wordmark = 'zuumviet' }) => {
   const color = tone === 'purple' ? Colors.primary : Colors.white;
@@ -47,7 +36,7 @@ export const Logo: React.FC<LogoProps> = ({ size = 72, tone = 'purple', showWord
     <View style={styles.wrap}>
       <LogoMark size={size} tone={tone} />
       {showWordmark ? (
-        <AppText weight="extraBold" size={size * 0.4} color={color} style={{ marginTop: 2, letterSpacing: -0.5 }}>
+        <AppText weight="extraBold" size={size * 0.4} color={color} style={{ marginTop: 4, letterSpacing: -0.5 }}>
           {wordmark}
         </AppText>
       ) : null}
@@ -57,10 +46,6 @@ export const Logo: React.FC<LogoProps> = ({ size = 72, tone = 'purple', showWord
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center' },
-  head: { alignItems: 'center', justifyContent: 'center', zIndex: 2 },
-  innerCircle: { alignItems: 'center', justifyContent: 'center' },
-  spark: { position: 'absolute', transform: [{ rotate: '45deg' }], borderRadius: 2 },
-  tail: { transform: [{ rotate: '45deg' }], zIndex: 1 },
 });
 
 export default Logo;
