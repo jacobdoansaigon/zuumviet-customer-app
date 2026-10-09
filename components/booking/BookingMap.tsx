@@ -7,8 +7,10 @@ import { Colors } from '@/constants/theme';
 import { HCM_CENTER } from '@/constants/booking';
 import { MapMarkerView, MARKER_SIZE } from './MapMarkerView';
 import type { BookingMapProps } from './mapTypes';
+import { BookingMap as BookingMapFallback } from './BookingMap.web';
+import { nativeMapsAvailable } from '@/services/maps';
 
-export const BookingMap: React.FC<BookingMapProps> = ({ stops, center, showsUserLocation = true, showRoute = true, bottomPadding = 0, style, onRegionChangeComplete }) => {
+const NativeBookingMap: React.FC<BookingMapProps> = ({ stops, center, showsUserLocation = true, showRoute = true, bottomPadding = 0, style, onRegionChangeComplete }) => {
   const ref = useRef<MapView | null>(null);
   const [ready, setReady] = useState(false);
   const first = stops[0];
@@ -66,5 +68,9 @@ export const BookingMap: React.FC<BookingMapProps> = ({ stops, center, showsUser
     </MapView>
   );
 };
+
+/** Android chưa có Google Maps API key → MapView làm app thoát: dùng bản đồ thay thế (như bản web) */
+export const BookingMap: React.FC<BookingMapProps> = (props) =>
+  nativeMapsAvailable ? <NativeBookingMap {...props} /> : <BookingMapFallback {...props} />;
 
 export default BookingMap;
