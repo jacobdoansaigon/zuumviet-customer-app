@@ -360,7 +360,7 @@ export const POLICIES: PolicyItem[] = [
     paragraphs: [
       'Trở thành đối tác tài xế ZuumViet để gia tăng thu nhập với lịch làm việc linh hoạt.',
       'Yêu cầu: từ 18 tuổi, có CMND/CCCD, bằng lái phù hợp và phương tiện đăng ký chính chủ hoặc có uỷ quyền.',
-      'Tải ứng dụng ZUUMDRIVER và đăng ký trong 5 bước — đội ngũ ZuumViet sẽ duyệt hồ sơ trong 24 giờ.',
+      'Tải ứng dụng Zuum Đối tác và đăng ký trong 5 bước — đội ngũ ZuumViet sẽ duyệt hồ sơ trong 24 giờ.',
     ],
   },
 ];

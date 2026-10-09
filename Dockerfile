@@ -1,4 +1,4 @@
-# ZUUMCUSTOMER Expo Web — static export served on $PORT
+# ZuumViet (app khách) Expo Web — static export served on $PORT
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./

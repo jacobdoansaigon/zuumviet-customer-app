@@ -1,4 +1,4 @@
-# ZUUMCUSTOMER — App khách hàng ZuumViet
+# ZuumViet — App khách hàng
 
 Luồng **khách hàng** (không phải tài xế):
 

@@ -1,4 +1,4 @@
-// Root layout — ZUUMCUSTOMER: load font Mulish, SafeAreaProvider, StatusBar, Stack không header.
+// Root layout — ZuumViet (app khách): load font Mulish, SafeAreaProvider, StatusBar, Stack không header.
 // Không liệt kê từng Stack.Screen để mọi route trong app/ đều hoạt động.
 // Toàn app: push + đăng ký thiết bị (useNotifications), kết nối realtime khi đã đăng nhập (useRealtimeConnection),
 // hết phiên đăng nhập (làm mới token thất bại) → về màn đăng nhập.
