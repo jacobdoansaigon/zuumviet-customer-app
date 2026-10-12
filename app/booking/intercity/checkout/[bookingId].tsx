@@ -9,7 +9,7 @@ import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { AppHeader, AppText, Button, Dialog, EmptyState, ErrorSheet, Icon, Icons, Radio, Screen, SwitchRow, TextField } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { PaymentSheet } from '@/components/booking';
-import { confirmBooking, getBooking, releaseHold, vnDateLabel, vnTime, type IntercityBooking } from '@/services/intercity';
+import { bulkyDm3Of, confirmBooking, getBooking, luggageFee, luggagePolicyLines, releaseHold, vnDateLabel, vnTime, type BulkyDims, type IntercityBooking, type LuggageFee } from '@/services/intercity';
 import { formatVnd, isValidPhoneVn, type PaymentMethod } from '@/services/bookingStore';
 import { getProfile, localPhone } from '@/services/session';
 import { errorMessage, isApiError, toZuumError } from '@/services/zuum';
@@ -39,7 +39,12 @@ export default function TicketCheckoutScreen() {
   const [pickupAddress, setPickupAddress] = useState('');
   const [dropoff, setDropoff] = useState<Where>('station');
   const [dropoffAddress, setDropoffAddress] = useState('');
+  // hàng gửi kèm: tổng kg hành lý thường + một kiện cồng kềnh (D×R×C cm) + ghi chú
   const [withCargo, setWithCargo] = useState(false);
+  const [luggageKgText, setLuggageKgText] = useState('');
+  const luggageKg = Math.min(999, Number(luggageKgText) || 0);
+  const [bulkyOn, setBulkyOn] = useState(false);
+  const [dims, setDims] = useState({ l: '', w: '', h: '' });
   const [cargoNote, setCargoNote] = useState('');
   const [payment, setPayment] = useState<PaymentMethod>('cash');
   const [paySheet, setPaySheet] = useState(false);
@@ -108,13 +113,27 @@ export default function TicketCheckoutScreen() {
   const trip = booking.trip;
   const expired = left <= 0;
   const seatsCost = booking.unitPrice * booking.seatIds.length;
-  const cargoCost = withCargo ? (trip.cargoFee ?? 0) : 0;
+  const policy = trip.luggagePolicy;
+  const bulkyDims: BulkyDims | null =
+    withCargo && bulkyOn && Number(dims.l) > 0 && Number(dims.w) > 0 && Number(dims.h) > 0
+      ? { lengthCm: Math.round(Number(dims.l)), widthCm: Math.round(Number(dims.w)), heightCm: Math.round(Number(dims.h)) }
+      : null;
+  let luggage: LuggageFee = { extraKg: 0, luggage: 0, bulkyDm3: 0, bulky: 0 };
+  let luggageError: string | null = null;
+  try {
+    luggage = luggageFee(policy, { kg: withCargo ? luggageKg : 0, bulky: bulkyDims });
+  } catch (e) {
+    luggageError = (e as Error).message;
+  }
+  const bulkyIncomplete = withCargo && bulkyOn && !bulkyDims;
   const pickupCost = pickup === 'home' ? (trip.homePickupFee ?? 0) : 0;
   const dropoffCost = dropoff === 'home' ? (trip.homeDropoffFee ?? 0) : 0;
-  const total = seatsCost + cargoCost + pickupCost + dropoffCost;
+  const total = seatsCost + luggage.luggage + luggage.bulky + pickupCost + dropoffCost;
   const phoneOk = isValidPhoneVn(phone);
   const ready =
     !expired &&
+    !luggageError &&
+    !bulkyIncomplete &&
     name.trim().length >= 2 &&
     phoneOk &&
     (pickup === 'station' || pickupAddress.trim().length >= 5) &&
@@ -135,8 +154,7 @@ export default function TicketCheckoutScreen() {
         paymentMethod: payment,
         contactName: name.trim(),
         contactPhone: phone.replace(/[\s.-]/g, ''),
-        withCargo,
-        ...(withCargo && cargoNote.trim() ? { cargoNote: cargoNote.trim() } : {}),
+        ...(withCargo ? { luggage: { kg: luggageKg, bulky: bulkyDims, ...(cargoNote.trim() ? { note: cargoNote.trim() } : {}) } } : {}),
         pickup: pickup === 'home' ? { type: 'home', address: pickupAddress.trim() } : { type: 'station' },
         dropoff: dropoff === 'home' ? { type: 'home', address: dropoffAddress.trim() } : { type: 'station' },
       });
@@ -267,17 +285,68 @@ export default function TicketCheckoutScreen() {
           <AppText size={15} weight="bold">
             Hàng hoá gửi kèm
           </AppText>
-          {trip.cargoFee != null ? (
+          {policy ? (
             <>
-              <SwitchRow
-                icon={Icons.box}
-                label="Gửi thêm hàng hoá"
-                sublabel={trip.cargoFee > 0 ? `Phụ thu ${formatVnd(trip.cargoFee)}` : 'Miễn phí'}
-                value={withCargo}
-                onValueChange={setWithCargo}
-              />
+              <SwitchRow icon={Icons.box} label="Gửi kèm hàng hoá" sublabel={luggagePolicyLines(policy)[0]} value={withCargo} onValueChange={setWithCargo} />
               {withCargo ? (
-                <TextField value={cargoNote} onChangeText={setCargoNote} placeholder="Mô tả hàng hoá (loại hàng, kích thước ước tính...)" maxLength={300} />
+                <>
+                  <TextField
+                    label="Tổng hành lý (kg)"
+                    value={luggageKgText}
+                    onChangeText={(v) => setLuggageKgText(v.replace(/[^0-9]/g, '').slice(0, 3))}
+                    placeholder={`VD: 25 (miễn phí tới ${policy.freeKg} kg)`}
+                    keyboardType="number-pad"
+                    helper={
+                      luggageError && !bulkyOn
+                        ? luggageError
+                        : luggage.extraKg > 0
+                          ? `Vượt ${luggage.extraKg} kg · phụ thu ${formatVnd(luggage.luggage)}`
+                          : `Miễn phí tới ${policy.freeKg} kg, tối đa ${policy.maxKg} kg mỗi vé`
+                    }
+                    error={luggageError && !bulkyOn ? luggageError : undefined}
+                    containerStyle={{ marginTop: Spacing.sm }}
+                  />
+                  {policy.bulkyPerM3Fare !== null ? (
+                    <>
+                      <SwitchRow
+                        icon={'mci:package-variant' as never}
+                        label="Có kiện cồng kềnh"
+                        sublabel={luggagePolicyLines(policy)[1]}
+                        value={bulkyOn}
+                        onValueChange={setBulkyOn}
+                        style={{ marginTop: Spacing.sm }}
+                      />
+                      {bulkyOn ? (
+                        <>
+                          <View style={styles.dimsRow}>
+                            {(['l', 'w', 'h'] as const).map((k, i) => (
+                              <TextField
+                                key={k}
+                                value={dims[k]}
+                                onChangeText={(v) => setDims((d) => ({ ...d, [k]: v.replace(/[^0-9]/g, '') }))}
+                                placeholder={['Dài', 'Rộng', 'Cao'][i]}
+                                keyboardType="number-pad"
+                                maxLength={3}
+                                containerStyle={{ flex: 1, marginTop: 0 }}
+                              />
+                            ))}
+                            <AppText size={13} color={Colors.textSecondary} style={{ marginLeft: 4 }}>
+                              cm
+                            </AppText>
+                          </View>
+                          <AppText size={12} color={luggageError ? Colors.error : Colors.textSecondary} style={{ marginTop: 4 }}>
+                            {luggageError
+                              ? luggageError
+                              : bulkyDims
+                                ? `${(bulkyDm3Of(bulkyDims) / 1000).toFixed(2).replace('.', ',')} m³ → phụ thu ${formatVnd(luggage.bulky)}`
+                                : 'Nhập kích thước kiện hàng để tính phí'}
+                          </AppText>
+                        </>
+                      ) : null}
+                    </>
+                  ) : null}
+                  <TextField value={cargoNote} onChangeText={setCargoNote} placeholder="Mô tả hàng hoá (loại hàng, lưu ý khi xếp...)" maxLength={300} />
+                </>
               ) : null}
             </>
           ) : (
@@ -302,7 +371,8 @@ export default function TicketCheckoutScreen() {
 
         <View style={styles.card}>
           <PriceRow label={`Vé × ${booking.seatIds.length}`} value={seatsCost} />
-          {cargoCost ? <PriceRow label="Phụ thu hàng hoá" value={cargoCost} /> : null}
+          {luggage.luggage ? <PriceRow label={`Hành lý vượt ${luggage.extraKg} kg`} value={luggage.luggage} /> : null}
+          {luggage.bulky ? <PriceRow label="Hàng cồng kềnh" value={luggage.bulky} /> : null}
           {pickupCost ? <PriceRow label="Đón tận nơi" value={pickupCost} /> : null}
           {dropoffCost ? <PriceRow label="Trả tận nơi" value={dropoffCost} /> : null}
           <View style={styles.totalRow}>
@@ -347,6 +417,7 @@ const PriceRow: React.FC<{ label: string; value: number }> = ({ label, value }) 
 );
 
 const styles = StyleSheet.create({
+  dimsRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginTop: Spacing.sm },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   body: { padding: Spacing.screen, gap: Spacing.md },
   timer: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderRadius: BorderRadius.md, backgroundColor: Colors.primaryBg },

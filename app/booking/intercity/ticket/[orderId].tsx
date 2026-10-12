@@ -132,7 +132,14 @@ export default function IntercityTicketScreen() {
           <Row label="Ghế" value={booking.seatIds.join(', ')} />
           <Row label="Điểm đón" value={whereLabel(booking.pickup, trip.from.station)} />
           <Row label="Điểm trả" value={whereLabel(booking.dropoff, trip.to.station)} />
-          <Row label="Hàng hoá đi kèm" value={booking.withCargo ? booking.cargoNote || 'Có' : 'Không'} />
+          <Row
+            label="Hàng hoá gửi kèm"
+            value={
+              booking.withCargo
+                ? [booking.luggage.kg ? `${booking.luggage.kg} kg hành lý` : '', booking.luggage.bulkyDims ? `kiện ${booking.luggage.bulkyDims}` : '', booking.luggage.note ?? ''].filter(Boolean).join(' · ') || 'Có'
+                : 'Không'
+            }
+          />
           {booking.contactName ? <Row label="Người đi" value={`${booking.contactName} · ${formatPhone(booking.contactPhone)}`} /> : null}
           {booking.paymentMethod ? <Row label="Thanh toán" value={booking.paymentMethod === 'wallet' ? 'Ví ZuumViet' : 'Tiền mặt khi lên xe'} /> : null}
           {booking.cancelReason ? <Row label="Lý do huỷ" value={booking.cancelReason} /> : null}
@@ -142,7 +149,8 @@ export default function IntercityTicketScreen() {
           {price ? (
             <>
               <Row label={`Vé × ${booking.seatIds.length}`} value={formatVnd(price.seats)} />
-              {price.cargo ? <Row label="Phụ thu hàng hoá" value={formatVnd(price.cargo)} /> : null}
+              {price.luggage ? <Row label={`Hành lý vượt ${price.extraKg} kg`} value={formatVnd(price.luggage)} /> : null}
+              {price.bulky ? <Row label="Hàng cồng kềnh" value={formatVnd(price.bulky)} /> : null}
               {price.pickup ? <Row label="Đón tận nơi" value={formatVnd(price.pickup)} /> : null}
               {price.dropoff ? <Row label="Trả tận nơi" value={formatVnd(price.dropoff)} /> : null}
             </>

@@ -367,8 +367,20 @@ export interface ZuumRoutes {
             name: null | string;
             color: null | string;
             plate: null | string;
+            photos: null | {
+              exterior: string[];
+              interior: string[];
+              credit?: null | string;
+            };
           };
-          cargoFee: null | number;
+          luggagePolicy: null | {
+            freeKg: number;
+            perKgFare: number;
+            maxKg: number;
+            bulkyPerM3Fare: null | number;
+            bulkyMaxDm3: number;
+            bulkyMaxSideCm: number;
+          };
           homePickupFee: null | number;
           homeDropoffFee: null | number;
           note: null | string;
@@ -380,7 +392,10 @@ export interface ZuumRoutes {
         unitPrice: number;
         price: null | {
           seats: number;
-          cargo: number;
+          luggage: number;
+          extraKg: number;
+          bulky: number;
+          bulkyDm3: number;
           pickup: number;
           dropoff: number;
           total: number;
@@ -389,6 +404,12 @@ export interface ZuumRoutes {
         paymentMethod: null | "cash" | "wallet";
         withCargo: boolean;
         cargoNote: null | string;
+        luggage: {
+          kg: number;
+          bulkyDm3: number;
+          bulkyDims: null | string;
+          note: null | string;
+        };
         pickup: {
           type: string;
           address: null | string;
@@ -445,8 +466,20 @@ export interface ZuumRoutes {
           name: null | string;
           color: null | string;
           plate: null | string;
+          photos: null | {
+            exterior: string[];
+            interior: string[];
+            credit?: null | string;
+          };
         };
-        cargoFee: null | number;
+        luggagePolicy: null | {
+          freeKg: number;
+          perKgFare: number;
+          maxKg: number;
+          bulkyPerM3Fare: null | number;
+          bulkyMaxDm3: number;
+          bulkyMaxSideCm: number;
+        };
         homePickupFee: null | number;
         homeDropoffFee: null | number;
         note: null | string;
@@ -458,7 +491,10 @@ export interface ZuumRoutes {
       unitPrice: number;
       price: null | {
         seats: number;
-        cargo: number;
+        luggage: number;
+        extraKg: number;
+        bulky: number;
+        bulkyDm3: number;
         pickup: number;
         dropoff: number;
         total: number;
@@ -467,6 +503,12 @@ export interface ZuumRoutes {
       paymentMethod: null | "cash" | "wallet";
       withCargo: boolean;
       cargoNote: null | string;
+      luggage: {
+        kg: number;
+        bulkyDm3: number;
+        bulkyDims: null | string;
+        note: null | string;
+      };
       pickup: {
         type: string;
         address: null | string;
@@ -519,8 +561,20 @@ export interface ZuumRoutes {
           name: null | string;
           color: null | string;
           plate: null | string;
+          photos: null | {
+            exterior: string[];
+            interior: string[];
+            credit?: null | string;
+          };
         };
-        cargoFee: null | number;
+        luggagePolicy: null | {
+          freeKg: number;
+          perKgFare: number;
+          maxKg: number;
+          bulkyPerM3Fare: null | number;
+          bulkyMaxDm3: number;
+          bulkyMaxSideCm: number;
+        };
         homePickupFee: null | number;
         homeDropoffFee: null | number;
         note: null | string;
@@ -532,7 +586,10 @@ export interface ZuumRoutes {
       unitPrice: number;
       price: null | {
         seats: number;
-        cargo: number;
+        luggage: number;
+        extraKg: number;
+        bulky: number;
+        bulkyDm3: number;
         pickup: number;
         dropoff: number;
         total: number;
@@ -541,6 +598,12 @@ export interface ZuumRoutes {
       paymentMethod: null | "cash" | "wallet";
       withCargo: boolean;
       cargoNote: null | string;
+      luggage: {
+        kg: number;
+        bulkyDm3: number;
+        bulkyDims: null | string;
+        note: null | string;
+      };
       pickup: {
         type: string;
         address: null | string;
@@ -565,6 +628,15 @@ export interface ZuumRoutes {
       paymentMethod: "cash" | "wallet";
       contactName: string;
       contactPhone: string;
+      luggage?: {
+        kg?: number;
+        bulky?: null | {
+          lengthCm: number;
+          widthCm: number;
+          heightCm: number;
+        };
+        note?: string;
+      };
       withCargo?: boolean;
       cargoNote?: string;
       pickup?: {
@@ -608,8 +680,20 @@ export interface ZuumRoutes {
           name: null | string;
           color: null | string;
           plate: null | string;
+          photos: null | {
+            exterior: string[];
+            interior: string[];
+            credit?: null | string;
+          };
         };
-        cargoFee: null | number;
+        luggagePolicy: null | {
+          freeKg: number;
+          perKgFare: number;
+          maxKg: number;
+          bulkyPerM3Fare: null | number;
+          bulkyMaxDm3: number;
+          bulkyMaxSideCm: number;
+        };
         homePickupFee: null | number;
         homeDropoffFee: null | number;
         note: null | string;
@@ -621,7 +705,10 @@ export interface ZuumRoutes {
       unitPrice: number;
       price: null | {
         seats: number;
-        cargo: number;
+        luggage: number;
+        extraKg: number;
+        bulky: number;
+        bulkyDm3: number;
         pickup: number;
         dropoff: number;
         total: number;
@@ -630,6 +717,12 @@ export interface ZuumRoutes {
       paymentMethod: null | "cash" | "wallet";
       withCargo: boolean;
       cargoNote: null | string;
+      luggage: {
+        kg: number;
+        bulkyDm3: number;
+        bulkyDims: null | string;
+        note: null | string;
+      };
       pickup: {
         type: string;
         address: null | string;
@@ -683,8 +776,20 @@ export interface ZuumRoutes {
           name: null | string;
           color: null | string;
           plate: null | string;
+          photos: null | {
+            exterior: string[];
+            interior: string[];
+            credit?: null | string;
+          };
         };
-        cargoFee: null | number;
+        luggagePolicy: null | {
+          freeKg: number;
+          perKgFare: number;
+          maxKg: number;
+          bulkyPerM3Fare: null | number;
+          bulkyMaxDm3: number;
+          bulkyMaxSideCm: number;
+        };
         homePickupFee: null | number;
         homeDropoffFee: null | number;
         note: null | string;
@@ -696,7 +801,10 @@ export interface ZuumRoutes {
       unitPrice: number;
       price: null | {
         seats: number;
-        cargo: number;
+        luggage: number;
+        extraKg: number;
+        bulky: number;
+        bulkyDm3: number;
         pickup: number;
         dropoff: number;
         total: number;
@@ -705,6 +813,12 @@ export interface ZuumRoutes {
       paymentMethod: null | "cash" | "wallet";
       withCargo: boolean;
       cargoNote: null | string;
+      luggage: {
+        kg: number;
+        bulkyDm3: number;
+        bulkyDims: null | string;
+        note: null | string;
+      };
       pickup: {
         type: string;
         address: null | string;
@@ -761,8 +875,20 @@ export interface ZuumRoutes {
           name: null | string;
           color: null | string;
           plate: null | string;
+          photos: null | {
+            exterior: string[];
+            interior: string[];
+            credit?: null | string;
+          };
         };
-        cargoFee: null | number;
+        luggagePolicy: null | {
+          freeKg: number;
+          perKgFare: number;
+          maxKg: number;
+          bulkyPerM3Fare: null | number;
+          bulkyMaxDm3: number;
+          bulkyMaxSideCm: number;
+        };
         homePickupFee: null | number;
         homeDropoffFee: null | number;
         note: null | string;
@@ -774,7 +900,10 @@ export interface ZuumRoutes {
       unitPrice: number;
       price: null | {
         seats: number;
-        cargo: number;
+        luggage: number;
+        extraKg: number;
+        bulky: number;
+        bulkyDm3: number;
         pickup: number;
         dropoff: number;
         total: number;
@@ -783,6 +912,12 @@ export interface ZuumRoutes {
       paymentMethod: null | "cash" | "wallet";
       withCargo: boolean;
       cargoNote: null | string;
+      luggage: {
+        kg: number;
+        bulkyDm3: number;
+        bulkyDims: null | string;
+        note: null | string;
+      };
       pickup: {
         type: string;
         address: null | string;
@@ -2831,7 +2966,7 @@ export interface ZuumRoutes {
       pricePerSeat: number;
       seatCount: number;
       amenities: string[];
-      cargoFee: null | number;
+      luggagePolicy: unknown;
       homePickupFee: null | number;
       homeDropoffFee: null | number;
       salesCloseMinutes: number;
@@ -2857,7 +2992,14 @@ export interface ZuumRoutes {
         deck?: number;
       }>;
       amenities?: string[];
-      cargoFee?: null | number;
+      luggagePolicy?: null | {
+        freeKg: number;
+        perKgFare: number;
+        maxKg: number;
+        bulkyPerM3Fare: null | number;
+        bulkyMaxDm3: number;
+        bulkyMaxSideCm: number;
+      };
       homePickupFee?: null | number;
       homeDropoffFee?: null | number;
       salesCloseMinutes?: number;
@@ -2879,7 +3021,7 @@ export interface ZuumRoutes {
       pricePerSeat: number;
       seatCount: number;
       amenities: string[];
-      cargoFee: null | number;
+      luggagePolicy: unknown;
       homePickupFee: null | number;
       homeDropoffFee: null | number;
       salesCloseMinutes: number;
@@ -2966,7 +3108,7 @@ export interface ZuumRoutes {
         pricePerSeat: number;
         seatCount: number;
         amenities: string[];
-        cargoFee: null | number;
+        luggagePolicy: unknown;
         homePickupFee: null | number;
         homeDropoffFee: null | number;
         salesCloseMinutes: number;
@@ -3000,6 +3142,11 @@ export interface ZuumRoutes {
         };
         withCargo: boolean;
         cargoNote: null | string;
+        luggage: {
+          kg: number;
+          bulkyDm3: number;
+          bulkyDims: null | string;
+        };
         total: number;
         paymentMethod: null | "cash" | "wallet";
         heldUntil: null | string;
@@ -5959,8 +6106,20 @@ export interface ZuumRoutes {
         name: null | string;
         color: null | string;
         plate: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+        };
       };
-      cargoFee: null | number;
+      luggagePolicy: null | {
+        freeKg: number;
+        perKgFare: number;
+        maxKg: number;
+        bulkyPerM3Fare: null | number;
+        bulkyMaxDm3: number;
+        bulkyMaxSideCm: number;
+      };
       homePickupFee: null | number;
       homeDropoffFee: null | number;
       note: null | string;
@@ -6009,8 +6168,20 @@ export interface ZuumRoutes {
         name: null | string;
         color: null | string;
         plate: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+        };
       };
-      cargoFee: null | number;
+      luggagePolicy: null | {
+        freeKg: number;
+        perKgFare: number;
+        maxKg: number;
+        bulkyPerM3Fare: null | number;
+        bulkyMaxDm3: number;
+        bulkyMaxSideCm: number;
+      };
       homePickupFee: null | number;
       homeDropoffFee: null | number;
       note: null | string;

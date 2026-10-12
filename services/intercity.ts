@@ -218,6 +218,58 @@ export async function findActiveHold(tripId: string) {
   return page.items.find((b) => b.trip.id === tripId && isLiveHold(b)) ?? null;
 }
 
+// ---------------------------------------------------------------- hàng gửi kèm vé (cùng công thức với server: luggageFee)
+export type LuggagePolicy = NonNullable<IntercityTripDetail['luggagePolicy']>;
+export interface BulkyDims {
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+}
+/** hàng cồng kềnh tính tối thiểu 0,1 m³ */
+export const BULKY_MIN_DM3 = 100;
+export const bulkyDm3Of = (d: BulkyDims): number => Math.ceil((d.lengthCm * d.widthCm * d.heightCm) / 1000);
+
+export interface LuggageFee {
+  extraKg: number;
+  luggage: number;
+  bulkyDm3: number;
+  bulky: number;
+}
+/** Phí hàng gửi kèm theo chính sách chuyến; sai giới hạn → ném Error có lý do (hiện ngay dưới ô nhập) */
+export function luggageFee(policy: LuggagePolicy | null, input: { kg: number; bulky: BulkyDims | null }): LuggageFee {
+  const kg = Math.max(0, Math.round(input.kg || 0));
+  const dims = input.bulky && bulkyDm3Of(input.bulky) > 0 ? input.bulky : null;
+  if (!policy) {
+    if (kg > 0 || dims) throw new Error('Chuyến này không nhận hàng gửi kèm');
+    return { extraKg: 0, luggage: 0, bulkyDm3: 0, bulky: 0 };
+  }
+  if (kg > policy.maxKg) throw new Error(`Hành lý tối đa ${policy.maxKg} kg mỗi vé`);
+  const extraKg = Math.max(0, kg - policy.freeKg);
+  let bulkyDm3 = 0;
+  let bulky = 0;
+  if (dims) {
+    if (policy.bulkyPerM3Fare === null) throw new Error('Chuyến này không nhận hàng cồng kềnh');
+    if (Math.max(dims.lengthCm, dims.widthCm, dims.heightCm) > policy.bulkyMaxSideCm) throw new Error(`Kiện hàng: mỗi cạnh tối đa ${policy.bulkyMaxSideCm} cm`);
+    bulkyDm3 = bulkyDm3Of(dims);
+    if (bulkyDm3 > policy.bulkyMaxDm3) throw new Error(`Kiện hàng tối đa ${(policy.bulkyMaxDm3 / 1000).toString().replace('.', ',')} m³`);
+    bulky = Math.round((Math.max(bulkyDm3, BULKY_MIN_DM3) / 1000) * policy.bulkyPerM3Fare);
+  }
+  return { extraKg, luggage: extraKg * policy.perKgFare, bulkyDm3, bulky };
+}
+
+const vndShort = (n: number) => `${n.toLocaleString('vi-VN')}đ`;
+/** Dòng mô tả chính sách hàng gửi kèm để hiện ở chi tiết chuyến / màn đặt vé */
+export function luggagePolicyLines(policy: LuggagePolicy | null): string[] {
+  if (!policy) return ['Chuyến này không nhận hàng gửi kèm'];
+  const lines = [`Miễn phí ${policy.freeKg} kg hành lý · vượt tính ${vndShort(policy.perKgFare)}/kg · tối đa ${policy.maxKg} kg`];
+  lines.push(
+    policy.bulkyPerM3Fare === null
+      ? 'Không nhận hàng cồng kềnh'
+      : `Hàng cồng kềnh ${vndShort(policy.bulkyPerM3Fare)}/m³ (tối thiểu 0,1 m³) · kiện tối đa ${(policy.bulkyMaxDm3 / 1000).toString().replace('.', ',')} m³, mỗi cạnh ≤ ${policy.bulkyMaxSideCm} cm`,
+  );
+  return lines;
+}
+
 export const BOOKING_STATUS_LABEL: Record<IntercityBooking['status'], string> = {
   held: 'Đang giữ chỗ',
   confirmed: 'Đã đặt',

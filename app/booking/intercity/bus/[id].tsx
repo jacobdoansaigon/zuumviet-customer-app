@@ -8,12 +8,13 @@ import { View, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Button, Chip, EmptyState, Icon, Icons, Screen, Toast } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { SeatPicker } from '@/components/booking';
+import { SeatPicker, VehicleGallery } from '@/components/booking';
 import {
   durationLabel,
   findActiveHold,
   getTrip,
   holdSeats,
+  luggagePolicyLines,
   settleHoldRelease,
   TRIP_KIND_LABEL,
   vnDateLabel,
@@ -117,6 +118,9 @@ export default function TripDetailScreen() {
 
   const seatTotal = trip.pricePerSeat * Math.max(1, selected.length);
   const v = trip.vehicle;
+  // giường nằm hay ghế ngồi → hình vẽ sơ đồ
+  const seatKind: 'bed' | 'seat' = trip.amenities.includes('Giường nằm') || /giường|limousine phòng/i.test(v.name ?? '') ? 'bed' : 'seat';
+  const photos = v.photos && (v.photos.exterior.length || v.photos.interior.length) ? v.photos : null;
 
   return (
     <Screen
@@ -146,6 +150,8 @@ export default function TripDetailScreen() {
             </AppText>
           </View>
         </View>
+
+        {photos ? <VehicleGallery photos={photos} /> : null}
 
         <View style={styles.routeCard}>
           <Icon name={Icons.calendar} size={16} color={Colors.primary} />
@@ -187,7 +193,7 @@ export default function TripDetailScreen() {
             ))}
           </View>
         ) : null}
-        <SeatPicker seats={seats} selected={selected} onToggle={(s) => toggle(s.id)} max={MAX_SEATS} />
+        <SeatPicker seats={seats} selected={selected} onToggle={(s) => toggle(s.id)} max={MAX_SEATS} kind={seatKind} />
 
         {trip.amenities.length ? (
           <>
@@ -210,7 +216,19 @@ export default function TripDetailScreen() {
         <AppText size={15} weight="bold" style={styles.sectionTitle}>
           Phụ phí tuỳ chọn
         </AppText>
-        <FeeRow label="Gửi kèm hàng hoá" fee={trip.cargoFee} />
+        <View style={styles.feeRow}>
+          <Icon name={trip.luggagePolicy ? Icons.checkCircle : Icons.closeCircle} size={16} color={trip.luggagePolicy ? Colors.success : Colors.textMuted} />
+          <View style={{ marginLeft: 6, flex: 1 }}>
+            <AppText size={13} color={trip.luggagePolicy ? Colors.text : Colors.textMuted}>
+              Gửi kèm hàng hoá
+            </AppText>
+            {luggagePolicyLines(trip.luggagePolicy).map((line) => (
+              <AppText key={line} size={12} color={Colors.textSecondary}>
+                {line}
+              </AppText>
+            ))}
+          </View>
+        </View>
         <FeeRow label="Đón tận nơi" fee={trip.homePickupFee} />
         <FeeRow label="Trả tận nơi" fee={trip.homeDropoffFee} />
         <AppText size={12} color={Colors.textMuted} style={{ marginTop: Spacing.xs }}>
