@@ -1,7 +1,8 @@
 // app/booking/location.tsx — GH 1.3.1 "Lựa chọn địa điểm" (người gửi) / GH 1.4 "Thêm điểm gửi hàng" (người nhận)
 // Params: target=sender|receiver, index (người nhận), back=1 (quay lại màn trước thay vì mở màn thông tin người nhận),
 // q (chữ điền sẵn — vd địa chỉ tách từ "Dán từ Zalo").
-// Gợi ý từ API places (autocomplete → chọn → lấy toạ độ thật), vị trí đã lưu (API), vị trí hiện tại (GPS → đảo địa chỉ).
+// Gợi ý từ API places (autocomplete → chọn → lấy toạ độ thật), địa chỉ đã đi (đơn cũ), vị trí đã lưu (API); chọn trên bản đồ.
+// Không có hàng "Vị trí hiện tại": điểm đi đã có bản đồ + nút định vị ở màn đặt; cần chọn chỗ khác thì vào bản đồ (anh Jacob 2026-10-12).
 // Xe đường dài (điểm đến): gợi ý mặc định là bến xe các tỉnh/thành đang có tuyến (API intercity/cities).
 // Không còn "dùng địa chỉ đã nhập" với toạ độ tự chế — giá tính theo toạ độ nên địa điểm phải đến từ API/bản đồ.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -11,7 +12,7 @@ import { AppHeader, AppText, Chip, Icon, Icons, Screen, StopMarker, fontStyle, u
 import { Colors, Spacing, BorderRadius, Sizes, NO_WEB_OUTLINE } from '@/constants/theme';
 import { SERVICE_GROUPS } from '@/constants/booking';
 import { useBooking, setSenderPlace, setReceiverPlace, updateReceiver, type Place } from '@/services/bookingStore';
-import { autocompletePlaces, newPlacesSession, placeDetail, placeHistory, reversePlace, type HistoryPlace, type PlaceHistory, type PlaceSuggestion } from '@/services/places';
+import { autocompletePlaces, newPlacesSession, placeDetail, placeHistory, type HistoryPlace, type PlaceHistory, type PlaceSuggestion } from '@/services/places';
 import { loadSavedAddresses, useSavedAddresses, SAVED_KIND_LABEL, type SavedAddress } from '@/services/addresses';
 import { destinationCities, ensureIntercityCities, useIntercityCities, type IntercityCity } from '@/services/intercity';
 import { errorMessage } from '@/services/zuum';
@@ -140,19 +141,6 @@ export default function LocationScreen() {
   const chooseCity = (c: IntercityCity) =>
     finish({ title: c.name, address: `${c.stationName}, ${c.stationAddress}`, lat: c.stationLat, lng: c.stationLng, source: 'search' });
 
-  const chooseCurrent = async () => {
-    if (!gps || resolving) return;
-    setResolving('gps');
-    try {
-      const p = await reversePlace(gps.latitude, gps.longitude);
-      finish({ title: p.name ?? 'Vị trí hiện tại', address: p.address, lat: p.lat, lng: p.lng, placeId: p.placeId, source: 'gps' });
-    } catch (e) {
-      setError(errorMessage(e, 'Không xác định được địa chỉ vị trí hiện tại'));
-    } finally {
-      setResolving(null);
-    }
-  };
-
   const typing = query.trim().length >= 2;
   // Không gõ: địa chỉ đã đi (ưu tiên đã đi từ điểm đi này, rồi nơi thường đi) → vị trí đã lưu
   const historyRows: Row[] = [];
@@ -241,20 +229,6 @@ export default function LocationScreen() {
         ListHeaderComponent={
           typing ? null : (
             <>
-              {gps && !isIntercityDest ? (
-                <Pressable onPress={() => void chooseCurrent()} style={styles.row}>
-                  <Icon name={Icons.location} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
-                  <View style={{ flex: 1 }}>
-                    <AppText weight="bold" size={16}>
-                      Vị trí hiện tại
-                    </AppText>
-                    <AppText size={13} color={Colors.textSecondary}>
-                      Dùng vị trí GPS của bạn
-                    </AppText>
-                  </View>
-                  {resolving === 'gps' ? <ActivityIndicator size="small" color={Colors.primary} /> : <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />}
-                </Pressable>
-              ) : null}
               {isIntercityDest ? null : (
                 <Pressable onPress={openMapPicker} style={styles.row}>
                   <Icon name={Icons.map} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
