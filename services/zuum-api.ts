@@ -1764,7 +1764,6 @@ export interface ZuumRoutes {
         bps: number;
         label: string;
       }>;
-      cancelDebt: number;
     };
   };
   'GET /v1/customer/quotes/:id': {
@@ -1809,7 +1808,6 @@ export interface ZuumRoutes {
         bps: number;
         label: string;
       }>;
-      cancelDebt: number;
     };
   };
   /** Giá nhanh cho nhiều dịch vụ cùng lộ trình (không lưu, không đặt được) — danh sách chọn dịch vụ hiện giá thật theo đường */

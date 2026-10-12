@@ -277,16 +277,6 @@ export default function ConfirmScreen() {
               </AppText>
             </View>
           ))}
-          {quoteData.cancelDebt > 0 ? (
-            <View style={styles.lineRow}>
-              <AppText size={13} color={Colors.error} style={{ flex: 1 }}>
-                Phí huỷ chuyến trước còn nợ (thu kèm đơn này)
-              </AppText>
-              <AppText size={13} color={Colors.error}>
-                {formatVnd(quoteData.cancelDebt)}
-              </AppText>
-            </View>
-          ) : null}
         </View>
       ) : null}
 
