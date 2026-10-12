@@ -5,13 +5,13 @@
 // Xe đường dài (điểm đến): gợi ý mặc định là bến xe các tỉnh/thành đang có tuyến (API intercity/cities).
 // Không còn "dùng địa chỉ đã nhập" với toạ độ tự chế — giá tính theo toạ độ nên địa điểm phải đến từ API/bản đồ.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, TextInput, Pressable, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, TextInput, Pressable, FlatList, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Chip, Icon, Icons, Screen, StopMarker, fontStyle, useBlurOnLeave } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Sizes, NO_WEB_OUTLINE } from '@/constants/theme';
 import { SERVICE_GROUPS } from '@/constants/booking';
 import { useBooking, setSenderPlace, setReceiverPlace, updateReceiver, type Place } from '@/services/bookingStore';
-import { autocompletePlaces, newPlacesSession, placeDetail, reversePlace, type PlaceSuggestion } from '@/services/places';
+import { autocompletePlaces, newPlacesSession, placeDetail, placeHistory, reversePlace, type HistoryPlace, type PlaceHistory, type PlaceSuggestion } from '@/services/places';
 import { loadSavedAddresses, useSavedAddresses, SAVED_KIND_LABEL, type SavedAddress } from '@/services/addresses';
 import { destinationCities, ensureIntercityCities, useIntercityCities, type IntercityCity } from '@/services/intercity';
 import { errorMessage } from '@/services/zuum';
@@ -20,7 +20,12 @@ import { ZaloPasteSheet, useCurrentLocation } from '@/components/booking';
 type Row =
   | { kind: 'suggestion'; key: string; item: PlaceSuggestion }
   | { kind: 'saved'; key: string; item: SavedAddress }
-  | { kind: 'city'; key: string; item: IntercityCity };
+  | { kind: 'city'; key: string; item: IntercityCity }
+  | { kind: 'history'; key: string; item: HistoryPlace }
+  | { kind: 'label'; key: string; text: string };
+
+/** "Landmark 81, Bình Thạnh" → tên "Landmark 81" */
+const placeTitle = (address: string) => address.split(',')[0]!.trim() || address;
 
 const fmtKm = (m: number | null) => (m == null ? '' : m >= 1000 ? `${(m / 1000).toFixed(1)}km - ` : `${Math.round(m)}m - `);
 
@@ -43,6 +48,8 @@ export default function LocationScreen() {
   const [error, setError] = useState<string | null>(null);
   const [resolving, setResolving] = useState<string | null>(null);
   const [zaloPaste, setZaloPaste] = useState(false);
+  // địa chỉ đã đi (đơn cũ): điểm đến → đã đi từ điểm đi hiện tại + nơi thường đến; điểm đi → điểm đi hay dùng
+  const [history, setHistory] = useState<PlaceHistory | null>(null);
   const reqSeq = useRef(0);
   const searchRef = useRef<TextInput>(null);
   useBlurOnLeave(searchRef);
@@ -52,6 +59,18 @@ export default function LocationScreen() {
     void loadSavedAddresses().catch(() => undefined);
     if (isIntercityDest) void ensureIntercityCities().catch(() => undefined);
   }, [isIntercityDest]);
+
+  const nearKey = isReceiver && near ? `${near.lat.toFixed(4)},${near.lng.toFixed(4)}` : '';
+  useEffect(() => {
+    if (isIntercityDest) return;
+    let alive = true;
+    placeHistory(nearKey ? { lat: Number(nearKey.split(',')[0]), lng: Number(nearKey.split(',')[1]) } : null)
+      .then((h) => alive && setHistory(h))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [isIntercityDest, nearKey]);
 
   // Gõ tìm: chờ 300ms rồi gọi autocomplete (bỏ kết quả của lần gõ cũ)
   useEffect(() => {
@@ -116,6 +135,8 @@ export default function LocationScreen() {
   const chooseSaved = (a: SavedAddress) =>
     finish({ title: a.label, address: a.address, lat: a.lat, lng: a.lng, savedAddressId: a.id, source: 'saved' }, { name: a.contactName, phone: a.contactPhone });
 
+  const chooseHistory = (h: HistoryPlace) => finish({ title: placeTitle(h.address), address: h.address, lat: h.lat, lng: h.lng, source: 'history' });
+
   const chooseCity = (c: IntercityCity) =>
     finish({ title: c.name, address: `${c.stationName}, ${c.stationAddress}`, lat: c.stationLat, lng: c.stationLng, source: 'search' });
 
@@ -133,11 +154,27 @@ export default function LocationScreen() {
   };
 
   const typing = query.trim().length >= 2;
+  // Không gõ: địa chỉ đã đi (ưu tiên đã đi từ điểm đi này, rồi nơi thường đi) → vị trí đã lưu
+  const historyRows: Row[] = [];
+  if (!typing && !isIntercityDest && history) {
+    const sections: [string, HistoryPlace[]][] = isReceiver
+      ? [
+          ['Đã đi từ điểm đi này', history.fromHere],
+          ['Thường đi', history.frequent],
+        ]
+      : [['Điểm đi gần đây', history.pickups]];
+    for (const [label, items] of sections) {
+      if (!items.length) continue;
+      historyRows.push({ kind: 'label', key: `label-${label}`, text: label });
+      items.forEach((item, i) => historyRows.push({ kind: 'history', key: `${label}-${i}-${item.lat},${item.lng}`, item }));
+    }
+  }
+  const savedRows: Row[] = (saved ?? []).map((item) => ({ kind: 'saved', key: item.id, item }));
   const rows: Row[] = typing
     ? suggestions.map((item) => ({ kind: 'suggestion', key: item.placeId, item }))
     : isIntercityDest
       ? destinationCities(cities).map((item) => ({ kind: 'city', key: item.id, item }))
-      : (saved ?? []).map((item) => ({ kind: 'saved', key: item.id, item }));
+      : [...historyRows, ...(savedRows.length ? [{ kind: 'label' as const, key: 'label-saved', text: 'Vị trí đã lưu' }, ...savedRows] : [])];
 
   const quickSaved = (saved ?? []).filter((a) => a.kind === 'home' || a.kind === 'work');
   const openMapPicker = () => router.push({ pathname: '/booking/pick-on-map', params: { target, index: String(index), back } });
@@ -146,15 +183,6 @@ export default function LocationScreen() {
     <Screen
       header={<AppHeader variant="dark" title={isReceiver ? labels.receiverLocationTitle : labels.senderLocationTitle} left="close" />}
       keyboardAvoiding={false}
-      footer={
-        <Pressable onPress={openMapPicker} style={styles.mapFooterRow}>
-          <Icon name={Icons.map} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
-          <AppText size={16} weight="bold" color={Colors.primary} style={{ flex: 1 }}>
-            Chọn trên bản đồ
-          </AppText>
-          <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
-        </Pressable>
-      }
     >
       <View style={styles.searchWrap}>
         <View style={styles.searchBox}>
@@ -168,6 +196,9 @@ export default function LocationScreen() {
             style={[styles.input, fontStyle('bold')]}
             autoFocus
             returnKeyType="search"
+            // Android: bàn phím chữ đơn giản — không thanh gợi ý / emoji / GIF
+            keyboardType={Platform.OS === 'android' ? 'visible-password' : 'default'}
+            autoCorrect={false}
           />
           {searching ? <ActivityIndicator size="small" color={Colors.primary} /> : null}
           {query && !searching ? (
@@ -224,9 +255,23 @@ export default function LocationScreen() {
                   {resolving === 'gps' ? <ActivityIndicator size="small" color={Colors.primary} /> : <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />}
                 </Pressable>
               ) : null}
-              {rows.length ? (
+              {isIntercityDest ? null : (
+                <Pressable onPress={openMapPicker} style={styles.row}>
+                  <Icon name={Icons.map} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
+                  <View style={{ flex: 1 }}>
+                    <AppText weight="bold" size={16}>
+                      Chọn trên bản đồ
+                    </AppText>
+                    <AppText size={13} color={Colors.textSecondary}>
+                      Kéo bản đồ tới đúng chỗ cần {isReceiver ? 'đến' : 'đón'}
+                    </AppText>
+                  </View>
+                  <Icon name={Icons.chevronRight} size={18} color={Colors.textSecondary} />
+                </Pressable>
+              )}
+              {isIntercityDest && rows.length ? (
                 <AppText size={12} weight="semiBold" color={Colors.textSecondary} style={styles.listLabel}>
-                  {isIntercityDest ? 'Tỉnh/thành đang có tuyến' : 'Vị trí đã lưu'}
+                  Tỉnh/thành đang có tuyến
                 </AppText>
               ) : null}
             </>
@@ -240,6 +285,34 @@ export default function LocationScreen() {
           ) : null
         }
         renderItem={({ item: row }) => {
+          if (row.kind === 'label') {
+            return (
+              <AppText size={12} weight="semiBold" color={Colors.textSecondary} style={styles.listLabel}>
+                {row.text}
+              </AppText>
+            );
+          }
+          if (row.kind === 'history') {
+            const h = row.item;
+            return (
+              <Pressable onPress={() => chooseHistory(h)} style={styles.row}>
+                <Icon name={Icons.clock} size={22} color={Colors.primary} style={{ marginRight: Spacing.md }} />
+                <View style={{ flex: 1 }}>
+                  <AppText weight="bold" size={16} numberOfLines={1}>
+                    {placeTitle(h.address)}
+                  </AppText>
+                  <AppText size={13} color={Colors.textSecondary} numberOfLines={1}>
+                    {h.address}
+                  </AppText>
+                </View>
+                {h.count > 1 ? (
+                  <AppText size={12} weight="semiBold" color={Colors.textSecondary} style={{ marginLeft: Spacing.sm }}>
+                    {h.count} lần
+                  </AppText>
+                ) : null}
+              </Pressable>
+            );
+          }
           if (row.kind === 'suggestion') {
             const s = row.item;
             return (
@@ -323,12 +396,5 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
-  },
-  mapFooterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
   },
 });

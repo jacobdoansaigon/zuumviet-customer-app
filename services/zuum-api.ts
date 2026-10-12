@@ -1658,6 +1658,36 @@ export interface ZuumRoutes {
       }>;
     };
   };
+  /** Địa chỉ đã đi (từ đơn cũ): `fromHere` = đã đi từ điểm đi hiện tại (lat/lng) nhiều lần → ít, `frequent` = nơi thường đến, `pickups` = điểm đi hay dùng */
+  'GET /v1/customer/places/history': {
+    query?: {
+      lat?: number;
+      lng?: number;
+    };
+    response: {
+      fromHere: Array<{
+        address: string;
+        lat: number;
+        lng: number;
+        count: number;
+        lastAt: string;
+      }>;
+      frequent: Array<{
+        address: string;
+        lat: number;
+        lng: number;
+        count: number;
+        lastAt: string;
+      }>;
+      pickups: Array<{
+        address: string;
+        lat: number;
+        lng: number;
+        count: number;
+        lastAt: string;
+      }>;
+    };
+  };
   /** Đảo toạ độ: vị trí ghim → địa chỉ chữ (toạ độ giữ nguyên như gửi lên) */
   'GET /v1/customer/places/reverse': {
     query: {
