@@ -14,7 +14,7 @@ import type { BookingMapProps } from './mapTypes';
 const FIT_MARGIN = { top: 140, right: 60, bottom: 80, left: 60 };
 
 const GoongBookingMap = forwardRef<ZMapHandle, BookingMapProps>(function GoongBookingMap(
-  { stops, center, showsUserLocation = true, showRoute = true, routePath, bottomPadding = 0, style, onRegionChangeComplete, onPress, extraMarkers },
+  { stops, center, showsUserLocation = true, showRoute = true, routePath, bottomPadding = 0, style, onRegionChangeComplete, onPress, extraMarkers, radar, fitOverride },
   ref,
 ) {
   const first = stops[0];
@@ -46,9 +46,10 @@ const GoongBookingMap = forwardRef<ZMapHandle, BookingMapProps>(function GoongBo
       initialZoom={stops.length === 1 ? 15 : 14}
       markers={allMarkers}
       lines={showRoute && route.length >= 2 ? [{ id: 'route', coords: route, color: Colors.primary, width: 4 }] : []}
+      radar={radar ?? null}
       insets={{ bottom: bottomPadding }}
       // "Chọn trên bản đồ": khách tự kéo — không canh lại khung (giữ mức phóng khách đang xem)
-      fit={!onRegionChangeComplete && points.length ? { key: stopsKey, points, margin: FIT_MARGIN } : null}
+      fit={fitOverride ? { key: fitOverride.key, points: fitOverride.points, margin: fitOverride.margin ?? FIT_MARGIN } : !onRegionChangeComplete && points.length ? { key: stopsKey, points, margin: FIT_MARGIN } : null}
       showsUserLocation={showsUserLocation}
       onRegionChangeComplete={onRegionChangeComplete}
       onPress={onPress}

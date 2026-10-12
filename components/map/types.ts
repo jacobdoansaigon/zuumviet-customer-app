@@ -32,6 +32,12 @@ export interface ZMapLine {
   dashed?: boolean;
 }
 
+/** vòng quét tìm tài xế quanh một điểm (hoạt ảnh vẽ trong ZMap — xem useRadar) */
+export interface ZMapRadar {
+  center: LatLng;
+  radiusMeters: number;
+}
+
 export interface ZMapProps {
   style?: StyleProp<ViewStyle>;
   initialCenter: LatLng;
@@ -41,6 +47,8 @@ export interface ZMapProps {
   /** đường nối / tuyến đường (vẽ dưới marker) */
   lines?: ZMapLine[];
   circle?: { center: LatLng; radiusMeters: number; fill: string; stroke: string } | null;
+  /** vòng quét tìm tài xế (vẽ dưới đường và marker); null = không vẽ */
+  radar?: ZMapRadar | null;
   /** phần khung bị che (bottom sheet…) — tâm bản đồ / canh khung tính theo phần còn nhìn thấy */
   insets?: Insets;
   /** mỗi lần `key` đổi: canh vừa các điểm (thêm lề `margin`); 1 điểm → phóng quanh điểm đó */
@@ -121,4 +129,37 @@ export function circleFeature(center: LatLng, radiusMeters: number): GeoJSON.Fea
     return [center.lng + dLng * Math.cos(t), center.lat + dLat * Math.sin(t)];
   });
   return { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring] } };
+}
+
+/** màu vòng quét (tím thương hiệu) */
+export const RADAR_COLOR = '#59267C';
+
+/** lớp vẽ vòng quét dùng chung native / web: nền mờ cả hai vòng, viền đứt vòng ngoài, viền liền xung lan */
+export const RADAR_LAYERS: Record<'fill' | 'outer' | 'pulse', LineLayerStyle> = {
+  fill: { filter: ['has', 'kind'], layout: {}, paint: { 'fill-color': RADAR_COLOR, 'fill-opacity': ['get', 'fillAlpha'] } },
+  outer: {
+    filter: ['==', ['get', 'kind'], 'outer'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': RADAR_COLOR, 'line-width': 1.5, 'line-opacity': 0.9, 'line-dasharray': [2, 2] },
+  },
+  pulse: {
+    filter: ['==', ['get', 'kind'], 'pulse'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': RADAR_COLOR, 'line-width': 2, 'line-opacity': ['get', 'lineAlpha'] },
+  },
+};
+
+export const EMPTY_FEATURES: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
+
+/** vòng ngoài + xung lan (bán kính `pulseRadius`, độ đậm `pulseAlpha` 1 → 0 khi lan tới mép) */
+export function radarFeatures(center: LatLng, outerRadius: number, pulseRadius: number, pulseAlpha: number): GeoJSON.FeatureCollection {
+  const outer = circleFeature(center, outerRadius);
+  const pulse = circleFeature(center, Math.max(1, pulseRadius));
+  return {
+    type: 'FeatureCollection',
+    features: [
+      { ...outer, properties: { kind: 'outer', fillAlpha: 0.06, lineAlpha: 0.9 } },
+      { ...pulse, properties: { kind: 'pulse', fillAlpha: 0.14 * pulseAlpha, lineAlpha: 0.9 * pulseAlpha } },
+    ],
+  };
 }

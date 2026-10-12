@@ -10,21 +10,24 @@ import {
   UserLocation,
   ViewAnnotation,
   type CameraRef,
+  type FillLayerSpecification,
   type FilterSpecification,
   type LineLayerSpecification,
 } from '@maplibre/maplibre-react-native';
 import { goongStyleUrl } from '@/services/maps';
-import { addInsets, boundsOf, circleFeature, LINE_LAYERS, linesFeature, type ZMapHandle, type ZMapProps } from './types';
+import { addInsets, boundsOf, circleFeature, EMPTY_FEATURES, LINE_LAYERS, linesFeature, RADAR_LAYERS, type ZMapHandle, type ZMapProps } from './types';
+import { useRadar } from './useRadar';
 
 /** thời gian flyTo (ms) */
 const FLY_MS = 500;
 
 export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
   (
-    { style, initialCenter, initialZoom = 14, markers = [], lines, circle, insets, fit, showsUserLocation = false, interactive = true, onRegionChangeComplete, onPress },
+    { style, initialCenter, initialZoom = 14, markers = [], lines, circle, radar, insets, fit, showsUserLocation = false, interactive = true, onRegionChangeComplete, onPress },
     ref,
   ) => {
     const camera = useRef<CameraRef>(null);
+    const radarData = useRadar(radar);
     const [ready, setReady] = useState(false);
     const padding = addInsets(insets);
     const paddingKey = `${padding.top},${padding.right},${padding.bottom},${padding.left}`;
@@ -90,6 +93,20 @@ export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
       >
         <Camera ref={camera} initialViewState={{ center: [initialCenter.lng, initialCenter.lat], zoom: initialZoom, padding }} />
         {showsUserLocation ? <UserLocation /> : null}
+        {/* vòng quét: luôn gắn nguồn (dữ liệu rỗng khi không quét) để lớp này nằm dưới đường và marker */}
+        <GeoJSONSource id="zmap-radar" data={radarData ?? EMPTY_FEATURES}>
+          <Layer id="zmap-radar-fill" type="fill" filter={RADAR_LAYERS.fill.filter as FilterSpecification} paint={RADAR_LAYERS.fill.paint as FillLayerSpecification['paint']} />
+          {(['outer', 'pulse'] as const).map((k) => (
+            <Layer
+              key={k}
+              id={`zmap-radar-${k}`}
+              type="line"
+              filter={RADAR_LAYERS[k].filter as FilterSpecification}
+              layout={RADAR_LAYERS[k].layout as LineLayerSpecification['layout']}
+              paint={RADAR_LAYERS[k].paint as LineLayerSpecification['paint']}
+            />
+          ))}
+        </GeoJSONSource>
         {circle ? (
           <GeoJSONSource id="zmap-circle" data={circleFeature(circle.center, circle.radiusMeters)}>
             <Layer id="zmap-circle-fill" type="fill" paint={{ 'fill-color': circle.fill }} />

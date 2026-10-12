@@ -10,17 +10,23 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { AppText, BottomSheet, Button, Icons, ListRow, Toast } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { SERVICE_GROUPS } from '@/constants/booking';
-import { estimateEtaMinutes, getOrder, groupOfOrder, isActiveStatus, retryOrder, type OrderDetail } from '@/services/orders';
+import { circleEdgePoints, estimateEtaMinutes, getOrder, groupOfOrder, isActiveStatus, radiusLabel, retryOrder, searchPhaseAt, type OrderDetail, type OrderSearch, type SearchPhase } from '@/services/orders';
+import { nearbySupply, type SupplyMarkerData } from '@/services/supply';
+import type { ZMapMarker } from '@/components/map/types';
 import { ensureCatalog } from '@/services/catalog';
 import { errorMessage, isApiError } from '@/services/zuum';
 import { useRealtime, useRealtimeRefetch } from '@/hooks/useRealtime';
 import { useOrderPushRefresh } from '@/hooks/useNotifications';
 import { cancelFeePending, mmss, useFreeCancelCountdown } from '@/hooks/useCancelCountdown';
-import { BookingMap, RoundIconButton, TrackingSheet, mapBottomPadding, type MapStop } from '@/components/booking';
+import { BookingMap, RoundIconButton, SupplyMarkerView, TrackingSheet, mapBottomPadding, type MapStop } from '@/components/booking';
 import { SUPPORT_HOTLINE as SUPPORT_PHONE } from '@/constants/content';
 import { decodePolyline } from '@/components/map/polyline';
 
 const FALLBACK_POLL_MS = 30_000;
+/** hỏi "tài xế quanh bạn" mỗi bao lâu khi đang tìm */
+const SUPPLY_POLL_MS = 5_000;
+/** lề để vòng quét nằm gọn trong phần bản đồ nhìn thấy (trên: nút đóng) */
+const RADAR_FIT_MARGIN = { top: 110, right: 36, bottom: 36, left: 36 };
 
 type LatLng = { lat: number; lng: number };
 
@@ -82,6 +88,60 @@ export default function TrackingScreen() {
 
   const showPartner = !!partnerLoc && (order?.status === 'assigned' || order?.status === 'arrived_pickup' || order?.status === 'picked_up');
   const eta = order && showPartner ? estimateEtaMinutes(order, partnerLoc) : null;
+
+  // ---- đang tìm: vòng quét (500 m → 1 km → 2 km…) theo lịch server trả, tính bằng đồng hồ máy từ `elapsedSeconds` ----
+  const search = order?.status === 'searching' ? order.search : null;
+  const clock = useRef<{ search: OrderSearch; startedLocal: number } | null>(null);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!search) return;
+    const t = setInterval(() => setTick((v) => v + 1), 1000);
+    return () => clearInterval(t);
+  }, [search]);
+  const phase = useMemo<SearchPhase | null>(() => {
+    if (!search) return null;
+    // mỗi lần tải lại đơn → chỉnh lại mốc theo elapsedSeconds mới (trôi vài giây giữa máy và server)
+    if (clock.current?.search !== search) clock.current = { search, startedLocal: Date.now() - search.elapsedSeconds * 1000 };
+    return searchPhaseAt(search, (Date.now() - clock.current.startedLocal) / 1000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, tick]);
+  const radar = phase && order ? { center: { lat: order.pickup.lat, lng: order.pickup.lng }, radiusMeters: phase.radiusMeters } : null;
+  const fitOverride = radar
+    ? { key: `radar:${radar.radiusMeters}:${radar.center.lat.toFixed(4)},${radar.center.lng.toFixed(4)}`, points: circleEdgePoints(radar.center, radar.radiusMeters * 1.08), margin: RADAR_FIT_MARGIN }
+    : null;
+
+  // icon tài xế / thợ quanh điểm đón trong vòng quét (server trộn thật + mô phỏng), hỏi lại mỗi 5 s và khi vòng nới rộng
+  const [supply, setSupply] = useState<SupplyMarkerData[]>([]);
+  const supplyRadius = phase?.radiusMeters ?? 0;
+  const serviceId = order?.service.id;
+  const pickupKey = order ? `${order.pickup.lat},${order.pickup.lng}` : '';
+  useEffect(() => {
+    if (!supplyRadius || !order) {
+      setSupply([]);
+      return;
+    }
+    let alive = true;
+    const { lat, lng } = order.pickup;
+    const run = async () => {
+      try {
+        const res = await nearbySupply({ lat, lng, radiusMeters: supplyRadius, ...(serviceId ? { serviceId } : {}) });
+        if (alive) setSupply(res.items);
+      } catch {
+        /* giữ icon cũ, thử lại lần sau */
+      }
+    };
+    void run();
+    const t = setInterval(() => void run(), SUPPLY_POLL_MS);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supplyRadius, serviceId, pickupKey]);
+  const supplyMarkers = useMemo<ZMapMarker[]>(
+    () => supply.map((m) => ({ id: `supply-${m.key}`, at: { lat: m.lat, lng: m.lng }, anchor: 'center', children: <SupplyMarkerView marker={m} /> })),
+    [supply],
+  );
 
   const stops = useMemo<MapStop[]>(() => {
     if (!order) return [];
@@ -147,7 +207,7 @@ export default function TrackingScreen() {
 
   return (
     <View style={styles.root}>
-      <BookingMap stops={stops} routePath={routePath} bottomPadding={mapBottomPadding(sheetH, height)} />
+      <BookingMap stops={stops} routePath={routePath} bottomPadding={mapBottomPadding(sheetH, height)} extraMarkers={supplyMarkers} radar={radar} fitOverride={fitOverride} />
       <RoundIconButton icon={Icons.close} onPress={close} style={[styles.close, { top: insets.top + Spacing.md }]} accessibilityLabel="Đóng" />
 
       <View style={styles.sheet} onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}>
@@ -161,6 +221,7 @@ export default function TrackingScreen() {
               onMore={() => setMenu(true)}
               onRetry={() => void retry()}
               retrying={retrying}
+              searchHint={phase ? `Đang quét trong bán kính ${radiusLabel(phase.radiusMeters)}` : null}
               onCall={() => call(order.partner?.phone)}
               onChat={() => setToast('Tính năng nhắn tin với tài xế sắp ra mắt')}
               onRate={() => router.push(`/orders/${order.id}/rate`)}

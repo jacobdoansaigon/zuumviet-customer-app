@@ -49,13 +49,15 @@ interface Props {
   onMore: () => void;
   onRetry: () => void;
   retrying?: boolean;
+  /** đang tìm: dòng phụ dưới tiêu đề (vd "Đang quét trong bán kính 500 m") */
+  searchHint?: string | null;
   onCall: () => void;
   onChat: () => void;
   onRate: () => void;
   onHome: () => void;
 }
 
-export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, onToggle, onMore, onRetry, retrying, onCall, onChat, onRate, onHome }) => {
+export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, onToggle, onMore, onRetry, retrying, searchHint, onCall, onChat, onRate, onHome }) => {
   const phase = phaseOf(order.status);
   const group = SERVICE_GROUPS[groupOfOrder(order.service)];
   const L = group.labels;
@@ -109,9 +111,16 @@ export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, on
         {phase === 'searching' ? (
           <>
             <Icon name={Icons.moon} size={26} color={Colors.secondary} style={styles.headIcon} />
-            <AppText weight="bold" size={15} style={{ flex: 1 }}>
-              Đang tìm {providerLower} gần bạn ....
-            </AppText>
+            <View style={{ flex: 1 }}>
+              <AppText weight="bold" size={15}>
+                Đang tìm {providerLower} gần bạn ....
+              </AppText>
+              {searchHint ? (
+                <AppText size={12} color={Colors.textSecondary} style={{ marginTop: 2 }}>
+                  {searchHint}
+                </AppText>
+              ) : null}
+            </View>
             {more}
           </>
         ) : phase === 'scheduled' ? (

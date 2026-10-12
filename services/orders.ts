@@ -140,3 +140,48 @@ export function estimateEtaMinutes(order: OrderDetail, partner: { lat: number; l
 export function orderGroupTitle(order: { service: OrderDetail['service'] | OrderListItem['service'] }): string {
   return SERVICE_GROUPS[groupOfOrder(order.service)].title;
 }
+
+// ---- vòng quét tìm tài xế ---------------------------------------------------------------------------------
+// Server trả `order.search` khi đang tìm: các vòng (bán kính + số giây) và `elapsedSeconds` lúc trả lời.
+// App tính vòng đang quét theo đồng hồ của chính nó từ mốc đó (không so với giờ server), 1 giây một lần.
+
+export type OrderSearch = NonNullable<OrderDetail['search']>;
+
+export interface SearchPhase {
+  /** vòng thứ mấy (0-based); = số vòng khi đã qua hết → quét ở bán kính tối đa tới hết giờ */
+  index: number;
+  radiusMeters: number;
+  startsAtSeconds: number;
+  endsAtSeconds: number | null;
+}
+
+/** Vòng đang quét tại giây thứ `elapsedSeconds` kể từ lúc bắt đầu tìm (cùng công thức với server: searchPhaseAt) */
+export function searchPhaseAt(search: Pick<OrderSearch, 'steps' | 'maxRadiusMeters'>, elapsedSeconds: number): SearchPhase {
+  const t = Math.max(0, elapsedSeconds);
+  let start = 0;
+  for (let i = 0; i < search.steps.length; i++) {
+    const s = search.steps[i]!;
+    if (t < start + s.seconds) return { index: i, radiusMeters: s.radiusMeters, startsAtSeconds: start, endsAtSeconds: start + s.seconds };
+    start += s.seconds;
+  }
+  return { index: search.steps.length, radiusMeters: search.maxRadiusMeters, startsAtSeconds: start, endsAtSeconds: null };
+}
+
+/** "500 m" / "1 km" / "1,5 km" */
+export function radiusLabel(meters: number): string {
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  const km = meters / 1000;
+  return `${Number.isInteger(km) ? km : km.toFixed(1).replace('.', ',')} km`;
+}
+
+/** 4 điểm mép vòng tròn (bắc / nam / đông / tây) để canh khung bản đồ vừa vòng quét */
+export function circleEdgePoints(center: { lat: number; lng: number }, radiusMeters: number): { lat: number; lng: number }[] {
+  const dLat = radiusMeters / 111_320;
+  const dLng = radiusMeters / (111_320 * Math.cos((center.lat * Math.PI) / 180));
+  return [
+    { lat: center.lat + dLat, lng: center.lng },
+    { lat: center.lat - dLat, lng: center.lng },
+    { lat: center.lat, lng: center.lng + dLng },
+    { lat: center.lat, lng: center.lng - dLng },
+  ];
+}

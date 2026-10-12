@@ -961,6 +961,19 @@ export interface ZuumRoutes {
         category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
         vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
       };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
+      };
       steps: {
         arrive: string;
         pickUp: string;
@@ -1120,6 +1133,19 @@ export interface ZuumRoutes {
         code: string;
         category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
         vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+      };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
       };
       steps: {
         arrive: string;
@@ -1286,6 +1312,19 @@ export interface ZuumRoutes {
         code: string;
         category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
         vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+      };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
       };
       steps: {
         arrive: string;
@@ -1461,6 +1500,19 @@ export interface ZuumRoutes {
         code: string;
         category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
         vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+      };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
       };
       steps: {
         arrive: string;
@@ -1848,6 +1900,25 @@ export interface ZuumRoutes {
           code: string;
           message: string;
         };
+      }>;
+    };
+  };
+  'GET /v1/customer/supply/nearby': {
+    query: {
+      lat: number;
+      lng: number;
+      radiusMeters?: number;
+      serviceId?: string;
+      category?: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
+    };
+    response: {
+      items: Array<{
+        key: string;
+        lat: number;
+        lng: number;
+        heading: null | number;
+        category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
+        vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
       }>;
     };
   };
@@ -3117,6 +3188,19 @@ export interface ZuumRoutes {
         category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
         vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
       };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
+      };
       steps: {
         arrive: string;
         pickUp: string;
@@ -3328,6 +3412,19 @@ export interface ZuumRoutes {
         category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
         vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
       };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
+      };
       steps: {
         arrive: string;
         pickUp: string;
@@ -3492,6 +3589,19 @@ export interface ZuumRoutes {
         category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
         vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
       };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
+      };
       steps: {
         arrive: string;
         pickUp: string;
@@ -3651,6 +3761,19 @@ export interface ZuumRoutes {
         code: string;
         category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
         vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+      };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
       };
       steps: {
         arrive: string;
@@ -3814,6 +3937,19 @@ export interface ZuumRoutes {
         code: string;
         category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
         vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+      };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
       };
       steps: {
         arrive: string;
@@ -3987,6 +4123,19 @@ export interface ZuumRoutes {
         category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
         vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
       };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
+      };
       steps: {
         arrive: string;
         pickUp: string;
@@ -4152,6 +4301,19 @@ export interface ZuumRoutes {
         category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
         vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
       };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
+      };
       steps: {
         arrive: string;
         pickUp: string;
@@ -4310,6 +4472,19 @@ export interface ZuumRoutes {
         code: string;
         category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
         vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+      };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
       };
       steps: {
         arrive: string;

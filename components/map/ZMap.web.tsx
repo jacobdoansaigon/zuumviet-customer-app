@@ -3,19 +3,19 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { View, StyleSheet } from 'react-native';
-import { Map as MapLibreMap, Marker, type FilterSpecification, type GeoJSONSource, type LineLayerSpecification } from 'maplibre-gl';
+import { Map as MapLibreMap, Marker, type FillLayerSpecification, type FilterSpecification, type GeoJSONSource, type LineLayerSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { goongStyleUrl } from '@/services/maps';
-import { addInsets, boundsOf, circleFeature, LINE_LAYERS, linesFeature, type ZMapHandle, type ZMapProps } from './types';
-
-const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
+import { addInsets, boundsOf, circleFeature, EMPTY_FEATURES as EMPTY, LINE_LAYERS, linesFeature, RADAR_LAYERS, type ZMapHandle, type ZMapProps } from './types';
+import { useRadar } from './useRadar';
 
 /** thời gian flyTo (ms) */
 const FLY_MS = 500;
 
 export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
-  ({ style, initialCenter, initialZoom = 14, markers = [], lines, circle, insets, fit, interactive = true, onRegionChangeComplete, onPress }, ref) => {
+  ({ style, initialCenter, initialZoom = 14, markers = [], lines, circle, radar, insets, fit, interactive = true, onRegionChangeComplete, onPress }, ref) => {
     const hostRef = useRef<View>(null);
+    const radarData = useRadar(radar);
     const mapRef = useRef<MapLibreMap | null>(null);
     const markerRefs = useRef(new Map<string, Marker>());
     const [ready, setReady] = useState(false);
@@ -54,6 +54,19 @@ export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
       });
       map.touchZoomRotate.disableRotation();
       map.on('load', () => {
+        // vòng quét nằm dưới cùng (thêm trước đường và vòng tròn)
+        map.addSource('zmap-radar', { type: 'geojson', data: EMPTY });
+        map.addLayer({ id: 'zmap-radar-fill', type: 'fill', source: 'zmap-radar', filter: RADAR_LAYERS.fill.filter as FilterSpecification, paint: RADAR_LAYERS.fill.paint as FillLayerSpecification['paint'] });
+        (['outer', 'pulse'] as const).forEach((k) =>
+          map.addLayer({
+            id: `zmap-radar-${k}`,
+            type: 'line',
+            source: 'zmap-radar',
+            filter: RADAR_LAYERS[k].filter as FilterSpecification,
+            layout: RADAR_LAYERS[k].layout as LineLayerSpecification['layout'],
+            paint: RADAR_LAYERS[k].paint as LineLayerSpecification['paint'],
+          }),
+        );
         map.addSource('zmap-circle', { type: 'geojson', data: EMPTY });
         map.addLayer({ id: 'zmap-circle-fill', type: 'fill', source: 'zmap-circle', paint: { 'fill-color': 'rgba(0,0,0,0)' } });
         map.addLayer({ id: 'zmap-circle-line', type: 'line', source: 'zmap-circle', paint: { 'line-color': 'rgba(0,0,0,0)', 'line-width': 1 } });
@@ -109,6 +122,11 @@ export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
       (map.getSource('zmap-lines') as GeoJSONSource).setData(linesFeature(lines));
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [ready, linesKey]);
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map || !ready) return;
+      (map.getSource('zmap-radar') as GeoJSONSource | undefined)?.setData(radarData ?? EMPTY);
+    }, [ready, radarData]);
     const circleKey = circle ? `${circle.center.lat},${circle.center.lng},${circle.radiusMeters},${circle.fill},${circle.stroke}` : '';
     useEffect(() => {
       const map = mapRef.current;
