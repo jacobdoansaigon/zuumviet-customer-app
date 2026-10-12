@@ -25,6 +25,8 @@ import { useVnToday } from '@/hooks/useVnToday';
 import { errorMessage } from '@/services/zuum';
 
 
+const SHOWN_KINDS: readonly TripKind[] = ['bus'];
+
 export default function IntercityTripsScreen() {
   const { cityId, kind: kindParam } = useLocalSearchParams<{ cityId: string; kind?: string }>();
   const cities = useIntercityCities();
@@ -124,8 +126,9 @@ export default function IntercityTripsScreen() {
           </AppText>
         </View>
 
-        <View style={styles.kindRow}>
-          {(['bus', 'carpool'] as const).map((k) => (
+        {/* "Xe ghép" tạm ẩn (anh Jacob 2026-10-12) — còn một loại thì không hiện bộ chọn; mở lại: thêm 'carpool' vào SHOWN_KINDS */}
+        <View style={[styles.kindRow, SHOWN_KINDS.length < 2 && { display: 'none' }]}>
+          {SHOWN_KINDS.map((k) => (
             <Chip key={k} label={TRIP_KIND_LABEL[k]} icon={k === 'bus' ? 'mci:bus' : 'mci:car-multiple'} active={kind === k} onPress={() => setKind(k)} style={styles.kindChip} />
           ))}
         </View>
