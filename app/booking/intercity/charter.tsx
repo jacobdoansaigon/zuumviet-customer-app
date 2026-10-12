@@ -6,7 +6,7 @@ import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { AppHeader, AppText, Button, Icon, Screen, ServiceOption } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
-import { useBooking, completeReceivers, switchRideOption, setOptions, estimateFor, formatVnd } from '@/services/bookingStore';
+import { useBooking, completeReceivers, switchRideOption, setOptions, estimateFor, formatVnd, buildPreviewRoute, refreshPreviews, previewFor, previewRoute, formatRouteDistance, formatRouteDuration } from '@/services/bookingStore';
 import { optionsFor, useCatalog, type ServiceOptionView } from '@/services/catalog';
 import { buildDateOptions } from '@/services/intercity';
 import { useVnToday } from '@/hooks/useVnToday';
@@ -49,13 +49,30 @@ export default function CharterScreen() {
     if (!o.paused) switchRideOption('intercity', o.id);
   };
 
+  // Giá thật theo đường (+ giá động) cho mọi hạng xe — màn chọn phương án đã tính tuyến, ở đây tính lại khi đổi ngày giờ đi
+  const previewKey = useMemo(() => {
+    const r = buildPreviewRoute(state);
+    return r ? JSON.stringify(r) : '';
+  }, [state]);
+  const previewIds = options.filter((o) => !o.paused).map((o) => o.service.id).join(',');
+  useEffect(() => {
+    if (!previewKey || !previewIds) return;
+    const t = setTimeout(() => void refreshPreviews(previewIds.split(',')), 300);
+    return () => clearTimeout(t);
+  }, [previewKey, previewIds]);
+  const route = previewRoute(state);
+  const priceOf = (o: ServiceOptionView) => {
+    const pv = previewFor(o.service.id, state);
+    return pv?.total != null ? formatVnd(pv.total) : `~${formatVnd(estimateFor(o, state))}`;
+  };
+
   return (
     <Screen
       header={<AppHeader title="Thuê cả xe" variant="dark" left="back" />}
       scroll
       footer={
         <Button
-          title={selected ? `Tiếp tục · ~${formatVnd(estimateFor(selected, state))}` : 'Tiếp tục'}
+          title={selected ? `Tiếp tục · ${priceOf(selected)}` : 'Tiếp tục'}
           disabled={!selected || selected.paused}
           onPress={() => router.push('/booking/confirm')}
         />
@@ -66,6 +83,7 @@ export default function CharterScreen() {
           <Icon name="mci:map-marker-distance" size={16} color={Colors.primary} />
           <AppText size={13} color={Colors.textSecondary} style={{ marginLeft: 6, flex: 1 }} numberOfLines={2}>
             {pickupLabel} → {destLabel}
+            {route ? ` · ${formatRouteDistance(route.distanceMeters)}${route.durationSeconds ? ` · ~${formatRouteDuration(route.durationSeconds)}` : ''}` : ''}
           </AppText>
         </View>
 
@@ -82,7 +100,7 @@ export default function CharterScreen() {
               key={o.id}
               name={o.name}
               description={o.description}
-              price={o.paused ? undefined : `~${formatVnd(estimateFor(o, state))}`}
+              price={o.paused ? undefined : priceOf(o)}
               priceHint={o.paused ? 'Tạm ngưng' : undefined}
               icon={o.icon}
               selected={o.id === selected?.id}

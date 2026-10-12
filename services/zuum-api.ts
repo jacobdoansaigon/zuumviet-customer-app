@@ -1889,6 +1889,7 @@ export interface ZuumRoutes {
         distanceMeters: null | number;
         durationSeconds: null | number;
         distanceSource: "none" | "goong" | "estimate";
+        routePolyline: null | string;
         adjustments: Array<{
           id: string;
           name: string;

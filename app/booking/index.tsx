@@ -16,30 +16,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AppText, Chip, Icon, Icons, ServiceOption, Toast } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { SERVICE_GROUPS, URBAN_RIDE_KEYS, toServiceKey } from '@/constants/booking';
-import {
-  useBooking,
-  startBooking,
-  syncOptionWithCatalog,
-  hydrateSender,
-  prefillRoute,
-  switchRideOption,
-  selectLaborOption,
-  setOptions,
-  addReceiver,
-  removeReceiver,
-  pruneIncompleteReceivers,
-  completeReceivers,
-  maxStopsOf,
-  estimateFor,
-  formatVnd,
-  pickupFromGps,
-  setSenderPlace,
-  refreshQuote,
-  refreshPreviews,
-  previewFor,
-  buildQuoteRequest,
-  type Place,
-} from '@/services/bookingStore';
+import { useBooking, startBooking, syncOptionWithCatalog, hydrateSender, prefillRoute, switchRideOption, selectLaborOption, setOptions, addReceiver, removeReceiver, pruneIncompleteReceivers, completeReceivers, maxStopsOf, estimateFor, formatVnd, pickupFromGps, setSenderPlace, refreshQuote, refreshPreviews, previewFor, buildQuoteRequest, type Place, buildPreviewRoute, previewRoute, formatRouteDistance, formatRouteDuration } from '@/services/bookingStore';
 import { decodePolyline } from '@/components/map/polyline';
 import type { LatLng, ZMapHandle, ZMapMarker } from '@/components/map/types';
 import { mapsAvailable } from '@/services/maps';
@@ -70,6 +47,9 @@ import {
 const samePlace = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6;
 /** kéo bản đồ dừng bao lâu mới đổi toạ độ ghim ra địa chỉ (gom nhiều lần dừng ngắn thành 1 request) */
 const PIN_SETTLE_MS = 1000;
+
+/** Phương án bán theo ghế đang mở — 'carpool' (Xe ghép) tạm ẩn theo anh Jacob 2026-10-12; mở lại: thêm vào mảng */
+const INTERCITY_TRIP_KINDS: readonly ('bus' | 'carpool')[] = ['bus'];
 
 export default function BookingScreen() {
   const { service, reorder } = useLocalSearchParams<{ service?: string; reorder?: string }>();
@@ -323,18 +303,36 @@ export default function BookingScreen() {
     const t = setTimeout(() => void refreshQuote(), 600);
     return () => clearTimeout(t);
   }, [quoteKey]);
-  // Giá thật (theo đường + giá động) cho mọi dịch vụ trong tab — thay ước tính "~" trên danh sách
-  const previewIds = useMemo(() => options.filter((o) => !o.paused).map((o) => o.service.id).join(','), [options]);
+  // Xe đường dài: chưa chọn hạng xe → chọn sẵn hạng đầu tiên đang bán để tính tuyến đường + giá ngay ở màn chọn phương án
   useEffect(() => {
-    if (!quoteKey || !previewIds) return;
+    if (!isIntercity || !hasDestination) return;
+    const list = optionsFor('intercity', catalog);
+    if (list.some((o) => o.id === state.optionId)) return;
+    const first = list.find((o) => !o.paused);
+    if (first) switchRideOption('intercity', first.id);
+  }, [isIntercity, hasDestination, catalog, state.optionId]);
+  // Giá thật (theo đường + giá động) cho mọi dịch vụ trong tab — thay ước tính "~" trên danh sách; xe đường dài cũng lấy
+  // tuyến đường (quãng đường, thời gian, hình dạng) từ đây để bước sau tính tiền ngay
+  const previewIds = useMemo(() => options.filter((o) => !o.paused).map((o) => o.service.id).join(','), [options]);
+  const previewRouteKey = useMemo(() => {
+    const r = buildPreviewRoute(state);
+    return r ? JSON.stringify(r) : '';
+  }, [state]);
+  useEffect(() => {
+    if (!previewRouteKey || !previewIds) return;
     const t = setTimeout(() => void refreshPreviews(previewIds.split(',')), 600);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quoteKey, previewIds]);
+  }, [previewRouteKey, previewIds]);
   const routePath = useMemo(() => {
     const q = state.quote;
-    return q.status === 'ready' && q.key === quoteKey && q.quote?.routePolyline ? decodePolyline(q.quote.routePolyline) : null;
-  }, [state.quote, quoteKey]);
+    if (q.status === 'ready' && q.key === quoteKey && q.quote?.routePolyline) return decodePolyline(q.quote.routePolyline);
+    // chưa có báo giá ngầm (xe đường dài): hình dạng tuyến từ xem trước giá
+    const pr = previewRoute(state);
+    return pr?.routePolyline ? decodePolyline(pr.routePolyline) : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.quote, state.previews, quoteKey, previewRouteKey]);
+  const intercityRoute = isIntercity ? previewRoute(state) : null;
 
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/home'));
   const openSender = () => router.push('/booking/sender');
@@ -499,6 +497,13 @@ export default function BookingScreen() {
                     <AppText size={12} weight="semiBold" color={Colors.textSecondary}>
                       Chọn phương án đi {destPlace?.title ?? ''}
                     </AppText>
+                    <AppText size={12} color={intercityRoute ? Colors.text : Colors.textSecondary} style={{ marginTop: 2 }}>
+                      {intercityRoute
+                        ? `Quãng đường ${formatRouteDistance(intercityRoute.distanceMeters)}${intercityRoute.durationSeconds ? ` · khoảng ${formatRouteDuration(intercityRoute.durationSeconds)} theo đường bộ` : ' theo đường bộ'}`
+                        : state.previews.status === 'error'
+                          ? 'Chưa tính được quãng đường, sẽ tính lại ở bước sau'
+                          : 'Đang tính quãng đường theo đường bộ…'}
+                    </AppText>
                   </View>
 
                   <Pressable onPress={openCharter} style={styles.marketplaceCard}>
@@ -516,7 +521,7 @@ export default function BookingScreen() {
                     <Icon name={Icons.chevronRight} size={18} color={Colors.gray400} />
                   </Pressable>
 
-                  {(['carpool', 'bus'] as const).map((kind) => (
+                  {INTERCITY_TRIP_KINDS.map((kind) => (
                     <Pressable
                       key={kind}
                       onPress={() => openTrips(kind)}

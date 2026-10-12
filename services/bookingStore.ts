@@ -574,6 +574,31 @@ export function previewFor(serviceId: string, s: BookingState = state): QuotePre
   return s.previews.items[serviceId] ?? null;
 }
 
+/** Tuyến của lộ trình hiện tại (quãng đường, thời gian, hình dạng) lấy từ xem trước giá — có ngay cả khi khách chưa chọn
+ * dịch vụ cụ thể (vd Xe đường dài ở màn chọn phương án); null = chưa tính xong / lộ trình đã đổi */
+export function previewRoute(s: BookingState = state): { distanceMeters: number; durationSeconds: number | null; routePolyline: string | null } | null {
+  const route = buildPreviewRoute(s);
+  if (!route || s.previews.routeKey !== JSON.stringify(route)) return null;
+  for (const it of Object.values(s.previews.items)) {
+    if (it.distanceMeters != null) return { distanceMeters: it.distanceMeters, durationSeconds: it.durationSeconds, routePolyline: it.routePolyline };
+  }
+  return null;
+}
+
+/** "860 km" / "9,5 km" */
+export function formatRouteDistance(meters: number): string {
+  const km = meters / 1000;
+  return km >= 100 ? `${Math.round(km)} km` : `${(Math.round(km * 10) / 10).toString().replace('.', ',')} km`;
+}
+
+/** "15 giờ 20 phút" / "2 giờ" / "45 phút" */
+export function formatRouteDuration(seconds: number): string {
+  const m = Math.max(1, Math.round(seconds / 60));
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return h ? (mm ? `${h} giờ ${mm} phút` : `${h} giờ`) : `${mm} phút`;
+}
+
 /** Báo giá còn hạn của đúng bản nháp hiện tại (null nếu chưa có / đã cũ) */
 export function currentQuote(s: BookingState = state): Quote | null {
   const req = buildQuoteRequest(s);
