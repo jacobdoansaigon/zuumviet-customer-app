@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, ScrollView, Linking, ActivityIndicator, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { AppText, BottomSheet, Button, Icons, ListRow, Toast } from '@/components/ui';
+import { AppText, Button, Icons, Toast } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { SERVICE_GROUPS } from '@/constants/booking';
 import { circleEdgePoints, estimateEtaMinutes, getOrder, groupOfOrder, isActiveStatus, radiusLabel, retryOrder, searchPhaseAt, type OrderDetail, type OrderSearch, type SearchPhase } from '@/services/orders';
@@ -38,7 +38,6 @@ export default function TrackingScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [menu, setMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [sheetH, setSheetH] = useState(0);
   const insets = useSafeAreaInsets();
@@ -193,8 +192,8 @@ export default function TrackingScreen() {
   };
 
   const cancellable = !!order?.allowedActions.includes('cancel');
-  // menu đang mở: đếm ngược huỷ miễn phí; qua mốc → tải lại đơn để hiện phí mới
-  const freeLeft = useFreeCancelCountdown(menu && cancellable ? order?.cancelFreeUntil : null, () => void load());
+  // phần mở rộng đang mở (có thanh huỷ): đếm ngược huỷ miễn phí; qua mốc → tải lại đơn để hiện phí mới
+  const freeLeft = useFreeCancelCountdown(expanded && cancellable ? order?.cancelFreeUntil : null, () => void load());
   const cancelFee = freeLeft != null ? 0 : (order?.cancelFeeIfNow ?? 0);
   const cancelSublabel =
     freeLeft != null
@@ -218,10 +217,12 @@ export default function TrackingScreen() {
               etaMinutes={eta}
               expanded={expanded}
               onToggle={() => setExpanded((v) => !v)}
-              onMore={() => setMenu(true)}
               onRetry={() => void retry()}
               retrying={retrying}
               searchHint={phase ? `Đang quét trong bán kính ${radiusLabel(phase.radiusMeters)}` : null}
+              onCancel={cancellable ? () => router.push({ pathname: '/booking/cancel', params: { orderId: order.id } }) : undefined}
+              cancelHint={cancellable ? cancelSublabel : null}
+              onSupport={() => call(SUPPORT_PHONE)}
               onCall={() => call(order.partner?.phone)}
               onChat={() => setToast('Tính năng nhắn tin với tài xế sắp ra mắt')}
               onRate={() => router.push(`/orders/${order.id}/rate`)}
@@ -244,31 +245,6 @@ export default function TrackingScreen() {
           )}
         </ScrollView>
       </View>
-
-      <BottomSheet visible={menu} onClose={() => setMenu(false)} contentStyle={{ paddingHorizontal: 0, paddingBottom: Spacing.sm }}>
-        {cancellable && order ? (
-          <ListRow
-            icon={Icons.closeCircle}
-            iconColor={Colors.error}
-            label="Huỷ đơn hàng"
-            sublabel={cancelSublabel}
-            onPress={() => {
-              setMenu(false);
-              router.push({ pathname: '/booking/cancel', params: { orderId: order.id } });
-            }}
-          />
-        ) : null}
-        <ListRow
-          icon={Icons.headset}
-          label="Liên hệ hỗ trợ"
-          sublabel={`Tổng đài ${SUPPORT_PHONE}`}
-          divider={false}
-          onPress={() => {
-            setMenu(false);
-            call(SUPPORT_PHONE);
-          }}
-        />
-      </BottomSheet>
 
       <Toast visible={!!toast} message={toast ?? ''} tone="info" onHide={() => setToast(null)} style={{ bottom: sheetH + Spacing.md }} />
     </View>

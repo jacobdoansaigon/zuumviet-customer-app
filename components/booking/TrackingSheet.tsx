@@ -6,6 +6,7 @@ import { View, Pressable, StyleSheet } from 'react-native';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppText, Avatar, Button, Icon, Icons, RouteStops, ServiceOption, type RouteStop } from '@/components/ui';
 import { SERVICE_GROUPS, SERVICE_PRESENTATION, type ServiceLabels } from '@/constants/booking';
+import { SUPPORT_HOTLINE_LABEL } from '@/constants/content';
 import { formatVnd, formatScheduleLabel } from '@/services/bookingStore';
 import { formatPhone } from '@/services/session';
 import { groupOfOrder, phaseOf, STOP_STATUS_LABEL, type OrderDetail, type StopStatus, type TrackingPhase } from '@/services/orders';
@@ -45,19 +46,25 @@ interface Props {
   /** phút (khoảng) tài xế tới điểm kế tiếp — null khi chưa có vị trí tài xế */
   etaMinutes: number | null;
   expanded: boolean;
+  /** mở rộng / thu gọn — thanh kéo, dòng mã đơn và nút "…" đều gọi cái này */
   onToggle: () => void;
-  onMore: () => void;
   onRetry: () => void;
   retrying?: boolean;
   /** đang tìm: dòng phụ dưới tiêu đề (vd "Đang quét trong bán kính 500 m") */
   searchHint?: string | null;
+  /** huỷ chuyến — thanh cuối phần mở rộng; không truyền = đơn không huỷ được lúc này */
+  onCancel?: () => void;
+  /** dòng dưới thanh huỷ: còn miễn phí bao lâu / phí nếu huỷ ngay */
+  cancelHint?: string | null;
+  /** gọi tổng đài hỗ trợ (thanh cuối phần mở rộng) */
+  onSupport: () => void;
   onCall: () => void;
   onChat: () => void;
   onRate: () => void;
   onHome: () => void;
 }
 
-export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, onToggle, onMore, onRetry, retrying, searchHint, onCall, onChat, onRate, onHome }) => {
+export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, onToggle, onRetry, retrying, searchHint, onCancel, cancelHint, onSupport, onCall, onChat, onRate, onHome }) => {
   const phase = phaseOf(order.status);
   const group = SERVICE_GROUPS[groupOfOrder(order.service)];
   const L = group.labels;
@@ -87,11 +94,13 @@ export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, on
     })),
   ];
 
+  // nút "…" = kéo trang lên / thu gọn (huỷ chuyến và liên hệ hỗ trợ nằm ở cuối phần mở rộng, không còn menu riêng)
   const more = (
-    <Pressable onPress={onMore} hitSlop={10} accessibilityLabel="Thêm">
+    <Pressable onPress={onToggle} hitSlop={10} accessibilityLabel={expanded ? 'Thu gọn' : 'Mở rộng'}>
       <Icon name={Icons.more} size={22} color={Colors.text} />
     </Pressable>
   );
+  const cancelTitle = group.kind === 'ride' ? 'Huỷ chuyến' : group.kind === 'onsite' ? 'Huỷ yêu cầu' : 'Huỷ đơn hàng';
 
   const acceptedTitle =
     order.status === 'arrived_pickup'
@@ -312,6 +321,20 @@ export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, on
               Kèm phí huỷ đơn trước còn nợ: {formatVnd(order.debtAmount)}
             </AppText>
           ) : null}
+
+          <View style={styles.bottomBars}>
+            <Button title={`Liên hệ hỗ trợ · ${SUPPORT_HOTLINE_LABEL}`} variant="outline" onPress={onSupport} />
+            {onCancel ? (
+              <>
+                <Button title={cancelTitle} variant="danger" onPress={onCancel} style={{ marginTop: Spacing.sm }} />
+                {cancelHint ? (
+                  <AppText size={12} color={Colors.textSecondary} align="center" style={{ marginTop: 6 }}>
+                    {cancelHint}
+                  </AppText>
+                ) : null}
+              </>
+            ) : null}
+          </View>
         </View>
       ) : null}
 
@@ -369,6 +392,7 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.border,
   },
   expanded: { paddingHorizontal: Spacing.screen, paddingBottom: Spacing.sm },
+  bottomBars: { marginTop: Spacing.lg, paddingTop: Spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border },
   lineRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 2 },
   cta: { paddingHorizontal: Spacing.screen, paddingTop: Spacing.sm, paddingBottom: Spacing.xs, borderRadius: BorderRadius.md },
 });
