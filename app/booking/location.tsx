@@ -6,7 +6,7 @@
 // Xe đường dài (điểm đến): gợi ý mặc định là bến xe các tỉnh/thành đang có tuyến (API intercity/cities).
 // Không còn "dùng địa chỉ đã nhập" với toạ độ tự chế — giá tính theo toạ độ nên địa điểm phải đến từ API/bản đồ.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, TextInput, Pressable, FlatList, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { View, TextInput, Pressable, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Chip, Icon, Icons, Screen, StopMarker, fontStyle, useBlurOnLeave } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Sizes, NO_WEB_OUTLINE } from '@/constants/theme';
@@ -184,9 +184,8 @@ export default function LocationScreen() {
             style={[styles.input, fontStyle('bold')]}
             autoFocus
             returnKeyType="search"
-            // Android: bàn phím chữ đơn giản — không thanh gợi ý / emoji / GIF
-            keyboardType={Platform.OS === 'android' ? 'visible-password' : 'default'}
-            autoCorrect={false}
+            // Giữ bàn phím chuẩn: Gboard tắt gõ Telex khi app xin kiểu "không gợi ý" (visible-password / autoCorrect=false)
+            // → thanh emoji/GIF là của Gboard, không ẩn được mà vẫn gõ được tiếng Việt (anh Jacob thử 2026-10-12).
           />
           {searching ? <ActivityIndicator size="small" color={Colors.primary} /> : null}
           {query && !searching ? (
