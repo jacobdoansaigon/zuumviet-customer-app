@@ -5,12 +5,16 @@
 // Xe máy / Xe hơi: tab đổi qua lại ngay trong màn; "Tất cả dịch vụ" gộp gói của cả 2.
 // Xe đường dài: điểm đến xong → 3 phương án: Thuê cả xe (đơn thường) / Xe ghép & Mua vé xe (chuyến bán theo ghế,
 // chỉ bật khi điểm đến khớp 1 tỉnh/thành đang bán vé — không khớp thì gợi ý bến xe gần nhất).
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, ScrollView, Pressable, StyleSheet, useWindowDimensions, ActivityIndicator } from 'react-native';
+// Chọn điểm đón bằng bản đồ (khi chưa có điểm đến): ghim logo ZuumViet đứng giữa khung, khách kéo bản đồ / chạm một điểm
+// (kể cả tên địa điểm có sẵn trên nền) → dừng 1 giây mới đổi toạ độ mũi ghim ra địa chỉ (1 request / lần dừng) và điền
+// vào ô điểm đón; nút định vị đưa bản đồ về vị trí GPS; vị trí đã lưu (Nhà / Công ty…) hiện trên bản đồ, chạm để chọn;
+// chip "Cổng / lối vào" ghi vào pickup.note cho tài xế.
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, ScrollView, Pressable, StyleSheet, TextInput, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { AppText, Chip, Icon, Icons, ServiceOption, Toast } from '@/components/ui';
-import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
+import { AppText, Chip, Icon, Icons, ServiceOption, Toast, fontStyle } from '@/components/ui';
+import { Colors, Spacing, BorderRadius, Shadow, NO_WEB_OUTLINE } from '@/constants/theme';
 import { SERVICE_GROUPS, URBAN_RIDE_KEYS, toServiceKey } from '@/constants/booking';
 import {
   useBooking,
@@ -29,16 +33,40 @@ import {
   estimateFor,
   formatVnd,
   pickupFromGps,
+  setSenderPlace,
   refreshQuote,
   buildQuoteRequest,
   type Place,
 } from '@/services/bookingStore';
 import { decodePolyline } from '@/components/map/polyline';
+import type { LatLng, ZMapHandle, ZMapMarker } from '@/components/map/types';
+import { mapsAvailable } from '@/services/maps';
+import { reversePlace } from '@/services/places';
+import { loadSavedAddresses, useSavedAddresses, SAVED_KIND_LABEL, type SavedAddress } from '@/services/addresses';
 import { ensureCatalog, optionsFor, useCatalog, type ServiceOptionView } from '@/services/catalog';
 import { ensureIntercityCities, matchIntercityCity, nearestCity, useIntercityCities } from '@/services/intercity';
 import { getOrder } from '@/services/orders';
 import { errorMessage } from '@/services/zuum';
-import { BookingMap, RoundIconButton, StopList, ServiceInfoDialog, HandymanJobDialog, FlatFooter, useCurrentLocation, type MapStop, type HandymanJobDetail } from '@/components/booking';
+import {
+  BookingMap,
+  RoundIconButton,
+  StopList,
+  ServiceInfoDialog,
+  HandymanJobDialog,
+  FlatFooter,
+  PickupPin,
+  PICKUP_PIN_HEIGHT,
+  SavedPlaceMarker,
+  useCurrentLocation,
+  getCurrentLatLng,
+  type MapStop,
+  type HandymanJobDetail,
+} from '@/components/booking';
+
+/** gợi ý cổng / lối vào cho toà nhà, siêu thị, chung cư — khách chọn hoặc tự ghi */
+const GATE_PRESETS = ['Cổng chính', 'Cổng phụ', 'Sảnh chính', 'Hầm xe', 'Cổng 1', 'Cổng 2'];
+/** kéo bản đồ dừng bao lâu mới đổi toạ độ ghim ra địa chỉ (gom nhiều lần dừng ngắn thành 1 request) */
+const PIN_SETTLE_MS = 1000;
 
 export default function BookingScreen() {
   const { service, reorder } = useLocalSearchParams<{ service?: string; reorder?: string }>();
@@ -53,8 +81,16 @@ export default function BookingScreen() {
   const [info, setInfo] = useState<ServiceOptionView | null>(null);
   const [jobOption, setJobOption] = useState<ServiceOptionView | null>(null);
   const [sheetH, setSheetH] = useState(0);
+  const [rootH, setRootH] = useState(0);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // ---- chọn điểm đón bằng ghim giữa bản đồ ----
+  const mapRef = useRef<ZMapHandle>(null);
+  const resolveSeq = useRef(0);
+  const [resolving, setResolving] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [gateOther, setGateOther] = useState(false);
+  const savedAddresses = useSavedAddresses();
 
   const loadCatalog = useCallback(() => {
     setCatalogError(null);
@@ -114,6 +150,106 @@ export default function BookingScreen() {
   const senderReady = !!state.sender.place && !!state.sender.name && !!state.sender.phone;
   // Gọi thợ / thuê nhân công (không có điểm đến) → tính giá được ngay; còn lại cần chọn xong điểm đến.
   const hasDestination = maxStops === 0 || complete.length > 0;
+  // Chưa có điểm đến: bản đồ ở chế độ ghim — kéo bản đồ để chọn điểm đón (có điểm đến rồi thì bản đồ canh theo lộ trình)
+  const pinMode = mapsAvailable && complete.length === 0;
+  const pickup = state.sender.place;
+
+  /** Toạ độ mũi ghim → địa chỉ chữ → ô điểm đón. Chỉ gọi API sau khi đứng yên `delayMs` (yêu cầu mới huỷ yêu cầu cũ). */
+  const resolvePickupAt = useCallback(
+    (c: LatLng, source: Place['source'], delayMs: number) => {
+      const my = ++resolveSeq.current;
+      setResolving(true);
+      const run = async () => {
+        try {
+          const p = await reversePlace(c.lat, c.lng);
+          if (my !== resolveSeq.current) return;
+          setSenderPlace({ title: p.name ?? (source === 'gps' ? 'Vị trí hiện tại' : 'Vị trí trên bản đồ'), address: p.address, lat: c.lat, lng: c.lng, placeId: p.placeId, source });
+        } catch (e) {
+          if (my === resolveSeq.current) setToast(errorMessage(e, 'Không xác định được địa chỉ tại vị trí này'));
+        } finally {
+          if (my === resolveSeq.current) setResolving(false);
+        }
+      };
+      const t = setTimeout(() => void run(), delayMs);
+      return () => clearTimeout(t);
+    },
+    [],
+  );
+  const cancelPendingResolve = useRef<(() => void) | null>(null);
+  const schedulePickup = useCallback(
+    (c: LatLng, source: Place['source'], delayMs: number) => {
+      cancelPendingResolve.current?.();
+      cancelPendingResolve.current = resolvePickupAt(c, source, delayMs);
+    },
+    [resolvePickupAt],
+  );
+
+  // Khách kéo / phóng bản đồ xong → tâm khung mới = mũi ghim; chờ 1 giây đứng yên rồi mới đổi ra địa chỉ
+  const onMapMoved = useCallback(
+    (c: LatLng) => {
+      if (!pinMode) return;
+      if (pickup && Math.abs(pickup.lat - c.lat) < 1e-6 && Math.abs(pickup.lng - c.lng) < 1e-6) return;
+      schedulePickup(c, 'map', PIN_SETTLE_MS);
+    },
+    [pinMode, pickup, schedulePickup],
+  );
+  // Chạm một điểm (địa chỉ / tên địa điểm có sẵn trên nền bản đồ) → bản đồ trượt tới, ghim nằm đúng chỗ đó
+  // chạm vào marker vị trí đã lưu: trên web bản đồ cũng nhận 'click' → bỏ qua chạm bản đồ ngay sau đó
+  const ignoreMapPressUntil = useRef(0);
+  const onMapPress = useCallback(
+    (c: LatLng) => {
+      if (!pinMode || Date.now() < ignoreMapPressUntil.current) return;
+      mapRef.current?.flyTo(c);
+      schedulePickup(c, 'map', 300);
+    },
+    [pinMode, schedulePickup],
+  );
+  // Nút định vị: bản đồ về đúng vị trí GPS, điểm đón = vị trí đó
+  const locateMe = async () => {
+    if (locating) return;
+    setLocating(true);
+    const loc = await getCurrentLatLng();
+    setLocating(false);
+    if (!loc) {
+      setToast('Chưa lấy được vị trí. Kiểm tra quyền truy cập vị trí của ứng dụng.');
+      return;
+    }
+    const c = { lat: loc.latitude, lng: loc.longitude };
+    mapRef.current?.flyTo(c, 16);
+    if (pinMode) schedulePickup(c, 'gps', 0);
+  };
+  // Điểm đón đổi từ nguồn khác (GPS lần đầu, tìm kiếm, vị trí đã lưu, đơn cũ) → bản đồ trượt tới, ghim nằm đúng điểm
+  useEffect(() => {
+    if (!pinMode || !pickup || pickup.source === 'map') return;
+    mapRef.current?.flyTo({ lat: pickup.lat, lng: pickup.lng }, 16);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pinMode, pickup?.lat, pickup?.lng, pickup?.source]);
+  // Vị trí đã lưu hiện trên bản đồ khi đang chọn điểm đón
+  useEffect(() => {
+    if (pinMode && !savedAddresses) void loadSavedAddresses().catch(() => undefined);
+  }, [pinMode, savedAddresses]);
+  const pickSaved = useCallback((a: SavedAddress) => {
+    ignoreMapPressUntil.current = Date.now() + 600;
+    cancelPendingResolve.current?.();
+    resolveSeq.current++;
+    setResolving(false);
+    setSenderPlace({ title: a.label || SAVED_KIND_LABEL[a.kind], address: a.address, lat: a.lat, lng: a.lng, savedAddressId: a.id, source: 'saved' });
+  }, []);
+  const savedMarkers = useMemo<ZMapMarker[]>(
+    () =>
+      pinMode && savedAddresses
+        ? savedAddresses.map((a) => ({
+            id: `saved-${a.id}`,
+            at: { lat: a.lat, lng: a.lng },
+            anchor: 'center' as const,
+            title: a.label,
+            children: <SavedPlaceMarker kind={a.kind} label={a.label || SAVED_KIND_LABEL[a.kind]} onPress={() => pickSaved(a)} />,
+          }))
+        : [],
+    [pinMode, savedAddresses, pickSaved],
+  );
+  useEffect(() => () => cancelPendingResolve.current?.(), []);
+  const gateNote = state.options.pickupNote;
 
   const tabKeys = URBAN_RIDE_KEYS.includes(state.service) ? URBAN_RIDE_KEYS : null;
   const options: ServiceOptionView[] = useMemo(
@@ -132,13 +268,14 @@ export default function BookingScreen() {
   const stops = useMemo<MapStop[]>(() => {
     const list: MapStop[] = [];
     const p = state.sender.place;
-    if (p) list.push({ id: 'pickup', lat: p.lat, lng: p.lng, type: 'pickup', label: labels.mapPickupLabel });
+    // chế độ ghim: ghim logo giữa khung đã đại diện điểm đón
+    if (p && !pinMode) list.push({ id: 'pickup', lat: p.lat, lng: p.lng, type: 'pickup', label: labels.mapPickupLabel });
     complete.forEach((r, i) => {
       list.push({ id: `drop-${r.id}`, lat: r.place!.lat, lng: r.place!.lng, type: 'dropoff', label: maxStops > 1 ? `${labels.mapDropLabel} ${i + 1}` : labels.mapDropLabel });
     });
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.sender.place, state.receivers, labels, maxStops]);
+  }, [state.sender.place, state.receivers, labels, maxStops, pinMode]);
 
   // Tuyến theo đường: đủ điểm thì lấy báo giá ngầm cho bản nháp (có hình dạng tuyến) — màn xác nhận dùng lại nếu còn hạn
   const quoteKey = useMemo(() => {
@@ -235,10 +372,37 @@ export default function BookingScreen() {
       </View>
     ) : null;
 
+  const pinTop = (rootH - sheetH) / 2 - PICKUP_PIN_HEIGHT;
+
   return (
-    <View style={styles.root}>
-      <BookingMap stops={stops} routePath={routePath} bottomPadding={sheetH} />
+    <View style={styles.root} onLayout={(e) => setRootH(e.nativeEvent.layout.height)}>
+      <BookingMap
+        ref={mapRef}
+        stops={stops}
+        routePath={routePath}
+        bottomPadding={sheetH}
+        center={pinMode && pickup ? { lat: pickup.lat, lng: pickup.lng } : undefined}
+        extraMarkers={savedMarkers}
+        onRegionChangeComplete={pinMode ? onMapMoved : undefined}
+        onPress={pinMode ? onMapPress : undefined}
+      />
+      {pinMode && rootH > 0 && sheetH > 0 ? (
+        <View pointerEvents="none" style={[styles.centerPin, { top: pinTop }]}>
+          <PickupPin lifted={resolving} />
+        </View>
+      ) : null}
       <RoundIconButton icon={Icons.back} onPress={goBack} style={[styles.back, { top: insets.top + Spacing.md }]} accessibilityLabel="Quay lại" />
+      {mapsAvailable ? (
+        <View style={[styles.locate, { bottom: sheetH + Spacing.md }]}>
+          {locating ? (
+            <View style={styles.locateBusy}>
+              <ActivityIndicator color={Colors.primary} />
+            </View>
+          ) : (
+            <RoundIconButton icon={Icons.locate} size={44} onPress={() => void locateMe()} accessibilityLabel="Vị trí của tôi" />
+          )}
+        </View>
+      ) : null}
 
       <View style={styles.sheet} onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}>
         {hasDestination ? (
@@ -337,7 +501,52 @@ export default function BookingScreen() {
             onAddReceiver={addStop}
             labels={labels}
             maxStops={maxStops}
+            senderAddressOverride={pinMode && resolving ? 'Đang xác định địa chỉ…' : undefined}
           />
+          {pinMode && pickup ? (
+            // Cổng / lối vào tại điểm đón (toà nhà, siêu thị, chung cư…) → tài xế thấy trong ghi chú điểm đón
+            // (vẫn giữ khối lúc đang xác định địa chỉ — chỉ mờ đi — để khung không đổi chiều cao làm bản đồ giật)
+            <View style={[styles.gateWrap, resolving && styles.gateBusy]}>
+              <AppText size={12} color={Colors.textSecondary} style={{ marginBottom: 6 }}>
+                Cổng / lối vào để tài xế dễ tìm
+              </AppText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.gateRow}>
+                {GATE_PRESETS.map((g) => (
+                  <Chip
+                    key={g}
+                    label={g}
+                    size="sm"
+                    variant="soft"
+                    active={gateNote === g}
+                    onPress={() => {
+                      setGateOther(false);
+                      setOptions({ pickupNote: gateNote === g ? '' : g });
+                    }}
+                  />
+                ))}
+                <Chip
+                  label="Khác…"
+                  size="sm"
+                  variant="soft"
+                  active={gateOther || (!!gateNote && !GATE_PRESETS.includes(gateNote))}
+                  onPress={() => {
+                    setGateOther(true);
+                    if (GATE_PRESETS.includes(gateNote)) setOptions({ pickupNote: '' });
+                  }}
+                />
+              </ScrollView>
+              {gateOther || (!!gateNote && !GATE_PRESETS.includes(gateNote)) ? (
+                <TextInput
+                  value={GATE_PRESETS.includes(gateNote) ? '' : gateNote}
+                  onChangeText={(t) => setOptions({ pickupNote: t.slice(0, 120) })}
+                  placeholder="Vd: Cổng B, sảnh thang máy số 2, kế quầy bảo vệ"
+                  placeholderTextColor={Colors.placeholder}
+                  style={[styles.gateInput, fontStyle('medium')]}
+                  autoFocus={gateOther}
+                />
+              ) : null}
+            </View>
+          ) : null}
         </ScrollView>
 
         {isIntercity && hasDestination ? null : (
@@ -382,6 +591,23 @@ export default function BookingScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.mapBg },
   back: { position: 'absolute', left: Spacing.screen },
+  centerPin: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  locate: { position: 'absolute', right: Spacing.screen },
+  locateBusy: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center', ...Shadow.md },
+  gateWrap: { paddingHorizontal: Spacing.screen, paddingBottom: Spacing.sm },
+  gateBusy: { opacity: 0.45, pointerEvents: 'none' },
+  gateRow: { flexDirection: 'row', gap: Spacing.sm, paddingRight: Spacing.screen },
+  gateInput: {
+    marginTop: Spacing.sm,
+    height: 40,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    fontSize: 14,
+    color: Colors.text,
+    ...NO_WEB_OUTLINE,
+  },
   sheet: {
     position: 'absolute',
     left: 0,

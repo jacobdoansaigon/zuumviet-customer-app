@@ -17,3 +17,5 @@ export * from './ServiceInfoDialog';
 export * from './PaymentSheet';
 export * from './ZaloPasteSheet';
 export * from './TrackingSheet';
+export * from './PickupPin';
+export * from './SavedPlaceMarker';

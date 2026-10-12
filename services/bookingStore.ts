@@ -73,6 +73,8 @@ export interface BookingOptions {
   /** Gọi thợ: mô tả sự cố + yêu cầu khẩn cấp (ghi chú đơn) */
   handymanIssueNote: string;
   handymanUrgent: boolean;
+  /** Cổng / lối vào tại điểm đón ("Cổng 2", "Sảnh A"...) — gửi trong pickup.note của đơn; xoá khi đổi điểm đón */
+  pickupNote: string;
 }
 
 export type Quote = ZuumResponse<'POST /v1/customer/quotes'>;
@@ -120,6 +122,7 @@ const defaultOptions = (): BookingOptions => ({
   movingBulkyItems: [],
   handymanIssueNote: '',
   handymanUrgent: false,
+  pickupNote: '',
 });
 
 const emptyReceiver = (): Receiver => ({
@@ -236,7 +239,12 @@ export function setSenderInfo(info: { name?: string; phone?: string }) {
 }
 
 export function setSenderPlace(place: Place) {
-  update((s) => ({ sender: { ...s.sender, place } }));
+  update((s) => {
+    const prev = s.sender.place;
+    // đổi sang vị trí khác (> ~5 m) → ghi chú cổng của chỗ cũ không còn đúng
+    const moved = !prev || Math.abs(prev.lat - place.lat) > 5e-5 || Math.abs(prev.lng - place.lng) > 5e-5;
+    return { sender: { ...s.sender, place }, options: moved ? { ...s.options, pickupNote: '' } : s.options };
+  });
 }
 
 /** Chưa có điểm đón: lấy vị trí GPS hiện tại, đổi ra địa chỉ chữ qua API (lỗi thì để khách tự chọn) */
@@ -447,6 +455,7 @@ export function buildOrderBody(s: BookingState, quoteId: string): ZuumRoutes['PO
     pickup: {
       contactName: s.sender.name.trim() || undefined,
       contactPhone: contactPhone(s.sender.phone),
+      note: clip(o.pickupNote.trim(), 200) || undefined,
     },
     // Giao hàng / dọn nhà / vận tải: liên hệ + ghi chú từng điểm; chở khách: không có người nhận riêng
     stops: isDelivery

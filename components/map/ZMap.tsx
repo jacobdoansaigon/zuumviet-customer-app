@@ -16,6 +16,9 @@ import {
 import { goongStyleUrl } from '@/services/maps';
 import { addInsets, boundsOf, circleFeature, LINE_LAYERS, linesFeature, type ZMapHandle, type ZMapProps } from './types';
 
+/** thời gian flyTo (ms) */
+const FLY_MS = 500;
+
 export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
   (
     { style, initialCenter, initialZoom = 14, markers = [], lines, circle, insets, fit, showsUserLocation = false, interactive = true, onRegionChangeComplete, onPress },
@@ -25,14 +28,26 @@ export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
     const [ready, setReady] = useState(false);
     const padding = addInsets(insets);
     const paddingKey = `${padding.top},${padding.right},${padding.bottom},${padding.left}`;
+    // đích flyTo đang bay — lề đổi giữa chừng (khung thông tin đổi chiều cao) thì bay tiếp tới đích với lề mới thay vì bị setStop cắt ngang
+    const flight = useRef<{ center: [number, number]; zoom?: number; until: number } | null>(null);
 
     useImperativeHandle(ref, () => ({
-      flyTo: (c, zoom) => camera.current?.easeTo({ center: [c.lng, c.lat], ...(zoom !== undefined ? { zoom } : {}), padding, duration: 500 }),
+      flyTo: (c, zoom) => {
+        flight.current = { center: [c.lng, c.lat], zoom, until: Date.now() + FLY_MS };
+        void camera.current?.easeTo({ center: [c.lng, c.lat], ...(zoom !== undefined ? { zoom } : {}), padding, duration: FLY_MS });
+      },
     }));
 
     // phần bị che đổi (vd khung thông tin cao lên) → tâm bản đồ vẫn là tâm phần nhìn thấy
     useEffect(() => {
-      if (ready && !fit) void camera.current?.setStop({ padding, duration: 0 });
+      const cam = camera.current;
+      if (!ready || fit || !cam) return;
+      const f = flight.current;
+      if (f && f.until > Date.now()) {
+        void cam.easeTo({ center: f.center, ...(f.zoom !== undefined ? { zoom: f.zoom } : {}), padding, duration: Math.max(200, f.until - Date.now()) });
+      } else {
+        void cam.setStop({ padding, duration: 0 });
+      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [ready, paddingKey]);
 

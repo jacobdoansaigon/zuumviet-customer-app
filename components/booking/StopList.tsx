@@ -66,6 +66,8 @@ interface StopListProps {
   labels?: ServiceLabels;
   /** số điểm đến tối đa; 0 = không có điểm đến (dịch vụ tận nơi) */
   maxStops?: number;
+  /** thay dòng địa chỉ điểm đón (vd "Đang xác định địa chỉ…" khi kéo bản đồ) */
+  senderAddressOverride?: string;
 }
 
 export const StopList: React.FC<StopListProps> = ({
@@ -77,6 +79,7 @@ export const StopList: React.FC<StopListProps> = ({
   onAddReceiver,
   labels = DELIVERY_LABELS,
   maxStops = 10,
+  senderAddressOverride,
 }) => {
   const complete = receivers.map((r, index) => ({ r, index })).filter((x) => isReceiverComplete(x.r));
   const senderTitle = sender.name && sender.phone ? `${sender.name} - ${formatPhone(sender.phone)}` : undefined;
@@ -88,7 +91,7 @@ export const StopList: React.FC<StopListProps> = ({
         title={senderTitle}
         placeholder={labels.senderPlaceholder}
         status={labels.senderStatus}
-        subtitle={sender.place?.address}
+        subtitle={senderAddressOverride ?? sender.place?.address}
         connector={maxStops > 0}
         onPress={onPressSender}
       />

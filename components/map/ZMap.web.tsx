@@ -10,6 +10,9 @@ import { addInsets, boundsOf, circleFeature, LINE_LAYERS, linesFeature, type ZMa
 
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
+/** thời gian flyTo (ms) */
+const FLY_MS = 500;
+
 export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
   ({ style, initialCenter, initialZoom = 14, markers = [], lines, circle, insets, fit, interactive = true, onRegionChangeComplete, onPress }, ref) => {
     const hostRef = useRef<View>(null);
@@ -21,11 +24,18 @@ export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
     onMoveEnd.current = onRegionChangeComplete;
     const onTap = useRef(onPress);
     onTap.current = onPress;
+    // đích flyTo đang bay — lề (padding) đổi giữa chừng thì bay tiếp tới đích với lề mới thay vì bị setPadding (= jumpTo → stop) cắt ngang
+    const flight = useRef<{ center: [number, number]; zoom?: number; until: number } | null>(null);
     const padding = addInsets(insets);
     const paddingKey = `${padding.top},${padding.right},${padding.bottom},${padding.left}`;
 
     useImperativeHandle(ref, () => ({
-      flyTo: (c, zoom) => mapRef.current?.easeTo({ center: [c.lng, c.lat], ...(zoom !== undefined ? { zoom } : {}), padding, duration: 500 }),
+      flyTo: (c, zoom) => {
+        const map = mapRef.current;
+        if (!map) return;
+        flight.current = { center: [c.lng, c.lat], zoom, until: Date.now() + FLY_MS };
+        map.easeTo({ center: [c.lng, c.lat], ...(zoom !== undefined ? { zoom } : {}), padding, duration: FLY_MS });
+      },
     }));
 
     // tạo bản đồ một lần
@@ -80,7 +90,14 @@ export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
 
     // phần bị che → tâm bản đồ = tâm phần nhìn thấy
     useEffect(() => {
-      mapRef.current?.setPadding(padding);
+      const map = mapRef.current;
+      if (!map) return;
+      const f = flight.current;
+      if (f && map.isEasing() && f.until > Date.now()) {
+        map.easeTo({ center: f.center, ...(f.zoom !== undefined ? { zoom: f.zoom } : {}), padding, duration: Math.max(200, f.until - Date.now()) });
+      } else {
+        map.setPadding(padding);
+      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [paddingKey]);
 
