@@ -1757,6 +1757,14 @@ export interface ZuumRoutes {
         name: string;
         discount: number;
       };
+      adjustments: Array<{
+        id: string;
+        name: string;
+        kind: "customer" | "time_window" | "weather" | "traffic" | "demand" | "manual";
+        bps: number;
+        label: string;
+      }>;
+      cancelDebt: number;
     };
   };
   'GET /v1/customer/quotes/:id': {
@@ -1794,6 +1802,55 @@ export interface ZuumRoutes {
         name: string;
         discount: number;
       };
+      adjustments: Array<{
+        id: string;
+        name: string;
+        kind: "customer" | "time_window" | "weather" | "traffic" | "demand" | "manual";
+        bps: number;
+        label: string;
+      }>;
+      cancelDebt: number;
+    };
+  };
+  /** Giá nhanh cho nhiều dịch vụ cùng lộ trình (không lưu, không đặt được) — danh sách chọn dịch vụ hiện giá thật theo đường */
+  'POST /v1/customer/quotes/preview': {
+    body: {
+      pickup: {
+        lat: number;
+        lng: number;
+        address: string;
+      };
+      serviceIds: string[];
+      scheduledAt?: null | string;
+      returnToPickup?: boolean;
+      durationMinutes?: number;
+      stops?: Array<{
+        lat: number;
+        lng: number;
+        address: string;
+        codAmount?: number;
+        weightTierId?: null | string;
+      }>;
+    };
+    response: {
+      items: Array<{
+        serviceId: string;
+        total: null | number;
+        distanceMeters: null | number;
+        durationSeconds: null | number;
+        distanceSource: "none" | "goong" | "estimate";
+        adjustments: Array<{
+          id: string;
+          name: string;
+          kind: "customer" | "time_window" | "weather" | "traffic" | "demand" | "manual";
+          bps: number;
+          label: string;
+        }>;
+        error: null | {
+          code: string;
+          message: string;
+        };
+      }>;
     };
   };
   'GET /v1/customer/wallet': {

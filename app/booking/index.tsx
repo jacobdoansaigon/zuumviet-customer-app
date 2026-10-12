@@ -35,6 +35,8 @@ import {
   pickupFromGps,
   setSenderPlace,
   refreshQuote,
+  refreshPreviews,
+  previewFor,
   buildQuoteRequest,
   type Place,
 } from '@/services/bookingStore';
@@ -320,6 +322,14 @@ export default function BookingScreen() {
     const t = setTimeout(() => void refreshQuote(), 600);
     return () => clearTimeout(t);
   }, [quoteKey]);
+  // Giá thật (theo đường + giá động) cho mọi dịch vụ trong tab — thay ước tính "~" trên danh sách
+  const previewIds = useMemo(() => options.filter((o) => !o.paused).map((o) => o.service.id).join(','), [options]);
+  useEffect(() => {
+    if (!quoteKey || !previewIds) return;
+    const t = setTimeout(() => void refreshPreviews(previewIds.split(',')), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteKey, previewIds]);
   const routePath = useMemo(() => {
     const q = state.quote;
     return q.status === 'ready' && q.key === quoteKey && q.quote?.routePolyline ? decodePolyline(q.quote.routePolyline) : null;
@@ -356,19 +366,25 @@ export default function BookingScreen() {
     switchRideOption(o.group, o.id);
     setExpanded(false);
   };
-  const renderOption = (o: ServiceOptionView) => (
+  const renderOption = (o: ServiceOptionView) => {
+    const pv = previewFor(o.service.id, state);
+    return (
     <ServiceOption
       key={o.id}
       name={o.name}
       description={o.description}
-      price={o.paused ? undefined : `~${formatVnd(estimateFor(o, state))}`}
+      price={o.paused ? undefined : pv && pv.total !== null ? formatVnd(pv.total) : `~${formatVnd(estimateFor(o, state))}`}
       priceHint={o.paused ? 'Tạm ngưng' : undefined}
       icon={o.icon}
       selected={o.id === selected?.id}
       onPress={() => onOptionPress(o)}
       onInfoPress={() => (state.service === 'handyman' ? setJobOption(o) : setInfo(o))}
     />
-  );
+    );
+  };
+  // Giá động đang áp cho dịch vụ đang chọn (hiện dưới danh sách để khách hiểu vì sao giá khác thường)
+  const selectedPreview = selected ? previewFor(selected.service.id, state) : null;
+  const adjustmentNote = selectedPreview?.adjustments.length ? `Giá đã gồm: ${selectedPreview.adjustments.map((a) => a.label).join(', ')}` : null;
 
   // Xe đường dài: 3 phương án đi, bấm vào là đi thẳng
   const openCharter = () => router.push('/booking/intercity/charter');
@@ -520,7 +536,14 @@ export default function BookingScreen() {
                   ))}
                 </View>
               ) : (
-                <View style={styles.options}>{catalogBlock ?? options.map(renderOption)}</View>
+                <>
+                  <View style={styles.options}>{catalogBlock ?? options.map(renderOption)}</View>
+                  {adjustmentNote ? (
+                    <AppText size={12} color={Colors.textSecondary} style={styles.adjustmentNote}>
+                      {adjustmentNote}
+                    </AppText>
+                  ) : null}
+                </>
               )}
               <View style={styles.divider} />
             </>
@@ -600,6 +623,7 @@ const styles = StyleSheet.create({
   tabs: { flexDirection: 'row', gap: Spacing.sm, paddingHorizontal: Spacing.screen, paddingBottom: Spacing.sm },
   tab: { flex: 1, justifyContent: 'center' },
   options: { paddingHorizontal: Spacing.screen, gap: 4 },
+  adjustmentNote: { paddingHorizontal: Spacing.screen, paddingTop: 6 },
   catalogState: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.md },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginHorizontal: Spacing.screen, marginVertical: Spacing.xs },
   sectionLabel: { paddingHorizontal: Spacing.screen, paddingTop: Spacing.sm, paddingBottom: 2 },

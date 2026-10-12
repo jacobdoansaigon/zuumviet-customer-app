@@ -80,6 +80,15 @@ export interface BookingOptions {
 export type Quote = ZuumResponse<'POST /v1/customer/quotes'>;
 export type QuoteRequest = ZuumRoutes['POST /v1/customer/quotes']['body'];
 export type CreatedOrder = ZuumResponse<'POST /v1/customer/orders'>;
+export type QuotePreviewItem = ZuumResponse<'POST /v1/customer/quotes/preview'>['items'][number];
+
+/** Giá thật (theo đường) cho mọi dịch vụ trong tab với lộ trình hiện tại — không lưu quote, chỉ để hiện trên danh sách */
+export interface QuotePreviews {
+  /** chữ ký lộ trình (điểm, hẹn giờ…) — khác bản nháp hiện tại nghĩa là giá đã cũ */
+  routeKey: string;
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  items: Record<string, QuotePreviewItem>;
+}
 
 /** Báo giá của server cho bản nháp hiện tại */
 export interface ServerQuote {
@@ -99,6 +108,7 @@ export interface BookingState {
   receivers: Receiver[];
   options: BookingOptions;
   quote: ServerQuote;
+  previews: QuotePreviews;
 }
 
 // ---------------------------------------------------------------- Store
@@ -138,6 +148,7 @@ const emptyReceiver = (): Receiver => ({
 });
 
 const idleQuote = (): ServerQuote => ({ status: 'idle', key: '', quote: null, error: null, errorCode: null });
+const idlePreviews = (): QuotePreviews => ({ routeKey: '', status: 'idle', items: {} });
 
 function firstOptionId(service: ServiceKey): string {
   const opts = optionsFor(service);
@@ -152,6 +163,7 @@ function createInitialState(service: ServiceKey): BookingState {
     receivers: [],
     options: defaultOptions(),
     quote: idleQuote(),
+    previews: idlePreviews(),
   };
 }
 
@@ -316,7 +328,7 @@ export function setOptions(patch: Partial<BookingOptions>) {
 
 /** Xoá bản nháp sau khi tạo đơn (giữ người gửi & dịch vụ) */
 export function resetDraft() {
-  update({ receivers: [], options: defaultOptions(), quote: idleQuote() });
+  update({ receivers: [], options: defaultOptions(), quote: idleQuote(), previews: idlePreviews() });
 }
 
 // ---------------------------------------------------------------- Dịch vụ đang chọn
@@ -511,6 +523,55 @@ export async function refreshQuote(force = false): Promise<ServerQuote> {
     update({ quote: { status: 'error', key, quote: null, error: errorMessage(e), errorCode: e instanceof ZuumApiError ? e.code : null } });
   }
   return state.quote;
+}
+
+/** Lộ trình dùng chung để xem trước giá nhiều dịch vụ (không phụ thuộc dịch vụ đang chọn; null khi chưa đủ điểm) */
+export function buildPreviewRoute(s: BookingState = state): Omit<ZuumRoutes['POST /v1/customer/quotes/preview']['body'], 'serviceIds'> | null {
+  const svc = getSelectedService(s);
+  const pickup = s.sender.place;
+  if (!svc || !pickup || !isDraftReady(s)) return null;
+  const o = s.options;
+  const stops = maxStopsOf(s) === 0 ? [] : completeReceivers(s);
+  const blockMinutes = svc.pricing.basis === 'time_block' ? svc.pricing.blockMinutes : 0;
+  return {
+    pickup: { lat: pickup.lat, lng: pickup.lng, address: pickup.address },
+    stops: stops.map((r) => ({ lat: r.place!.lat, lng: r.place!.lng, address: r.place!.address, codAmount: svc.rules.allowCod ? r.cod : 0, weightTierId: resolveWeightTier(r.weightTierId, svc) })),
+    returnToPickup: svc.rules.allowReturnToPickup && o.returnToPickup,
+    scheduledAt: svc.rules.allowScheduling && o.scheduledAt ? new Date(o.scheduledAt).toISOString() : null,
+    ...(blockMinutes > 0 ? { durationMinutes: Math.max(1, o.laborBlocks) * blockMinutes } : {}),
+  };
+}
+
+let previewSeq = 0;
+/** Xem trước giá thật cho các dịch vụ trong tab (một lần gọi, server tính tuyến một lần cho mỗi loại xe) */
+export async function refreshPreviews(serviceIds: string[]): Promise<void> {
+  const route = buildPreviewRoute(state);
+  if (!route || !serviceIds.length) {
+    if (state.previews.status !== 'idle') update({ previews: idlePreviews() });
+    return;
+  }
+  const routeKey = JSON.stringify(route);
+  const missing = serviceIds.filter((id) => !state.previews.items[id]);
+  if (state.previews.routeKey === routeKey && state.previews.status !== 'error' && missing.length === 0) return;
+  const seq = ++previewSeq;
+  update((cur) => ({ previews: { routeKey, status: 'loading', items: cur.previews.routeKey === routeKey ? cur.previews.items : {} } }));
+  try {
+    const res = await api('POST /v1/customer/quotes/preview', { body: { ...route, serviceIds } });
+    if (seq !== previewSeq) return;
+    const items: Record<string, QuotePreviewItem> = { ...state.previews.items };
+    for (const it of res.items) items[it.serviceId] = it;
+    update({ previews: { routeKey, status: 'ready', items } });
+  } catch {
+    if (seq !== previewSeq) return;
+    update((cur) => ({ previews: { ...cur.previews, status: 'error' } }));
+  }
+}
+
+/** Giá thật của một dịch vụ cho lộ trình hiện tại (null = chưa có → dùng ước tính) */
+export function previewFor(serviceId: string, s: BookingState = state): QuotePreviewItem | null {
+  const route = buildPreviewRoute(s);
+  if (!route || s.previews.routeKey !== JSON.stringify(route)) return null;
+  return s.previews.items[serviceId] ?? null;
 }
 
 /** Báo giá còn hạn của đúng bản nháp hiện tại (null nếu chưa có / đã cũ) */
