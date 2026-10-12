@@ -62,6 +62,7 @@ import {
   useCurrentLocation,
   getCurrentLatLng,
   EntranceChips,
+  mapBottomPadding,
   type MapStop,
   type HandymanJobDetail,
 } from '@/components/booking';
@@ -421,7 +422,9 @@ export default function BookingScreen() {
       </View>
     ) : null;
 
-  const pinTop = (rootH - sheetH) / 2 - PICKUP_PIN_HEIGHT;
+  // khung thông tin cao (nhiều dịch vụ) → lề bản đồ bị chặn lại để tuyến không bị zoom tuột ra xa
+  const mapPad = mapBottomPadding(sheetH, rootH);
+  const pinTop = (rootH - mapPad) / 2 - PICKUP_PIN_HEIGHT;
 
   return (
     <View style={styles.root} onLayout={(e) => setRootH(e.nativeEvent.layout.height)}>
@@ -429,7 +432,7 @@ export default function BookingScreen() {
         ref={mapRef}
         stops={stops}
         routePath={routePath}
-        bottomPadding={sheetH}
+        bottomPadding={mapPad}
         center={pinMode && pickup ? { lat: pickup.lat, lng: pickup.lng } : undefined}
         extraMarkers={savedMarkers}
         onRegionChangeComplete={pinMode ? onMapMoved : undefined}

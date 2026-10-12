@@ -20,3 +20,4 @@ export * from './TrackingSheet';
 export * from './PickupPin';
 export * from './SavedPlaceMarker';
 export { EntranceChips } from './EntranceChips';
+export { mapBottomPadding, MAP_MIN_VISIBLE } from './mapTypes';

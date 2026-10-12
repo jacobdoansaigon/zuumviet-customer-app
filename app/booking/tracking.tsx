@@ -16,7 +16,7 @@ import { errorMessage, isApiError } from '@/services/zuum';
 import { useRealtime, useRealtimeRefetch } from '@/hooks/useRealtime';
 import { useOrderPushRefresh } from '@/hooks/useNotifications';
 import { cancelFeePending, mmss, useFreeCancelCountdown } from '@/hooks/useCancelCountdown';
-import { BookingMap, RoundIconButton, TrackingSheet, type MapStop } from '@/components/booking';
+import { BookingMap, RoundIconButton, TrackingSheet, mapBottomPadding, type MapStop } from '@/components/booking';
 import { SUPPORT_HOTLINE as SUPPORT_PHONE } from '@/constants/content';
 import { decodePolyline } from '@/components/map/polyline';
 
@@ -147,7 +147,7 @@ export default function TrackingScreen() {
 
   return (
     <View style={styles.root}>
-      <BookingMap stops={stops} routePath={routePath} bottomPadding={sheetH} />
+      <BookingMap stops={stops} routePath={routePath} bottomPadding={mapBottomPadding(sheetH, height)} />
       <RoundIconButton icon={Icons.close} onPress={close} style={[styles.close, { top: insets.top + Spacing.md }]} accessibilityLabel="Đóng" />
 
       <View style={styles.sheet} onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}>

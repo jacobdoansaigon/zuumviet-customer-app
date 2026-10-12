@@ -12,6 +12,14 @@ export interface MapStop {
   label?: string;
 }
 
+/** Phần bản đồ tối thiểu còn nhìn thấy phía trên khung thông tin (dp) — lề canh tuyến lớn hơn thì bớt đi */
+export const MAP_MIN_VISIBLE = 280;
+/** lề dưới cho bản đồ = chiều cao khung, nhưng chừa lại MAP_MIN_VISIBLE phía trên (khung quá cao → tuyến chỉ còn nằm dưới khung một phần) */
+export function mapBottomPadding(sheetHeight: number, screenHeight: number): number {
+  if (!sheetHeight || !screenHeight) return sheetHeight;
+  return Math.min(sheetHeight, Math.max(0, screenHeight - MAP_MIN_VISIBLE));
+}
+
 export interface BookingMapProps {
   stops: MapStop[];
   center?: { lat: number; lng: number };
