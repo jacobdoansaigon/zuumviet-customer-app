@@ -10,11 +10,11 @@
 // vào ô điểm đón; nút định vị đưa bản đồ về vị trí GPS; vị trí đã lưu (Nhà / Công ty…) hiện trên bản đồ, chạm để chọn;
 // chip "Cổng / lối vào" ghi vào pickup.note cho tài xế.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, ScrollView, Pressable, StyleSheet, TextInput, useWindowDimensions, ActivityIndicator } from 'react-native';
+import { View, ScrollView, Pressable, StyleSheet, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { AppText, Chip, Icon, Icons, ServiceOption, Toast, fontStyle } from '@/components/ui';
-import { Colors, Spacing, BorderRadius, Shadow, NO_WEB_OUTLINE } from '@/constants/theme';
+import { AppText, Chip, Icon, Icons, ServiceOption, Toast } from '@/components/ui';
+import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { SERVICE_GROUPS, URBAN_RIDE_KEYS, toServiceKey } from '@/constants/booking';
 import {
   useBooking,
@@ -41,7 +41,7 @@ import {
 import { decodePolyline } from '@/components/map/polyline';
 import type { LatLng, ZMapHandle, ZMapMarker } from '@/components/map/types';
 import { mapsAvailable } from '@/services/maps';
-import { reversePlace } from '@/services/places';
+import { placeEntrances, reversePlace, type PlaceEntrance } from '@/services/places';
 import { loadSavedAddresses, useSavedAddresses, SAVED_KIND_LABEL, type SavedAddress } from '@/services/addresses';
 import { ensureCatalog, optionsFor, useCatalog, type ServiceOptionView } from '@/services/catalog';
 import { ensureIntercityCities, matchIntercityCity, nearestCity, useIntercityCities } from '@/services/intercity';
@@ -59,12 +59,12 @@ import {
   SavedPlaceMarker,
   useCurrentLocation,
   getCurrentLatLng,
+  EntranceChips,
   type MapStop,
   type HandymanJobDetail,
 } from '@/components/booking';
 
-/** gợi ý cổng / lối vào cho toà nhà, siêu thị, chung cư — khách chọn hoặc tự ghi */
-const GATE_PRESETS = ['Cổng chính', 'Cổng phụ', 'Sảnh chính', 'Hầm xe', 'Cổng 1', 'Cổng 2'];
+const samePlace = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6;
 /** kéo bản đồ dừng bao lâu mới đổi toạ độ ghim ra địa chỉ (gom nhiều lần dừng ngắn thành 1 request) */
 const PIN_SETTLE_MS = 1000;
 
@@ -89,7 +89,8 @@ export default function BookingScreen() {
   const resolveSeq = useRef(0);
   const [resolving, setResolving] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [gateOther, setGateOther] = useState(false);
+  // cổng / lối vào của địa điểm tại điểm đón (API bản đồ) — chỉ có với siêu thị, bệnh viện, trường, chung cư…; anchor = điểm của địa điểm
+  const [entrances, setEntrances] = useState<{ anchor: Place; parent: string | null; items: PlaceEntrance[] } | null>(null);
   const savedAddresses = useSavedAddresses();
 
   const loadCatalog = useCallback(() => {
@@ -249,7 +250,39 @@ export default function BookingScreen() {
     [pinMode, savedAddresses, pickSaved],
   );
   useEffect(() => () => cancelPendingResolve.current?.(), []);
-  const gateNote = state.options.pickupNote;
+  // Điểm đón đổi (không phải do chọn cổng) → hỏi cổng / lối vào của địa điểm đó; không có → không hiện gì
+  useEffect(() => {
+    if (!pickup || pickup.source === 'gate') return;
+    if (entrances && samePlace(entrances.anchor, pickup)) return;
+    setEntrances(null);
+    let alive = true;
+    const anchor = pickup;
+    // tên địa điểm chỉ chắc chắn khi khách chọn từ tìm kiếm (ghim / GPS / vị trí lưu: title không phải tên nơi)
+    const name = anchor.source === 'search' && anchor.title && anchor.title !== anchor.address ? anchor.title : undefined;
+    placeEntrances(anchor.lat, anchor.lng, name)
+      .then((r) => {
+        if (alive && r.items.length) setEntrances({ anchor, parent: r.parent, items: r.items });
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickup?.lat, pickup?.lng, pickup?.source, pickup?.placeId]);
+  const selectedGate = pickup?.source === 'gate' && entrances ? (entrances.items.find((g) => samePlace(g, pickup)) ?? null) : null;
+  const showEntrances = !!entrances && !!pickup && !resolving && (pickup.source === 'gate' || samePlace(entrances.anchor, pickup));
+  // Chọn cổng: điểm đón = toạ độ cổng (tài xế tới đúng cổng), địa chỉ giữ của địa điểm, ghi chú = tên cổng; bấm lại → về điểm cũ
+  const pickGate = (g: PlaceEntrance) => {
+    if (!entrances) return;
+    const a = entrances.anchor;
+    if (selectedGate?.placeId === g.placeId) {
+      setSenderPlace({ ...a, source: 'gate' });
+      setOptions({ pickupNote: '' });
+      return;
+    }
+    setSenderPlace({ ...a, lat: g.lat, lng: g.lng, source: 'gate' });
+    setOptions({ pickupNote: entrances.parent ? `${g.name} (${entrances.parent})` : g.name });
+  };
 
   const tabKeys = URBAN_RIDE_KEYS.includes(state.service) ? URBAN_RIDE_KEYS : null;
   const options: ServiceOptionView[] = useMemo(
@@ -502,51 +535,8 @@ export default function BookingScreen() {
             labels={labels}
             maxStops={maxStops}
             senderAddressOverride={pinMode && resolving ? 'Đang xác định địa chỉ…' : undefined}
+            senderExtra={showEntrances && entrances ? <EntranceChips parent={entrances.parent} items={entrances.items} selectedId={selectedGate?.placeId ?? null} onPick={pickGate} /> : undefined}
           />
-          {pinMode && pickup ? (
-            // Cổng / lối vào tại điểm đón (toà nhà, siêu thị, chung cư…) → tài xế thấy trong ghi chú điểm đón
-            // (vẫn giữ khối lúc đang xác định địa chỉ — chỉ mờ đi — để khung không đổi chiều cao làm bản đồ giật)
-            <View style={[styles.gateWrap, resolving && styles.gateBusy]}>
-              <AppText size={12} color={Colors.textSecondary} style={{ marginBottom: 6 }}>
-                Cổng / lối vào để tài xế dễ tìm
-              </AppText>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.gateRow}>
-                {GATE_PRESETS.map((g) => (
-                  <Chip
-                    key={g}
-                    label={g}
-                    size="sm"
-                    variant="soft"
-                    active={gateNote === g}
-                    onPress={() => {
-                      setGateOther(false);
-                      setOptions({ pickupNote: gateNote === g ? '' : g });
-                    }}
-                  />
-                ))}
-                <Chip
-                  label="Khác…"
-                  size="sm"
-                  variant="soft"
-                  active={gateOther || (!!gateNote && !GATE_PRESETS.includes(gateNote))}
-                  onPress={() => {
-                    setGateOther(true);
-                    if (GATE_PRESETS.includes(gateNote)) setOptions({ pickupNote: '' });
-                  }}
-                />
-              </ScrollView>
-              {gateOther || (!!gateNote && !GATE_PRESETS.includes(gateNote)) ? (
-                <TextInput
-                  value={GATE_PRESETS.includes(gateNote) ? '' : gateNote}
-                  onChangeText={(t) => setOptions({ pickupNote: t.slice(0, 120) })}
-                  placeholder="Vd: Cổng B, sảnh thang máy số 2, kế quầy bảo vệ"
-                  placeholderTextColor={Colors.placeholder}
-                  style={[styles.gateInput, fontStyle('medium')]}
-                  autoFocus={gateOther}
-                />
-              ) : null}
-            </View>
-          ) : null}
         </ScrollView>
 
         {isIntercity && hasDestination ? null : (
@@ -594,20 +584,6 @@ const styles = StyleSheet.create({
   centerPin: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   locate: { position: 'absolute', right: Spacing.screen },
   locateBusy: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center', ...Shadow.md },
-  gateWrap: { paddingHorizontal: Spacing.screen, paddingBottom: Spacing.sm },
-  gateBusy: { opacity: 0.45, pointerEvents: 'none' },
-  gateRow: { flexDirection: 'row', gap: Spacing.sm, paddingRight: Spacing.screen },
-  gateInput: {
-    marginTop: Spacing.sm,
-    height: 40,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: Spacing.md,
-    fontSize: 14,
-    color: Colors.text,
-    ...NO_WEB_OUTLINE,
-  },
   sheet: {
     position: 'absolute',
     left: 0,

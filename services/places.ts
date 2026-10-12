@@ -5,6 +5,8 @@ import { api, type ZuumResponse } from '@/services/zuum';
 
 export type PlaceSuggestion = ZuumResponse<'GET /v1/customer/places/autocomplete'>['items'][number];
 export type PlaceDetail = ZuumResponse<'GET /v1/customer/places/:placeId'>;
+export type PlaceEntrances = ZuumResponse<'GET /v1/customer/places/entrances'>;
+export type PlaceEntrance = PlaceEntrances['items'][number];
 
 /** Phiên gõ tìm (dùng chung cho các lần gõ + lần chọn — Google tính 1 phiên) */
 export function newPlacesSession(): string {
@@ -26,4 +28,10 @@ export function placeDetail(placeId: string, sessionToken?: string): Promise<Pla
 /** Ghim bản đồ / GPS → địa chỉ chữ (toạ độ giữ nguyên) */
 export function reversePlace(lat: number, lng: number): Promise<PlaceDetail> {
   return api('GET /v1/customer/places/reverse', { query: { lat, lng } });
+}
+
+/** Cổng / lối vào của địa điểm tại điểm đón theo dữ liệu bản đồ (siêu thị, bệnh viện, trường…); rỗng = không có cổng.
+ * `name` = tên địa điểm khi khách chọn từ tìm kiếm (khớp chính xác hơn). */
+export function placeEntrances(lat: number, lng: number, name?: string): Promise<PlaceEntrances> {
+  return api('GET /v1/customer/places/entrances', { query: { lat, lng, ...(name ? { name } : {}) } });
 }

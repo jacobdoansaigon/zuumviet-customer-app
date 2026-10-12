@@ -19,3 +19,4 @@ export * from './ZaloPasteSheet';
 export * from './TrackingSheet';
 export * from './PickupPin';
 export * from './SavedPlaceMarker';
+export { EntranceChips } from './EntranceChips';

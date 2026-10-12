@@ -77,6 +77,8 @@ export const Icon: React.FC<IconProps> = ({ name, size = 22, color = Colors.text
 /** Tên icon dùng lại nhiều nơi (theo Figma UI Core > Icons) */
 export const Icons = {
   back: 'ion:chevron-back' as IconName,
+  /** cổng / lối vào */
+  entrance: 'ion:enter-outline' as IconName,
   backArrow: 'ion:arrow-back' as IconName,
   close: 'ion:close' as IconName,
   more: 'ion:ellipsis-horizontal' as IconName,

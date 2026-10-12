@@ -68,6 +68,8 @@ interface StopListProps {
   maxStops?: number;
   /** thay dòng địa chỉ điểm đón (vd "Đang xác định địa chỉ…" khi kéo bản đồ) */
   senderAddressOverride?: string;
+  /** khối hiện ngay dưới địa chỉ điểm đón (vd chip cổng / lối vào) — thẳng cột với địa chỉ, không lẫn với điểm đến */
+  senderExtra?: React.ReactNode;
 }
 
 export const StopList: React.FC<StopListProps> = ({
@@ -80,6 +82,7 @@ export const StopList: React.FC<StopListProps> = ({
   labels = DELIVERY_LABELS,
   maxStops = 10,
   senderAddressOverride,
+  senderExtra,
 }) => {
   const complete = receivers.map((r, index) => ({ r, index })).filter((x) => isReceiverComplete(x.r));
   const senderTitle = sender.name && sender.phone ? `${sender.name} - ${formatPhone(sender.phone)}` : undefined;
@@ -95,6 +98,12 @@ export const StopList: React.FC<StopListProps> = ({
         connector={maxStops > 0}
         onPress={onPressSender}
       />
+      {senderExtra ? (
+        <View style={styles.extraRow}>
+          <View style={styles.markerCol}>{maxStops > 0 ? <View style={[styles.connector, styles.extraConnector]} /> : null}</View>
+          <View style={[styles.body, maxStops > 0 && { paddingBottom: Spacing.md }]}>{senderExtra}</View>
+        </View>
+      ) : null}
       {complete.map(({ r, index }, i) => (
         <StopRow
           key={r.id}
@@ -120,6 +129,9 @@ const styles = StyleSheet.create({
   connector: { flex: 1, width: 1, borderLeftWidth: 1.5, borderColor: Colors.gray300, borderStyle: 'dashed', marginVertical: 3 },
   body: { flex: 1, paddingLeft: Spacing.sm, paddingTop: 1 },
   titleRow: { flexDirection: 'row', alignItems: 'center' },
+  // hàng phụ dưới điểm đón (chip cổng): đường nối nét đứt chạy liền từ dòng trên
+  extraRow: { flexDirection: 'row', alignItems: 'stretch', marginTop: -Spacing.sm },
+  extraConnector: { marginVertical: 0 },
 });
 
 export default StopList;

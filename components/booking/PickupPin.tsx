@@ -5,7 +5,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { LogoMark } from '@/components/ui';
 
-export const PICKUP_PIN_WIDTH = 40;
+export const PICKUP_PIN_WIDTH = 28;
 /** cao ảnh logo (tỉ lệ 1212 × 1004) + phần nhấc lên tối đa */
 export const PICKUP_PIN_HEIGHT = Math.round(PICKUP_PIN_WIDTH * (1212 / 1004)) + 6;
 

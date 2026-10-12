@@ -1640,6 +1640,24 @@ export interface ZuumRoutes {
       source: string;
     };
   };
+  /** Cổng / lối vào của địa điểm tại điểm đón (siêu thị, bệnh viện, trường, chung cư…) theo dữ liệu bản đồ; rỗng = nơi đó không có cổng. `name` = tên địa điểm nếu khách chọn từ tìm kiếm. */
+  'GET /v1/customer/places/entrances': {
+    query: {
+      lat: number;
+      lng: number;
+      name?: string;
+    };
+    response: {
+      parent: null | string;
+      items: Array<{
+        placeId: string;
+        name: string;
+        lat: number;
+        lng: number;
+        distanceMeters: number;
+      }>;
+    };
+  };
   /** Đảo toạ độ: vị trí ghim → địa chỉ chữ (toạ độ giữ nguyên như gửi lên) */
   'GET /v1/customer/places/reverse': {
     query: {

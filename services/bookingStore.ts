@@ -22,8 +22,8 @@ export interface Place {
   lng: number;
   placeId?: string;
   savedAddressId?: string;
-  /** gps: vị trí hiện tại · search: gợi ý tìm kiếm · saved: vị trí đã lưu · map: ghim bản đồ · history: đơn cũ */
-  source: 'gps' | 'search' | 'saved' | 'map' | 'history';
+  /** gps: vị trí hiện tại · search: gợi ý tìm kiếm · saved: vị trí đã lưu · map: ghim bản đồ · history: đơn cũ · gate: cổng/lối vào của địa điểm đã chọn */
+  source: 'gps' | 'search' | 'saved' | 'map' | 'history' | 'gate';
 }
 
 export interface Sender {
