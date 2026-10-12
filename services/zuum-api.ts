@@ -5790,6 +5790,13 @@ export interface ZuumRoutes {
             baseFare: number;
             includedDistanceMeters: number;
             perKmFare: number;
+            distanceTiers: null | Array<{
+              uptoKm: null | number;
+              perKmFare: number;
+            }>;
+            returnLegFactorBps: number;
+            overnightFee: number;
+            overnightEveryHours: number;
             blockMinutes: number;
           };
           rules: {

@@ -152,7 +152,16 @@ export function serviceInfoLines(s: CatalogService): string[] {
   switch (p.basis) {
     case 'distance':
       lines.push(p.includedDistanceMeters > 0 ? `Giá mở cửa (${km(p.includedDistanceMeters)} đầu): ${vnd(p.baseFare)}` : `Giá mở cửa: ${vnd(p.baseFare)}`);
-      if (p.perKmFare > 0) lines.push(`Mỗi km tiếp theo: ${vnd(p.perKmFare)}`);
+      if (p.distanceTiers?.length) {
+        // bậc km giảm dần (đường dài): "0–100 km: 9.000đ/km", "trên 300 km: 6.500đ/km"
+        let lower = 0;
+        for (const t of p.distanceTiers) {
+          lines.push(`${t.uptoKm === null ? `Trên ${lower} km` : `${lower}–${t.uptoKm} km`}: ${vnd(t.perKmFare)}/km`);
+          lower = t.uptoKm ?? lower;
+        }
+      } else if (p.perKmFare > 0) lines.push(`Mỗi km tiếp theo: ${vnd(p.perKmFare)}`);
+      if (s.rules.allowReturnToPickup && p.returnLegFactorBps < 10_000) lines.push(`Khứ hồi: chiều về tính ${p.returnLegFactorBps / 100}% cước quãng đường`);
+      if (p.overnightFee > 0) lines.push(`Tài xế lưu đêm: ${vnd(p.overnightFee)} mỗi ${p.overnightEveryHours} giờ lái`);
       break;
     case 'flat_per_stop':
       lines.push(`Đồng giá từ ${vnd(s.fromPrice)} / điểm giao`);
@@ -191,8 +200,24 @@ export function estimatePrice(s: CatalogService, input: { distanceMeters: number
   let fare: number;
   switch (p.basis) {
     case 'distance': {
-      const extraKm = Math.max(0, Math.ceil((input.distanceMeters - p.includedDistanceMeters) / 1000));
-      fare = p.baseFare + extraKm * p.perKmFare;
+      if (p.distanceTiers?.length) {
+        // bậc km trên tổng quãng đường, phần đã gồm miễn phí (cùng công thức với server)
+        const totalKm = input.distanceMeters / 1000;
+        const freeKm = p.includedDistanceMeters / 1000;
+        let lower = 0;
+        let tiered = 0;
+        for (const t of p.distanceTiers) {
+          const upper = t.uptoKm ?? Number.POSITIVE_INFINITY;
+          const chargeable = Math.min(upper, totalKm) - Math.max(lower, freeKm);
+          if (chargeable > 0) tiered += chargeable * t.perKmFare;
+          lower = upper;
+          if (lower >= totalKm) break;
+        }
+        fare = p.baseFare + tiered;
+      } else {
+        const extraKm = Math.max(0, Math.ceil((input.distanceMeters - p.includedDistanceMeters) / 1000));
+        fare = p.baseFare + extraKm * p.perKmFare;
+      }
       break;
     }
     case 'flat_per_stop':
