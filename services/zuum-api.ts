@@ -289,9 +289,10 @@ export interface ZuumRoutes {
     params: { deviceId: string };
     response: void;
   };
+  /** Ảnh đại diện, ảnh / video bằng chứng (huỷ đơn…) */
   'POST /v1/customer/files': {
     body: {
-      purpose: "partner_document" | "avatar" | "order_proof" | "vehicle_photo" | "service_image";
+      purpose: "avatar" | "order_proof";
       contentType: string;
       size: number;
     };
@@ -338,6 +339,7 @@ export interface ZuumRoutes {
     };
     response: {
       items: Array<{
+        qrImageUrl: null | string;
         trip: {
           id: string;
           kind: "bus" | "carpool";
@@ -442,6 +444,7 @@ export interface ZuumRoutes {
   'GET /v1/customer/intercity/bookings/:id': {
     params: { id: string };
     response: {
+      qrImageUrl: null | string;
       trip: {
         id: string;
         kind: "bus" | "carpool";
@@ -542,6 +545,7 @@ export interface ZuumRoutes {
   'POST /v1/customer/intercity/bookings/:id/cancel': {
     params: { id: string };
     response: {
+      qrImageUrl: null | string;
       trip: {
         id: string;
         kind: "bus" | "carpool";
@@ -666,6 +670,7 @@ export interface ZuumRoutes {
       };
     };
     response: {
+      qrImageUrl: null | string;
       trip: {
         id: string;
         kind: "bus" | "carpool";
@@ -767,6 +772,7 @@ export interface ZuumRoutes {
   'POST /v1/customer/intercity/bookings/:id/release': {
     params: { id: string };
     response: {
+      qrImageUrl: null | string;
       trip: {
         id: string;
         kind: "bus" | "carpool";
@@ -871,6 +877,7 @@ export interface ZuumRoutes {
       seatIds: string[];
     };
     response: {
+      qrImageUrl: null | string;
       trip: {
         id: string;
         kind: "bus" | "carpool";
@@ -2800,10 +2807,10 @@ export interface ZuumRoutes {
       };
     };
   };
-  /** Xin link upload. Sau đó PUT file lên `url` với đúng header `headers`, rồi gọi /complete */
+  /** Xin link upload (giấy tờ, bằng chứng đơn ảnh / video, ảnh xe). Sau đó PUT file lên `url` với đúng header `headers`, rồi gọi /complete */
   'POST /v1/partner/files': {
     body: {
-      purpose: "partner_document" | "avatar" | "order_proof" | "vehicle_photo" | "service_image";
+      purpose: "partner_document" | "order_proof" | "vehicle_photo";
       contentType: string;
       size: number;
     };

@@ -1,8 +1,9 @@
 // BusTicket — vé điện tử theo mẫu vé xe khách (anh Jacob 2026-10-13): đầu vé tên nhà xe + tuyến, thân vé ngày / giờ xuất bến /
 // ghế / hành khách / xe / điểm đón, chân vé mã QR + mã vé để nhân viên nhà xe quét khi lên xe. Vé đang giữ chỗ chưa có QR;
-// vé đã lên xe / đã huỷ / đã đi đóng dấu trạng thái. QR = chuỗi `qr` của API (ZVT:<mã vé>:<chữ ký>), vẽ bằng react-native-qrcode-svg.
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
+// vé đã lên xe / đã huỷ / đã đi đóng dấu trạng thái. QR: ảnh `qrImageUrl` API sinh và lưu trong kho file (MinIO); không tải được thì
+// vẽ tại chỗ từ chuỗi `qr` (ZVT:<mã vé>:<chữ ký>) bằng react-native-qrcode-svg.
+import React, { useState } from 'react';
+import { View, StyleSheet, Image } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { AppText, Icon, Icons } from '@/components/ui';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
@@ -21,6 +22,9 @@ const NOTCH = 22;
 const stampTime = (iso: string) => `${vnTime(iso)} ${vnDateLabel(iso).split(', ')[1] ?? ''}`.trim();
 
 export const BusTicket: React.FC<BusTicketProps> = ({ booking }) => {
+  // ảnh QR do API sinh và lưu trong kho file (link ký sẵn); kho không tải được thì vẽ tại chỗ từ chuỗi `qr`
+  const [imageFailed, setImageFailed] = useState(false);
+  const qrImage = booking.qrImageUrl && !imageFailed ? booking.qrImageUrl : null;
   const trip = booking.trip;
   const bed = trip.seatKind === 'bed';
   const stamp =
@@ -118,7 +122,11 @@ export const BusTicket: React.FC<BusTicketProps> = ({ booking }) => {
         {booking.qr ? (
           <>
             <View style={styles.qrBox}>
-              <QRCode value={booking.qr} size={QR_SIZE} color={Colors.text} backgroundColor={Colors.white} ecl="M" />
+              {qrImage ? (
+                <Image source={{ uri: qrImage }} style={{ width: QR_SIZE, height: QR_SIZE }} resizeMode="contain" onError={() => setImageFailed(true)} accessibilityLabel={`Mã QR vé ${booking.code}`} />
+              ) : (
+                <QRCode value={booking.qr} size={QR_SIZE} color={Colors.text} backgroundColor={Colors.white} ecl="M" />
+              )}
               {stamp ? (
                 <View style={styles.stampOverlay} pointerEvents="none">
                   <View style={[styles.stamp, { borderColor: stamp.color }]}>
