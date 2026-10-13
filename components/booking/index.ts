@@ -25,3 +25,4 @@ export { EntranceChips } from './EntranceChips';
 export { ReceiverGates } from './ReceiverGates';
 export { useEntrances, gateLabel, samePlace } from './useEntrances';
 export { mapBottomPadding, MAP_MIN_VISIBLE } from './mapTypes';
+export * from './BusTicket';

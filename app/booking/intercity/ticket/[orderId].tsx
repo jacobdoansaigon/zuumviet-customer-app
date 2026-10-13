@@ -1,10 +1,12 @@
 // app/booking/intercity/ticket/[orderId].tsx — Vé điện tử (orderId = id vé, GET /v1/customer/intercity/bookings/:id):
-// tuyến, giờ đi, nhà xe / xe, ghế, điểm đón/trả, hàng gửi, người đi, thanh toán, giá. Huỷ vé khi canCancel
-// (đã đặt: chỉ khi còn ≥ 24 giờ trước giờ chạy, hoàn đủ). Param done=1: vừa đặt xong (hiện lời chúc mừng).
-import React, { useCallback, useEffect, useState } from 'react';
+// vé theo mẫu vé xe khách (BusTicket: nhà xe, tuyến, giờ xuất bến, ghế, hành khách, số xe, điểm đón, QR + mã vé để nhà xe quét
+// khi lên xe) + chi tiết hàng gửi / giá. Huỷ vé khi canCancel (đã đặt: chỉ khi còn ≥ 24 giờ trước giờ chạy, hoàn đủ).
+// Param done=1: vừa đặt xong (hiện lời chúc mừng). Tải lại khi quay về màn (nhà xe quét xong → hiện "đã lên xe").
+import React, { useCallback, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Button, Dialog, EmptyState, ErrorSheet, Icon, Icons, Screen, Toast } from '@/components/ui';
+import { BusTicket } from '@/components/booking';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { BOOKING_STATUS_LABEL, cancelBooking, getBooking, releaseBooking, vnDateLabel, vnTime, type IntercityBooking } from '@/services/intercity';
 import { formatVnd } from '@/services/bookingStore';
@@ -31,9 +33,11 @@ export default function IntercityTicketScreen() {
     }
   }, [id]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   const close = () => {
     if (justBooked) {
@@ -118,18 +122,15 @@ export default function IntercityTicketScreen() {
             Trạng thái
           </AppText>
           <AppText size={14} weight="bold" color={booking.status === 'cancelled' || booking.status === 'expired' ? Colors.error : confirmed ? Colors.successDark : Colors.primary}>
-            {BOOKING_STATUS_LABEL[booking.status]}
+            {booking.boardedAt ? 'Đã lên xe' : BOOKING_STATUS_LABEL[booking.status]}
           </AppText>
         </View>
 
+        <BusTicket booking={booking} />
+
         <View style={styles.card}>
-          <Row label="Mã vé" value={booking.code} />
-          <Row label="Tuyến" value={`${trip.from.name} → ${trip.to.name}`} />
-          <Row label="Ngày giờ đi" value={`${vnDateLabel(trip.departAt)} · ${vnTime(trip.departAt)}`} />
-          <Row label="Dự kiến đến" value={vnTime(trip.arriveAt)} />
-          <Row label={trip.kind === 'bus' ? 'Nhà xe' : 'Tài xế'} value={trip.operator.name} />
-          {[v.name, v.color, v.plate].filter(Boolean).length ? <Row label="Xe" value={[v.name, v.color, v.plate].filter(Boolean).join(' · ')} /> : null}
-          <Row label="Ghế" value={booking.seatIds.join(', ')} />
+          <Row label="Dự kiến đến" value={`${vnDateLabel(trip.arriveAt)} · ${vnTime(trip.arriveAt)} · ${trip.to.station}`} />
+          {[v.name, v.color].filter(Boolean).length ? <Row label="Xe" value={[v.name, v.color].filter(Boolean).join(' · ')} /> : null}
           <Row label="Điểm đón" value={whereLabel(booking.pickup, trip.from.station)} />
           <Row label="Điểm trả" value={whereLabel(booking.dropoff, trip.to.station)} />
           <Row
@@ -141,7 +142,6 @@ export default function IntercityTicketScreen() {
             }
           />
           {booking.contactName ? <Row label="Người đi" value={`${booking.contactName} · ${formatPhone(booking.contactPhone)}`} /> : null}
-          {booking.paymentMethod ? <Row label="Thanh toán" value={booking.paymentMethod === 'wallet' ? 'Ví ZuumViet' : 'Tiền mặt khi lên xe'} /> : null}
           {booking.cancelReason ? <Row label="Lý do huỷ" value={booking.cancelReason} /> : null}
         </View>
 

@@ -291,7 +291,7 @@ export interface ZuumRoutes {
   };
   'POST /v1/customer/files': {
     body: {
-      purpose: "partner_document" | "avatar" | "order_proof";
+      purpose: "partner_document" | "avatar" | "order_proof" | "vehicle_photo";
       contentType: string;
       size: number;
     };
@@ -361,6 +361,7 @@ export interface ZuumRoutes {
           arriveAt: string;
           pricePerSeat: number;
           seatCount: number;
+          seatKind: "seat" | "bed";
           amenities: string[];
           vehicle: {
             type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
@@ -422,9 +423,13 @@ export interface ZuumRoutes {
         contactPhone: null | string;
         heldUntil: null | string;
         confirmedAt: null | string;
+        boardedAt: null | string;
         cancelledAt: null | string;
         cancelReason: null | string;
         canCancel: boolean;
+        qr: null | string;
+        vehiclePlate: null | string;
+        operatorPhone: null | string;
         createdAt: string;
       }>;
       page: number;
@@ -460,6 +465,7 @@ export interface ZuumRoutes {
         arriveAt: string;
         pricePerSeat: number;
         seatCount: number;
+        seatKind: "seat" | "bed";
         amenities: string[];
         vehicle: {
           type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
@@ -521,9 +527,13 @@ export interface ZuumRoutes {
       contactPhone: null | string;
       heldUntil: null | string;
       confirmedAt: null | string;
+      boardedAt: null | string;
       cancelledAt: null | string;
       cancelReason: null | string;
       canCancel: boolean;
+      qr: null | string;
+      vehiclePlate: null | string;
+      operatorPhone: null | string;
       createdAt: string;
     };
   };
@@ -555,6 +565,7 @@ export interface ZuumRoutes {
         arriveAt: string;
         pricePerSeat: number;
         seatCount: number;
+        seatKind: "seat" | "bed";
         amenities: string[];
         vehicle: {
           type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
@@ -616,9 +627,13 @@ export interface ZuumRoutes {
       contactPhone: null | string;
       heldUntil: null | string;
       confirmedAt: null | string;
+      boardedAt: null | string;
       cancelledAt: null | string;
       cancelReason: null | string;
       canCancel: boolean;
+      qr: null | string;
+      vehiclePlate: null | string;
+      operatorPhone: null | string;
       createdAt: string;
     };
   };
@@ -674,6 +689,7 @@ export interface ZuumRoutes {
         arriveAt: string;
         pricePerSeat: number;
         seatCount: number;
+        seatKind: "seat" | "bed";
         amenities: string[];
         vehicle: {
           type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
@@ -735,9 +751,13 @@ export interface ZuumRoutes {
       contactPhone: null | string;
       heldUntil: null | string;
       confirmedAt: null | string;
+      boardedAt: null | string;
       cancelledAt: null | string;
       cancelReason: null | string;
       canCancel: boolean;
+      qr: null | string;
+      vehiclePlate: null | string;
+      operatorPhone: null | string;
       createdAt: string;
     };
   };
@@ -770,6 +790,7 @@ export interface ZuumRoutes {
         arriveAt: string;
         pricePerSeat: number;
         seatCount: number;
+        seatKind: "seat" | "bed";
         amenities: string[];
         vehicle: {
           type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
@@ -831,9 +852,13 @@ export interface ZuumRoutes {
       contactPhone: null | string;
       heldUntil: null | string;
       confirmedAt: null | string;
+      boardedAt: null | string;
       cancelledAt: null | string;
       cancelReason: null | string;
       canCancel: boolean;
+      qr: null | string;
+      vehiclePlate: null | string;
+      operatorPhone: null | string;
       createdAt: string;
     };
   };
@@ -869,6 +894,7 @@ export interface ZuumRoutes {
         arriveAt: string;
         pricePerSeat: number;
         seatCount: number;
+        seatKind: "seat" | "bed";
         amenities: string[];
         vehicle: {
           type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
@@ -930,9 +956,13 @@ export interface ZuumRoutes {
       contactPhone: null | string;
       heldUntil: null | string;
       confirmedAt: null | string;
+      boardedAt: null | string;
       cancelledAt: null | string;
       cancelReason: null | string;
       canCancel: boolean;
+      qr: null | string;
+      vehiclePlate: null | string;
+      operatorPhone: null | string;
       createdAt: string;
     };
   };
@@ -2450,6 +2480,24 @@ export interface ZuumRoutes {
         seats: null | number;
         loadKg: null | number;
         ownerName: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+          files?: {
+            exterior: string[];
+            interior: string[];
+          };
+        };
+        seatLayout: null | {
+          kind: "seat" | "bed";
+          seats: Array<{
+            id: string;
+            row: string;
+            col: number;
+            deck: number;
+          }>;
+        };
         status: "rejected" | "pending" | "approved" | "superseded" | "removed";
         reviewNote: null | string;
         reviewedAt: null | string;
@@ -2560,6 +2608,24 @@ export interface ZuumRoutes {
         seats: null | number;
         loadKg: null | number;
         ownerName: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+          files?: {
+            exterior: string[];
+            interior: string[];
+          };
+        };
+        seatLayout: null | {
+          kind: "seat" | "bed";
+          seats: Array<{
+            id: string;
+            row: string;
+            col: number;
+            deck: number;
+          }>;
+        };
         status: "rejected" | "pending" | "approved" | "superseded" | "removed";
         reviewNote: null | string;
         reviewedAt: null | string;
@@ -2681,6 +2747,24 @@ export interface ZuumRoutes {
         seats: null | number;
         loadKg: null | number;
         ownerName: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+          files?: {
+            exterior: string[];
+            interior: string[];
+          };
+        };
+        seatLayout: null | {
+          kind: "seat" | "bed";
+          seats: Array<{
+            id: string;
+            row: string;
+            col: number;
+            deck: number;
+          }>;
+        };
         status: "rejected" | "pending" | "approved" | "superseded" | "removed";
         reviewNote: null | string;
         reviewedAt: null | string;
@@ -2717,7 +2801,7 @@ export interface ZuumRoutes {
   /** Xin link upload. Sau đó PUT file lên `url` với đúng header `headers`, rồi gọi /complete */
   'POST /v1/partner/files': {
     body: {
-      purpose: "partner_document" | "avatar" | "order_proof";
+      purpose: "partner_document" | "avatar" | "order_proof" | "vehicle_photo";
       contentType: string;
       size: number;
     };
@@ -2753,6 +2837,98 @@ export interface ZuumRoutes {
       status: string;
       createdAt: string;
       url: null | string;
+    };
+  };
+  /** Ghi nhận khách lên xe bằng tay (khách không mở được QR) */
+  'POST /v1/partner/intercity/bookings/:id/board': {
+    params: { id: string };
+    response: {
+      id: string;
+      code: string;
+      status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+      seatIds: string[];
+      contactName: null | string;
+      contactPhone: null | string;
+      pickup: {
+        type: string;
+        address: null | string;
+      };
+      dropoff: {
+        type: string;
+        address: null | string;
+      };
+      withCargo: boolean;
+      luggage: {
+        kg: number;
+        bulkyDm3: number;
+        bulkyDims: null | string;
+        note: null | string;
+      };
+      total: number;
+      paymentMethod: null | "cash" | "wallet";
+      boardedAt: null | string;
+      trip: {
+        id: string;
+        status: "scheduled" | "completed" | "cancelled" | "departed";
+        departAt: string;
+        arriveAt: string;
+        from: {
+          name: string;
+          station: string;
+        };
+        to: {
+          name: string;
+          station: string;
+        };
+        vehiclePlate: string;
+        seatKind: "seat" | "bed";
+      };
+    };
+  };
+  /** Bỏ ghi nhận lên xe (quét nhầm) */
+  'POST /v1/partner/intercity/bookings/:id/unboard': {
+    params: { id: string };
+    response: {
+      id: string;
+      code: string;
+      status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+      seatIds: string[];
+      contactName: null | string;
+      contactPhone: null | string;
+      pickup: {
+        type: string;
+        address: null | string;
+      };
+      dropoff: {
+        type: string;
+        address: null | string;
+      };
+      withCargo: boolean;
+      luggage: {
+        kg: number;
+        bulkyDm3: number;
+        bulkyDims: null | string;
+        note: null | string;
+      };
+      total: number;
+      paymentMethod: null | "cash" | "wallet";
+      boardedAt: null | string;
+      trip: {
+        id: string;
+        status: "scheduled" | "completed" | "cancelled" | "departed";
+        departAt: string;
+        arriveAt: string;
+        from: {
+          name: string;
+          station: string;
+        };
+        to: {
+          name: string;
+          station: string;
+        };
+        vehiclePlate: string;
+        seatKind: "seat" | "bed";
+      };
     };
   };
   'GET /v1/partner/intercity/cities': {
@@ -2912,6 +3088,107 @@ export interface ZuumRoutes {
       toCityId: string;
     };
   };
+  /** Tra vé theo mã (chỉ vé trên chuyến của mình) — không ghi nhận gì */
+  'GET /v1/partner/intercity/tickets/:code': {
+    params: { code: string };
+    response: {
+      id: string;
+      code: string;
+      status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+      seatIds: string[];
+      contactName: null | string;
+      contactPhone: null | string;
+      pickup: {
+        type: string;
+        address: null | string;
+      };
+      dropoff: {
+        type: string;
+        address: null | string;
+      };
+      withCargo: boolean;
+      luggage: {
+        kg: number;
+        bulkyDm3: number;
+        bulkyDims: null | string;
+        note: null | string;
+      };
+      total: number;
+      paymentMethod: null | "cash" | "wallet";
+      boardedAt: null | string;
+      trip: {
+        id: string;
+        status: "scheduled" | "completed" | "cancelled" | "departed";
+        departAt: string;
+        arriveAt: string;
+        from: {
+          name: string;
+          station: string;
+        };
+        to: {
+          name: string;
+          station: string;
+        };
+        vehiclePlate: string;
+        seatKind: "seat" | "bed";
+      };
+    };
+  };
+  /** Quét QR vé (hoặc gõ mã vé): vé hợp lệ của chuyến mình, trong giờ lên xe → ghi nhận lên xe; trả kết quả + vé */
+  'POST /v1/partner/intercity/tickets/scan': {
+    body: {
+      qr: string;
+      tripId?: string;
+    };
+    response: ({
+      result: "cancelled" | "invalid" | "boarded" | "already_boarded" | "wrong_trip" | "not_boarding" | "unpaid";
+      ticket: {
+        id: string;
+        code: string;
+        status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+        seatIds: string[];
+        contactName: null | string;
+        contactPhone: null | string;
+        pickup: {
+          type: string;
+          address: null | string;
+        };
+        dropoff: {
+          type: string;
+          address: null | string;
+        };
+        withCargo: boolean;
+        luggage: {
+          kg: number;
+          bulkyDm3: number;
+          bulkyDims: null | string;
+          note: null | string;
+        };
+        total: number;
+        paymentMethod: null | "cash" | "wallet";
+        boardedAt: null | string;
+        trip: {
+          id: string;
+          status: "scheduled" | "completed" | "cancelled" | "departed";
+          departAt: string;
+          arriveAt: string;
+          from: {
+            name: string;
+            station: string;
+          };
+          to: {
+            name: string;
+            station: string;
+          };
+          vehiclePlate: string;
+          seatKind: "seat" | "bed";
+        };
+      };
+    }) | ({
+      result: "cancelled" | "invalid" | "boarded" | "already_boarded" | "wrong_trip" | "not_boarding" | "unpaid";
+      ticket: null;
+    });
+  };
   'GET /v1/partner/intercity/trips': {
     query?: {
       from?: string;
@@ -2976,6 +3253,7 @@ export interface ZuumRoutes {
       departAt: string;
       arriveAt: string;
       pricePerSeat: number;
+      seatKind: "seat" | "bed";
       seatCount: number;
       amenities: string[];
       luggagePolicy: unknown;
@@ -3003,6 +3281,7 @@ export interface ZuumRoutes {
         col: number;
         deck?: number;
       }>;
+      seatKind?: "seat" | "bed";
       amenities?: string[];
       luggagePolicy?: null | {
         freeKg: number;
@@ -3031,6 +3310,7 @@ export interface ZuumRoutes {
       departAt: string;
       arriveAt: string;
       pricePerSeat: number;
+      seatKind: "seat" | "bed";
       seatCount: number;
       amenities: string[];
       luggagePolicy: unknown;
@@ -3118,6 +3398,7 @@ export interface ZuumRoutes {
         departAt: string;
         arriveAt: string;
         pricePerSeat: number;
+        seatKind: "seat" | "bed";
         seatCount: number;
         amenities: string[];
         luggagePolicy: unknown;
@@ -3162,8 +3443,10 @@ export interface ZuumRoutes {
         total: number;
         paymentMethod: null | "cash" | "wallet";
         heldUntil: null | string;
+        boardedAt: null | string;
       }>;
       soldSeats: number;
+      boardedSeats: number;
     };
   };
   /** Huỷ chuyến: mọi vé hoàn tiền, báo khách */
@@ -4868,6 +5151,24 @@ export interface ZuumRoutes {
         seats: null | number;
         loadKg: null | number;
         ownerName: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+          files?: {
+            exterior: string[];
+            interior: string[];
+          };
+        };
+        seatLayout: null | {
+          kind: "seat" | "bed";
+          seats: Array<{
+            id: string;
+            row: string;
+            col: number;
+            deck: number;
+          }>;
+        };
         status: "rejected" | "pending" | "approved" | "superseded" | "removed";
         reviewNote: null | string;
         reviewedAt: null | string;
@@ -4993,6 +5294,24 @@ export interface ZuumRoutes {
         seats: null | number;
         loadKg: null | number;
         ownerName: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+          files?: {
+            exterior: string[];
+            interior: string[];
+          };
+        };
+        seatLayout: null | {
+          kind: "seat" | "bed";
+          seats: Array<{
+            id: string;
+            row: string;
+            col: number;
+            deck: number;
+          }>;
+        };
         status: "rejected" | "pending" | "approved" | "superseded" | "removed";
         reviewNote: null | string;
         reviewedAt: null | string;
@@ -5102,6 +5421,24 @@ export interface ZuumRoutes {
         seats: null | number;
         loadKg: null | number;
         ownerName: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+          files?: {
+            exterior: string[];
+            interior: string[];
+          };
+        };
+        seatLayout: null | {
+          kind: "seat" | "bed";
+          seats: Array<{
+            id: string;
+            row: string;
+            col: number;
+            deck: number;
+          }>;
+        };
         status: "rejected" | "pending" | "approved" | "superseded" | "removed";
         reviewNote: null | string;
         reviewedAt: null | string;
@@ -5211,6 +5548,24 @@ export interface ZuumRoutes {
         seats: null | number;
         loadKg: null | number;
         ownerName: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+          files?: {
+            exterior: string[];
+            interior: string[];
+          };
+        };
+        seatLayout: null | {
+          kind: "seat" | "bed";
+          seats: Array<{
+            id: string;
+            row: string;
+            col: number;
+            deck: number;
+          }>;
+        };
         status: "rejected" | "pending" | "approved" | "superseded" | "removed";
         reviewNote: null | string;
         reviewedAt: null | string;
@@ -5365,6 +5720,24 @@ export interface ZuumRoutes {
         seats: null | number;
         loadKg: null | number;
         ownerName: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+          files?: {
+            exterior: string[];
+            interior: string[];
+          };
+        };
+        seatLayout: null | {
+          kind: "seat" | "bed";
+          seats: Array<{
+            id: string;
+            row: string;
+            col: number;
+            deck: number;
+          }>;
+        };
         status: "rejected" | "pending" | "approved" | "superseded" | "removed";
         reviewNote: null | string;
         reviewedAt: null | string;
@@ -5485,6 +5858,24 @@ export interface ZuumRoutes {
         seats: null | number;
         loadKg: null | number;
         ownerName: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+          files?: {
+            exterior: string[];
+            interior: string[];
+          };
+        };
+        seatLayout: null | {
+          kind: "seat" | "bed";
+          seats: Array<{
+            id: string;
+            row: string;
+            col: number;
+            deck: number;
+          }>;
+        };
         status: "rejected" | "pending" | "approved" | "superseded" | "removed";
         reviewNote: null | string;
         reviewedAt: null | string;
@@ -5595,6 +5986,24 @@ export interface ZuumRoutes {
         seats: null | number;
         loadKg: null | number;
         ownerName: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+          files?: {
+            exterior: string[];
+            interior: string[];
+          };
+        };
+        seatLayout: null | {
+          kind: "seat" | "bed";
+          seats: Array<{
+            id: string;
+            row: string;
+            col: number;
+            deck: number;
+          }>;
+        };
         status: "rejected" | "pending" | "approved" | "superseded" | "removed";
         reviewNote: null | string;
         reviewedAt: null | string;
@@ -5715,6 +6124,297 @@ export interface ZuumRoutes {
         seats: null | number;
         loadKg: null | number;
         ownerName: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+          files?: {
+            exterior: string[];
+            interior: string[];
+          };
+        };
+        seatLayout: null | {
+          kind: "seat" | "bed";
+          seats: Array<{
+            id: string;
+            row: string;
+            col: number;
+            deck: number;
+          }>;
+        };
+        status: "rejected" | "pending" | "approved" | "superseded" | "removed";
+        reviewNote: null | string;
+        reviewedAt: null | string;
+        createdAt: string;
+        version: string;
+      }>;
+      services: Array<{
+        serviceId: string;
+        code: string;
+        name: string;
+        category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
+        kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
+        vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+        vehicleSeats: null | number;
+        vehicleLoadKg: null | number;
+        serviceStatus: "active" | "draft" | "paused" | "archived";
+        status: "rejected" | "pending" | "approved" | "superseded" | "removed";
+        enabled: boolean;
+        reviewNote: null | string;
+        reviewedAt: null | string;
+        version: string;
+      }>;
+      lastReview: null | {
+        event: "changes_requested" | "rejected" | "approved" | "submitted" | "withdrawn" | "reopened" | "items_reviewed";
+        note: null | string;
+        at: string;
+      };
+      availability: {
+        online: boolean;
+        activeVehicleId: null | string;
+      };
+    };
+  };
+  /** Ảnh xe giới thiệu với khách: id file đã tải lên với purpose `vehicle_photo` (ngoại thất / nội thất, mỗi nhóm ≤ 8) */
+  'PUT /v1/partner/vehicles/:id/photos': {
+    params: { id: string };
+    body: {
+      exterior: string[];
+      interior: string[];
+    };
+    response: {
+      status: "active" | "suspended" | "deleted" | "pending_profile" | "pending_review" | "changes_requested" | "rejected";
+      profile: null | {
+        kind: "individual" | "moving_team" | "bus_company";
+        gender: null | "other" | "male" | "female";
+        dateOfBirth: null | string;
+        city: null | string;
+        address: null | string;
+        organizationName: null | string;
+        taxCode: null | string;
+        teamSize: null | number;
+        fleetSize: null | number;
+        serviceArea: null | string;
+        note: null | string;
+        languages: string[];
+        acceptCod: boolean;
+        autoAccept: boolean;
+        submittedAt: null | string;
+        firstApprovedAt: null | string;
+      };
+      editable: boolean;
+      canChangeKind: boolean;
+      canSubmit: boolean;
+      blockers: string[];
+      requirements: Array<{
+        key: string;
+        kind: "vehicle" | "document";
+        documentType: null | "other" | "id_card" | "portrait" | "driver_license" | "judicial_record" | "professional_certificate" | "business_license" | "vehicle_registration" | "vehicle_insurance" | "vehicle_inspection" | "vehicle_photos";
+        vehicleId: null | string;
+        label: string;
+        reason: string;
+        required: boolean;
+        state: "rejected" | "expired" | "pending" | "approved" | "missing" | "insufficient";
+        message: null | string;
+      }>;
+      eligibility: Array<{
+        serviceId: string;
+        eligible: boolean;
+        vehicleIds: string[];
+        problems: string[];
+      }>;
+      documents: Array<{
+        id: string;
+        type: "other" | "id_card" | "portrait" | "driver_license" | "judicial_record" | "professional_certificate" | "business_license" | "vehicle_registration" | "vehicle_insurance" | "vehicle_inspection" | "vehicle_photos";
+        vehicleId: null | string;
+        number: null | string;
+        licenseClasses: string[];
+        issuedOn: null | string;
+        issuedPlace: null | string;
+        expiresOn: null | string;
+        note: null | string;
+        status: "rejected" | "pending" | "approved" | "superseded" | "removed";
+        reviewNote: null | string;
+        reviewedAt: null | string;
+        createdAt: string;
+        version: string;
+        files: Array<{
+          slot: string;
+          fileId: string;
+          contentType: string;
+          size: number;
+          url: null | string;
+        }>;
+      }>;
+      vehicles: Array<{
+        id: string;
+        type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+        plate: string;
+        brand: null | string;
+        model: null | string;
+        color: null | string;
+        year: null | number;
+        seats: null | number;
+        loadKg: null | number;
+        ownerName: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+          files?: {
+            exterior: string[];
+            interior: string[];
+          };
+        };
+        seatLayout: null | {
+          kind: "seat" | "bed";
+          seats: Array<{
+            id: string;
+            row: string;
+            col: number;
+            deck: number;
+          }>;
+        };
+        status: "rejected" | "pending" | "approved" | "superseded" | "removed";
+        reviewNote: null | string;
+        reviewedAt: null | string;
+        createdAt: string;
+        version: string;
+      }>;
+      services: Array<{
+        serviceId: string;
+        code: string;
+        name: string;
+        category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
+        kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
+        vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+        vehicleSeats: null | number;
+        vehicleLoadKg: null | number;
+        serviceStatus: "active" | "draft" | "paused" | "archived";
+        status: "rejected" | "pending" | "approved" | "superseded" | "removed";
+        enabled: boolean;
+        reviewNote: null | string;
+        reviewedAt: null | string;
+        version: string;
+      }>;
+      lastReview: null | {
+        event: "changes_requested" | "rejected" | "approved" | "submitted" | "withdrawn" | "reopened" | "items_reviewed";
+        note: null | string;
+        at: string;
+      };
+      availability: {
+        online: boolean;
+        activeVehicleId: null | string;
+      };
+    };
+  };
+  /** Sơ đồ ghế của xe chạy tuyến (kind seat|bed + danh sách ghế) — null để về mặc định theo số chỗ */
+  'PUT /v1/partner/vehicles/:id/seat-layout': {
+    params: { id: string };
+    body: {
+      layout: null | {
+        kind: "seat" | "bed";
+        seats: Array<{
+          id: string;
+          row: string;
+          col: number;
+          deck?: number;
+        }>;
+      };
+    };
+    response: {
+      status: "active" | "suspended" | "deleted" | "pending_profile" | "pending_review" | "changes_requested" | "rejected";
+      profile: null | {
+        kind: "individual" | "moving_team" | "bus_company";
+        gender: null | "other" | "male" | "female";
+        dateOfBirth: null | string;
+        city: null | string;
+        address: null | string;
+        organizationName: null | string;
+        taxCode: null | string;
+        teamSize: null | number;
+        fleetSize: null | number;
+        serviceArea: null | string;
+        note: null | string;
+        languages: string[];
+        acceptCod: boolean;
+        autoAccept: boolean;
+        submittedAt: null | string;
+        firstApprovedAt: null | string;
+      };
+      editable: boolean;
+      canChangeKind: boolean;
+      canSubmit: boolean;
+      blockers: string[];
+      requirements: Array<{
+        key: string;
+        kind: "vehicle" | "document";
+        documentType: null | "other" | "id_card" | "portrait" | "driver_license" | "judicial_record" | "professional_certificate" | "business_license" | "vehicle_registration" | "vehicle_insurance" | "vehicle_inspection" | "vehicle_photos";
+        vehicleId: null | string;
+        label: string;
+        reason: string;
+        required: boolean;
+        state: "rejected" | "expired" | "pending" | "approved" | "missing" | "insufficient";
+        message: null | string;
+      }>;
+      eligibility: Array<{
+        serviceId: string;
+        eligible: boolean;
+        vehicleIds: string[];
+        problems: string[];
+      }>;
+      documents: Array<{
+        id: string;
+        type: "other" | "id_card" | "portrait" | "driver_license" | "judicial_record" | "professional_certificate" | "business_license" | "vehicle_registration" | "vehicle_insurance" | "vehicle_inspection" | "vehicle_photos";
+        vehicleId: null | string;
+        number: null | string;
+        licenseClasses: string[];
+        issuedOn: null | string;
+        issuedPlace: null | string;
+        expiresOn: null | string;
+        note: null | string;
+        status: "rejected" | "pending" | "approved" | "superseded" | "removed";
+        reviewNote: null | string;
+        reviewedAt: null | string;
+        createdAt: string;
+        version: string;
+        files: Array<{
+          slot: string;
+          fileId: string;
+          contentType: string;
+          size: number;
+          url: null | string;
+        }>;
+      }>;
+      vehicles: Array<{
+        id: string;
+        type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+        plate: string;
+        brand: null | string;
+        model: null | string;
+        color: null | string;
+        year: null | number;
+        seats: null | number;
+        loadKg: null | number;
+        ownerName: null | string;
+        photos: null | {
+          exterior: string[];
+          interior: string[];
+          credit?: null | string;
+          files?: {
+            exterior: string[];
+            interior: string[];
+          };
+        };
+        seatLayout: null | {
+          kind: "seat" | "bed";
+          seats: Array<{
+            id: string;
+            row: string;
+            col: number;
+            deck: number;
+          }>;
+        };
         status: "rejected" | "pending" | "approved" | "superseded" | "removed";
         reviewNote: null | string;
         reviewedAt: null | string;
@@ -6062,6 +6762,10 @@ export interface ZuumRoutes {
       refreshTokenExpiresAt: string;
     };
   };
+  'GET /v1/public/files/:id': {
+    params: { id: string };
+    response: void;
+  };
   'GET /v1/public/intercity/cities': {
     response: Array<{
       id: string;
@@ -6112,6 +6816,7 @@ export interface ZuumRoutes {
       arriveAt: string;
       pricePerSeat: number;
       seatCount: number;
+      seatKind: "seat" | "bed";
       amenities: string[];
       vehicle: {
         type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
@@ -6174,6 +6879,7 @@ export interface ZuumRoutes {
       arriveAt: string;
       pricePerSeat: number;
       seatCount: number;
+      seatKind: "seat" | "bed";
       amenities: string[];
       vehicle: {
         type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";

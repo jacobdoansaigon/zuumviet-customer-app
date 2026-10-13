@@ -118,8 +118,8 @@ export default function TripDetailScreen() {
 
   const seatTotal = trip.pricePerSeat * Math.max(1, selected.length);
   const v = trip.vehicle;
-  // giường nằm hay ghế ngồi → hình vẽ sơ đồ
-  const seatKind: 'bed' | 'seat' = trip.amenities.includes('Giường nằm') || /giường|limousine phòng/i.test(v.name ?? '') ? 'bed' : 'seat';
+  // giường nằm hay ghế ngồi → hình vẽ sơ đồ (nhà xe khai trên xe; chuyến cũ chưa có thì đoán theo tiện ích / tên xe)
+  const seatKind: 'bed' | 'seat' = trip.seatKind ?? (trip.amenities.includes('Giường nằm') || /giường|limousine phòng/i.test(v.name ?? '') ? 'bed' : 'seat');
   const photos = v.photos && (v.photos.exterior.length || v.photos.interior.length) ? v.photos : null;
 
   return (
