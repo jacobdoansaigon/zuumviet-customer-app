@@ -5791,6 +5791,8 @@ export interface ZuumRoutes {
       page?: number;
       pageSize?: number;
       tab?: "scheduled" | "queued";
+      lat?: number;
+      lng?: number;
     };
     response: {
       items: Array<{
@@ -5823,6 +5825,10 @@ export interface ZuumRoutes {
   };
   'GET /v1/partner/orders/open/:id': {
     params: { id: string };
+    query?: {
+      lat?: number;
+      lng?: number;
+    };
     response: {
       customer: null | {
         phone: string;
