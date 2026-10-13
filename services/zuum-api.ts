@@ -2039,6 +2039,18 @@ export interface ZuumRoutes {
       }>;
     };
   };
+  'GET /v1/customer/routes/shape': {
+    query: {
+      points: string;
+      mode?: "car" | "motorbike" | "truck";
+    };
+    response: {
+      distanceMeters: number;
+      durationSeconds: number;
+      polyline: null | string;
+      source: "goong" | "estimate";
+    };
+  };
   'GET /v1/customer/supply/nearby': {
     query: {
       lat: number;

@@ -42,3 +42,16 @@ export function placeEntrances(lat: number, lng: number, name?: string): Promise
 export function placeHistory(near: { lat: number; lng: number } | null): Promise<PlaceHistory> {
   return api('GET /v1/customer/places/history', { query: near ? { lat: near.lat, lng: near.lng } : undefined });
 }
+
+// ---- hình dạng tuyến đường thật (vẽ ở màn xem trước, chưa báo giá) ----
+export type RouteMode = 'motorbike' | 'car' | 'truck';
+export type RouteShape = ZuumResponse<'GET /v1/customer/routes/shape'>;
+/** xe máy → bike; xe tải / xe khách → truck; còn lại car (giống server routeModeOf) */
+export function routeModeOf(vehicleType: string | null | undefined): RouteMode {
+  if (vehicleType === 'motorbike') return 'motorbike';
+  if (vehicleType === 'truck' || vehicleType === 'bus') return 'truck';
+  return 'car';
+}
+export function routeShape(points: { lat: number; lng: number }[], mode: RouteMode = 'car'): Promise<RouteShape> {
+  return api('GET /v1/customer/routes/shape', { query: { points: points.map((p) => `${p.lat},${p.lng}`).join(';'), mode } });
+}

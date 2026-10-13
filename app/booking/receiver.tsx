@@ -10,17 +10,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Chip, Icon, Icons, Radio, Screen, SwitchRow, TextField } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
 import { SERVICE_GROUPS, VIEW_OPTIONS, MOVING_BULKY_ITEMS, type ViewOptionId } from '@/constants/booking';
-import {
-  useBooking,
-  ensureReceiver,
-  updateReceiver,
-  setOptions,
-  isValidPhoneVn,
-  formatThousands,
-  formatVnd,
-  getSelectedService,
-  isReceiverComplete,
-} from '@/services/bookingStore';
+import { useBooking, ensureReceiver, updateReceiver, setOptions, isValidPhoneVn, formatThousands, formatVnd, getSelectedService, isReceiverComplete } from '@/services/bookingStore';
+import { routeModeOf } from '@/services/places';
 import { AddressBlock, AddressMapPreview, FlatFooter, FloorAccessPicker, PackageSizePicker, ZaloPasteSheet, type MapStop } from '@/components/booking';
 
 export default function ReceiverScreen() {
@@ -231,6 +222,7 @@ export default function ReceiverScreen() {
           placeholder={labels.receiverPlaceholder}
           markerType="dropoff"
           stops={mapStops}
+          routeMode={routeModeOf(getSelectedService(state)?.vehicleType)}
           hintLabel={`Chạm để đổi ${labels.mapDropLabel.toLowerCase()}`}
           onChange={() => openPicker()}
         />
