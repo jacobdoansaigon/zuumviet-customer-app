@@ -292,7 +292,7 @@ export interface ZuumRoutes {
   /** Ảnh đại diện, ảnh / video bằng chứng (huỷ đơn…) */
   'POST /v1/customer/files': {
     body: {
-      purpose: "avatar" | "order_proof";
+      purpose: "avatar" | "order_proof" | "order_photo";
       contentType: string;
       size: number;
     };
@@ -1071,7 +1071,7 @@ export interface ZuumRoutes {
       items: Array<{
         id: string;
         code: string;
-        status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+        status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
         service: {
           id: string;
           kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -1101,6 +1101,7 @@ export interface ZuumRoutes {
           phone: string;
           fullName: string;
         };
+        jobSummary: null | string;
       }>;
       page: number;
       pageSize: number;
@@ -1122,11 +1123,14 @@ export interface ZuumRoutes {
         note?: string;
       }>;
       note?: string;
+      photoFileIds?: string[];
+      floor?: string;
+      issue?: string;
     };
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -1187,6 +1191,28 @@ export interface ZuumRoutes {
         name: string;
         price: number;
       }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
       distanceMeters: number;
       durationSeconds: null | number;
       routePolyline: null | string;
@@ -1282,7 +1308,7 @@ export interface ZuumRoutes {
         stopId: null | string;
         url: null | string;
       }>;
-      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "arrive" | "pick_up" | "complete" | "release">;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
       rating: null | {
         createdAt: string;
         stars: number;
@@ -1299,7 +1325,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -1360,6 +1386,28 @@ export interface ZuumRoutes {
         name: string;
         price: number;
       }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
       distanceMeters: number;
       durationSeconds: null | number;
       routePolyline: null | string;
@@ -1455,7 +1503,7 @@ export interface ZuumRoutes {
         stopId: null | string;
         url: null | string;
       }>;
-      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "arrive" | "pick_up" | "complete" | "release">;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
       rating: null | {
         createdAt: string;
         stars: number;
@@ -1478,7 +1526,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -1539,6 +1587,28 @@ export interface ZuumRoutes {
         name: string;
         price: number;
       }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
       distanceMeters: number;
       durationSeconds: null | number;
       routePolyline: null | string;
@@ -1634,7 +1704,203 @@ export interface ZuumRoutes {
         stopId: null | string;
         url: null | string;
       }>;
-      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "arrive" | "pick_up" | "complete" | "release">;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
+      rating: null | {
+        createdAt: string;
+        stars: number;
+        tags: string[];
+        comment: null | string;
+      };
+      canRate: boolean;
+      cancelFreeUntil: null | string;
+      cancelFeeIfNow?: number;
+    };
+  };
+  /** Gọi thợ: không có thợ rảnh → xếp hàng chờ thợ tự nhận (tối đa 6 giờ) */
+  'POST /v1/customer/orders/:id/queue': {
+    params: { id: string };
+    response: {
+      id: string;
+      code: string;
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      service: {
+        id: string;
+        kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
+        name: string;
+        code: string;
+        category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
+        vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+      };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
+      };
+      steps: {
+        arrive: string;
+        pickUp: string;
+        complete: string;
+        inProgress: string;
+      };
+      paymentMethod: "cash" | "wallet";
+      scheduledAt: null | string;
+      pickup: {
+        lat: number;
+        lng: number;
+        address: string;
+        contactName: null | string;
+        contactPhone: null | string;
+        note: null | string;
+      };
+      stops: Array<{
+        id: string;
+        seq: number;
+        lat: number;
+        lng: number;
+        address: string;
+        contactName: null | string;
+        contactPhone: null | string;
+        note: null | string;
+        codAmount: number;
+        status: "pending" | "failed" | "arrived" | "delivered" | "returned";
+        arrivedAt: null | string;
+        completedAt: null | string;
+        failReason: null | string;
+      }>;
+      returnToPickup: boolean;
+      durationMinutes: null | number;
+      note: null | string;
+      addons: Array<{
+        id: string;
+        name: string;
+        price: number;
+      }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
+      distanceMeters: number;
+      durationSeconds: null | number;
+      routePolyline: null | string;
+      price: {
+        lines: Array<{
+          code: string;
+          label: string;
+          amount: number;
+        }>;
+        fare: number;
+        discountable: number;
+        discount: number;
+        serviceTotal: number;
+        platformFee: number;
+        tip: number;
+        total: number;
+      };
+      finalPrice: null | {
+        lines: Array<{
+          code: string;
+          label: string;
+          amount: number;
+        }>;
+        fare: number;
+        discountable: number;
+        discount: number;
+        serviceTotal: number;
+        platformFee: number;
+        tip: number;
+        total: number;
+      };
+      total: number;
+      codTotal: number;
+      codCollected: number;
+      tip: number;
+      debtAmount: number;
+      cashToCollect: number;
+      walletHeld: number;
+      timeline: {
+        createdAt: string;
+        searchStartedAt: null | string;
+        searchDeadlineAt: null | string;
+        assignedAt: null | string;
+        arrivedPickupAt: null | string;
+        pickedUpAt: null | string;
+        completedAt: null | string;
+        cancelledAt: null | string;
+      };
+      cancellation: null | {
+        by: null | "customer" | "partner" | "staff" | "system";
+        reason: null | {
+          id: string;
+          label: string;
+        };
+        note: null | string;
+        fee: number;
+      };
+      partner: null | {
+        id: string;
+        code: string;
+        fullName: string;
+        phone: string;
+        photoUrl: null | string;
+        rating: {
+          average: null | number;
+          count: number;
+        };
+      };
+      vehicle: null | {
+        id: string;
+        type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+        model: null | string;
+        plate: string;
+        brand: null | string;
+        color: null | string;
+        seats: null | number;
+      };
+      partnerLocation: null | {
+        lat: number;
+        lng: number;
+        heading: null | number;
+        at: string;
+      };
+      customer: null | {
+        id: string;
+        code: string;
+        phone: string;
+        fullName: string;
+      };
+      proofs: Array<{
+        fileId: string;
+        kind: "delivery" | "pickup" | "cancel";
+        stopId: null | string;
+        url: null | string;
+      }>;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
       rating: null | {
         createdAt: string;
         stars: number;
@@ -1666,7 +1932,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -1727,6 +1993,28 @@ export interface ZuumRoutes {
         name: string;
         price: number;
       }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
       distanceMeters: number;
       durationSeconds: null | number;
       routePolyline: null | string;
@@ -1822,7 +2110,7 @@ export interface ZuumRoutes {
         stopId: null | string;
         url: null | string;
       }>;
-      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "arrive" | "pick_up" | "complete" | "release">;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
       rating: null | {
         createdAt: string;
         stars: number;
@@ -1947,6 +2235,15 @@ export interface ZuumRoutes {
       scheduledAt?: null | string;
       durationMinutes?: number;
       addonIds?: string[];
+      jobs?: Array<{
+        id: string;
+        qty?: number;
+      }>;
+      handyman?: {
+        height?: boolean;
+        ladder?: boolean;
+        urgent?: boolean;
+      };
       tip?: number;
       couponCode?: string;
     };
@@ -2055,6 +2352,15 @@ export interface ZuumRoutes {
         codAmount?: number;
         weightTierId?: null | string;
       }>;
+      jobs?: Array<{
+        id: string;
+        qty?: number;
+      }>;
+      handyman?: {
+        height?: boolean;
+        ladder?: boolean;
+        urgent?: boolean;
+      };
     };
     response: {
       items: Array<{
@@ -3626,6 +3932,26 @@ export interface ZuumRoutes {
       paymentMethod: "cash" | "wallet";
       scheduledAt: null | string;
       note: null | string;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
     }>;
   };
   'POST /v1/partner/offers/:id/accept': {
@@ -3633,7 +3959,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -3694,6 +4020,28 @@ export interface ZuumRoutes {
         name: string;
         price: number;
       }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
       distanceMeters: number;
       durationSeconds: null | number;
       routePolyline: null | string;
@@ -3789,7 +4137,7 @@ export interface ZuumRoutes {
         stopId: null | string;
         url: null | string;
       }>;
-      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "arrive" | "pick_up" | "complete" | "release">;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
       rating: null | {
         createdAt: string;
         stars: number;
@@ -3816,7 +4164,7 @@ export interface ZuumRoutes {
       items: Array<{
         id: string;
         code: string;
-        status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+        status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
         service: {
           id: string;
           kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -3846,6 +4194,7 @@ export interface ZuumRoutes {
           phone: string;
           fullName: string;
         };
+        jobSummary: null | string;
       }>;
       page: number;
       pageSize: number;
@@ -3857,7 +4206,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -3918,6 +4267,28 @@ export interface ZuumRoutes {
         name: string;
         price: number;
       }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
       distanceMeters: number;
       durationSeconds: null | number;
       routePolyline: null | string;
@@ -4013,7 +4384,7 @@ export interface ZuumRoutes {
         stopId: null | string;
         url: null | string;
       }>;
-      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "arrive" | "pick_up" | "complete" | "release">;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
       rating: null | {
         createdAt: string;
         stars: number;
@@ -4034,7 +4405,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -4095,6 +4466,28 @@ export interface ZuumRoutes {
         name: string;
         price: number;
       }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
       distanceMeters: number;
       durationSeconds: null | number;
       routePolyline: null | string;
@@ -4190,7 +4583,203 @@ export interface ZuumRoutes {
         stopId: null | string;
         url: null | string;
       }>;
-      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "arrive" | "pick_up" | "complete" | "release">;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
+      rating: null | {
+        createdAt: string;
+        stars: number;
+        tags: string[];
+        comment: null | string;
+      };
+      canRate: boolean;
+      cancelFreeUntil: null | string;
+      cancelFeeIfNow?: number;
+    };
+  };
+  /** Nhận đơn mở — đúng một thợ nhận được; đơn hẹn giờ giữ nguyên giờ hẹn */
+  'POST /v1/partner/orders/:id/claim': {
+    params: { id: string };
+    response: {
+      id: string;
+      code: string;
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      service: {
+        id: string;
+        kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
+        name: string;
+        code: string;
+        category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
+        vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+      };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
+      };
+      steps: {
+        arrive: string;
+        pickUp: string;
+        complete: string;
+        inProgress: string;
+      };
+      paymentMethod: "cash" | "wallet";
+      scheduledAt: null | string;
+      pickup: {
+        lat: number;
+        lng: number;
+        address: string;
+        contactName: null | string;
+        contactPhone: null | string;
+        note: null | string;
+      };
+      stops: Array<{
+        id: string;
+        seq: number;
+        lat: number;
+        lng: number;
+        address: string;
+        contactName: null | string;
+        contactPhone: null | string;
+        note: null | string;
+        codAmount: number;
+        status: "pending" | "failed" | "arrived" | "delivered" | "returned";
+        arrivedAt: null | string;
+        completedAt: null | string;
+        failReason: null | string;
+      }>;
+      returnToPickup: boolean;
+      durationMinutes: null | number;
+      note: null | string;
+      addons: Array<{
+        id: string;
+        name: string;
+        price: number;
+      }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
+      distanceMeters: number;
+      durationSeconds: null | number;
+      routePolyline: null | string;
+      price: {
+        lines: Array<{
+          code: string;
+          label: string;
+          amount: number;
+        }>;
+        fare: number;
+        discountable: number;
+        discount: number;
+        serviceTotal: number;
+        platformFee: number;
+        tip: number;
+        total: number;
+      };
+      finalPrice: null | {
+        lines: Array<{
+          code: string;
+          label: string;
+          amount: number;
+        }>;
+        fare: number;
+        discountable: number;
+        discount: number;
+        serviceTotal: number;
+        platformFee: number;
+        tip: number;
+        total: number;
+      };
+      total: number;
+      codTotal: number;
+      codCollected: number;
+      tip: number;
+      debtAmount: number;
+      cashToCollect: number;
+      walletHeld: number;
+      timeline: {
+        createdAt: string;
+        searchStartedAt: null | string;
+        searchDeadlineAt: null | string;
+        assignedAt: null | string;
+        arrivedPickupAt: null | string;
+        pickedUpAt: null | string;
+        completedAt: null | string;
+        cancelledAt: null | string;
+      };
+      cancellation: null | {
+        by: null | "customer" | "partner" | "staff" | "system";
+        reason: null | {
+          id: string;
+          label: string;
+        };
+        note: null | string;
+        fee: number;
+      };
+      partner: null | {
+        id: string;
+        code: string;
+        fullName: string;
+        phone: string;
+        photoUrl: null | string;
+        rating: {
+          average: null | number;
+          count: number;
+        };
+      };
+      vehicle: null | {
+        id: string;
+        type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+        model: null | string;
+        plate: string;
+        brand: null | string;
+        color: null | string;
+        seats: null | number;
+      };
+      partnerLocation: null | {
+        lat: number;
+        lng: number;
+        heading: null | number;
+        at: string;
+      };
+      customer: null | {
+        id: string;
+        code: string;
+        phone: string;
+        fullName: string;
+      };
+      proofs: Array<{
+        fileId: string;
+        kind: "delivery" | "pickup" | "cancel";
+        stopId: null | string;
+        url: null | string;
+      }>;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
       rating: null | {
         createdAt: string;
         stars: number;
@@ -4207,7 +4796,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -4268,6 +4857,28 @@ export interface ZuumRoutes {
         name: string;
         price: number;
       }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
       distanceMeters: number;
       durationSeconds: null | number;
       routePolyline: null | string;
@@ -4363,7 +4974,7 @@ export interface ZuumRoutes {
         stopId: null | string;
         url: null | string;
       }>;
-      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "arrive" | "pick_up" | "complete" | "release">;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
       rating: null | {
         createdAt: string;
         stars: number;
@@ -4383,7 +4994,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -4444,6 +5055,28 @@ export interface ZuumRoutes {
         name: string;
         price: number;
       }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
       distanceMeters: number;
       durationSeconds: null | number;
       routePolyline: null | string;
@@ -4539,7 +5172,7 @@ export interface ZuumRoutes {
         stopId: null | string;
         url: null | string;
       }>;
-      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "arrive" | "pick_up" | "complete" | "release">;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
       rating: null | {
         createdAt: string;
         stars: number;
@@ -4568,7 +5201,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -4629,6 +5262,28 @@ export interface ZuumRoutes {
         name: string;
         price: number;
       }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
       distanceMeters: number;
       durationSeconds: null | number;
       routePolyline: null | string;
@@ -4724,7 +5379,7 @@ export interface ZuumRoutes {
         stopId: null | string;
         url: null | string;
       }>;
-      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "arrive" | "pick_up" | "complete" | "release">;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
       rating: null | {
         createdAt: string;
         stars: number;
@@ -4746,7 +5401,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -4807,6 +5462,28 @@ export interface ZuumRoutes {
         name: string;
         price: number;
       }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
       distanceMeters: number;
       durationSeconds: null | number;
       routePolyline: null | string;
@@ -4902,7 +5579,7 @@ export interface ZuumRoutes {
         stopId: null | string;
         url: null | string;
       }>;
-      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "arrive" | "pick_up" | "complete" | "release">;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
       rating: null | {
         createdAt: string;
         stars: number;
@@ -4918,7 +5595,7 @@ export interface ZuumRoutes {
     response: null | ({
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -4979,6 +5656,28 @@ export interface ZuumRoutes {
         name: string;
         price: number;
       }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
       distanceMeters: number;
       durationSeconds: null | number;
       routePolyline: null | string;
@@ -5074,7 +5773,7 @@ export interface ZuumRoutes {
         stopId: null | string;
         url: null | string;
       }>;
-      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "arrive" | "pick_up" | "complete" | "release">;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
       rating: null | {
         createdAt: string;
         stars: number;
@@ -5085,6 +5784,237 @@ export interface ZuumRoutes {
       cancelFreeUntil: null | string;
       cancelFeeIfNow?: number;
     });
+  };
+  /** Đơn mở cho thợ tự nhận: tab queued (khách đang chờ) / scheduled (hẹn giờ chưa có thợ), gần vị trí của bạn */
+  'GET /v1/partner/orders/open': {
+    query?: {
+      page?: number;
+      pageSize?: number;
+      tab?: "scheduled" | "queued";
+    };
+    response: {
+      items: Array<{
+        id: string;
+        code: string;
+        status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+        service: {
+          id: string;
+          kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
+          name: string;
+          category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
+        };
+        pickupAddress: string;
+        pickupLat: number;
+        pickupLng: number;
+        distanceMeters: null | number;
+        total: number;
+        paymentMethod: "cash" | "wallet";
+        scheduledAt: null | string;
+        queuedAt: null | string;
+        createdAt: string;
+        jobSummary: null | string;
+        urgent: boolean;
+        photoCount: number;
+      }>;
+      page: number;
+      pageSize: number;
+      total: number;
+    };
+  };
+  'GET /v1/partner/orders/open/:id': {
+    params: { id: string };
+    response: {
+      customer: null | {
+        phone: string;
+        id: string;
+        code: string;
+        fullName: string;
+      };
+      pickup: {
+        contactPhone: null;
+        lat: number;
+        lng: number;
+        address: string;
+        contactName: null | string;
+        note: null | string;
+      };
+      distanceMeters: null | number;
+      id: string;
+      code: string;
+      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      service: {
+        id: string;
+        kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
+        name: string;
+        code: string;
+        category: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
+        vehicleType: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+      };
+      search: null | {
+        startedAt: string;
+        deadlineAt: null | string;
+        elapsedSeconds: number;
+        maxSearchSeconds: number;
+        steps: Array<{
+          radiusMeters: number;
+          seconds: number;
+        }>;
+        maxRadiusMeters: number;
+        phase: number;
+        radiusMeters: number;
+      };
+      steps: {
+        arrive: string;
+        pickUp: string;
+        complete: string;
+        inProgress: string;
+      };
+      paymentMethod: "cash" | "wallet";
+      scheduledAt: null | string;
+      stops: Array<{
+        id: string;
+        seq: number;
+        lat: number;
+        lng: number;
+        address: string;
+        contactName: null | string;
+        contactPhone: null | string;
+        note: null | string;
+        codAmount: number;
+        status: "pending" | "failed" | "arrived" | "delivered" | "returned";
+        arrivedAt: null | string;
+        completedAt: null | string;
+        failReason: null | string;
+      }>;
+      returnToPickup: boolean;
+      durationMinutes: null | number;
+      note: null | string;
+      addons: Array<{
+        id: string;
+        name: string;
+        price: number;
+      }>;
+      jobDetails: null | {
+        jobs: Array<{
+          id: string;
+          code: string;
+          name: string;
+          unit: "lan" | "cai" | "bo" | "may" | "m2";
+          qty: number;
+          price: number;
+        }>;
+        height: boolean;
+        ladder: boolean;
+        floor: null | string;
+        issue: null | string;
+        urgent: boolean;
+        photos: Array<{
+          fileId: string;
+          url: null | string;
+        }>;
+        summary: string;
+      };
+      queuedAt: null | string;
+      queueExpiresAt: null | string;
+      durationSeconds: null | number;
+      routePolyline: null | string;
+      price: {
+        lines: Array<{
+          code: string;
+          label: string;
+          amount: number;
+        }>;
+        fare: number;
+        discountable: number;
+        discount: number;
+        serviceTotal: number;
+        platformFee: number;
+        tip: number;
+        total: number;
+      };
+      finalPrice: null | {
+        lines: Array<{
+          code: string;
+          label: string;
+          amount: number;
+        }>;
+        fare: number;
+        discountable: number;
+        discount: number;
+        serviceTotal: number;
+        platformFee: number;
+        tip: number;
+        total: number;
+      };
+      total: number;
+      codTotal: number;
+      codCollected: number;
+      tip: number;
+      debtAmount: number;
+      cashToCollect: number;
+      walletHeld: number;
+      timeline: {
+        createdAt: string;
+        searchStartedAt: null | string;
+        searchDeadlineAt: null | string;
+        assignedAt: null | string;
+        arrivedPickupAt: null | string;
+        pickedUpAt: null | string;
+        completedAt: null | string;
+        cancelledAt: null | string;
+      };
+      cancellation: null | {
+        by: null | "customer" | "partner" | "staff" | "system";
+        reason: null | {
+          id: string;
+          label: string;
+        };
+        note: null | string;
+        fee: number;
+      };
+      partner: null | {
+        id: string;
+        code: string;
+        fullName: string;
+        phone: string;
+        photoUrl: null | string;
+        rating: {
+          average: null | number;
+          count: number;
+        };
+      };
+      vehicle: null | {
+        id: string;
+        type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
+        model: null | string;
+        plate: string;
+        brand: null | string;
+        color: null | string;
+        seats: null | number;
+      };
+      partnerLocation: null | {
+        lat: number;
+        lng: number;
+        heading: null | number;
+        at: string;
+      };
+      proofs: Array<{
+        fileId: string;
+        kind: "delivery" | "pickup" | "cancel";
+        stopId: null | string;
+        url: null | string;
+      }>;
+      allowedActions: Array<"cancel" | "start_search" | "accept" | "search_timeout" | "retry" | "queue" | "claim" | "queue_timeout" | "arrive" | "pick_up" | "complete" | "release">;
+      rating: null | {
+        createdAt: string;
+        stars: number;
+        tags: string[];
+        comment: null | string;
+      };
+      canRate: boolean;
+      cancelFreeUntil: null | string;
+      cancelFeeIfNow?: number;
+    };
   };
   'GET /v1/partner/profile': {
     response: {
@@ -6667,6 +7597,9 @@ export interface ZuumRoutes {
             returnLegFactorBps: number;
             overnightFee: number;
             overnightEveryHours: number;
+            heightFee: number;
+            ladderFee: number;
+            urgentFee: number;
             blockMinutes: number;
           };
           rules: {
@@ -6696,6 +7629,17 @@ export interface ZuumRoutes {
             label: string;
             maxWeightKg: null | number;
             surcharge: number;
+          }>;
+          jobs: Array<{
+            id: string;
+            code: string;
+            name: string;
+            description: null | string;
+            price: number;
+            unit: "lan" | "cai" | "bo" | "may" | "m2";
+            durationMinutes: number;
+            heightWork: boolean;
+            materialsNote: null | string;
           }>;
         }>;
       }>;
@@ -6994,7 +7938,7 @@ export interface ZuumRoutes {
 export interface ZuumCustomerEvents {
   "order.updated": {
     orderId: string;
-    status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled";
+    status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
   };
   "partner.location": {
     orderId: string;
@@ -7025,7 +7969,7 @@ export interface ZuumCustomerEvents {
 export interface ZuumPartnerEvents {
   "order.updated": {
     orderId: string;
-    status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "cancelled" | "released";
+    status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled" | "released";
   };
   "offer.new": {
     offerId: string;

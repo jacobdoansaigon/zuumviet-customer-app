@@ -28,6 +28,8 @@ const phaseStatus = (phase: TrackingPhase, L: ServiceLabels): string => {
       return `Tìm ${p}`;
     case 'notfound':
       return `Không tìm thấy ${p}`;
+    case 'queued':
+      return `Đang chờ ${p} nhận việc`;
     case 'accepted':
       return L.trackingAccepted;
     case 'delivering':
@@ -49,6 +51,9 @@ interface Props {
   /** mở rộng / thu gọn — thanh kéo, dòng mã đơn và nút "…" đều gọi cái này */
   onToggle: () => void;
   onRetry: () => void;
+  /** xếp hàng chờ thợ nhận (dịch vụ tại chỗ, khi không tìm thấy thợ) */
+  onQueue?: () => void;
+  queueing?: boolean;
   retrying?: boolean;
   /** đang tìm: dòng phụ dưới tiêu đề (vd "Đang quét trong bán kính 500 m") */
   searchHint?: string | null;
@@ -64,7 +69,7 @@ interface Props {
   onHome: () => void;
 }
 
-export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, onToggle, onRetry, retrying, searchHint, onCancel, cancelHint, onSupport, onCall, onChat, onRate, onHome }) => {
+export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, onToggle, onRetry, onQueue, queueing, retrying, searchHint, onCancel, cancelHint, onSupport, onCall, onChat, onRate, onHome }) => {
   const phase = phaseOf(order.status);
   const group = SERVICE_GROUPS[groupOfOrder(order.service)];
   const L = group.labels;
@@ -140,17 +145,38 @@ export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, on
             </AppText>
             {more}
           </>
+        ) : phase === 'queued' ? (
+          <>
+            <Icon name={Icons.clock} size={26} color={Colors.secondary} style={styles.headIcon} />
+            <View style={{ flex: 1 }}>
+              <AppText weight="bold" size={15}>
+                Đang chờ {providerLower} nhận việc
+              </AppText>
+              <AppText size={12} color={Colors.textSecondary} style={{ marginTop: 2 }}>
+                {order.queueExpiresAt
+                  ? `Yêu cầu nằm trong hàng chờ đến ${new Date(order.queueExpiresAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} · báo ngay khi có ${providerLower} nhận`
+                  : `Báo ngay khi có ${providerLower} nhận`}
+              </AppText>
+            </View>
+            {more}
+          </>
         ) : phase === 'notfound' ? (
           <>
             <View style={{ flex: 1 }}>
               <AppText weight="bold" size={16}>
                 Không tìm thấy {providerLower}
               </AppText>
-              <Pressable onPress={onRetry} hitSlop={8} style={{ marginTop: 4 }} disabled={retrying}>
-                <AppText weight="semiBold" size={14} color={retrying ? Colors.textMuted : Colors.primary}>
-                  {retrying ? 'Đang tìm lại...' : 'Thử lại tìm kiếm'}
+              {onQueue ? (
+                <AppText size={12} color={Colors.textSecondary} style={{ marginTop: 2 }}>
+                  Bạn có thể xếp hàng chờ — {providerLower} rảnh gần bạn sẽ thấy và nhận việc.
                 </AppText>
-              </Pressable>
+              ) : (
+                <Pressable onPress={onRetry} hitSlop={8} style={{ marginTop: 4 }} disabled={retrying}>
+                  <AppText weight="semiBold" size={14} color={retrying ? Colors.textMuted : Colors.primary}>
+                    {retrying ? 'Đang tìm lại...' : 'Thử lại tìm kiếm'}
+                  </AppText>
+                </Pressable>
+              )}
             </View>
             {more}
           </>
@@ -356,7 +382,14 @@ export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, on
         </View>
       ) : phase === 'notfound' ? (
         <View style={styles.cta}>
-          <Button title={`Tìm lại ${providerLower}`} onPress={onRetry} loading={retrying} />
+          {onQueue ? (
+            <>
+              <Button title={`Xếp hàng chờ ${providerLower}`} onPress={onQueue} loading={queueing} disabled={retrying} />
+              <Button title={`Tìm lại ${providerLower}`} variant="outline" onPress={onRetry} loading={retrying} disabled={queueing} style={{ marginTop: Spacing.sm }} />
+            </>
+          ) : (
+            <Button title={`Tìm lại ${providerLower}`} onPress={onRetry} loading={retrying} />
+          )}
         </View>
       ) : null}
     </View>

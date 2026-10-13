@@ -16,7 +16,7 @@ export type CancelReason = ZuumResponse<'GET /v1/public/cancel-reasons'>[number]
 export type OrderScope = 'active' | 'history';
 
 /** Đơn còn chạy (kể cả hẹn giờ) */
-export const ACTIVE_STATUSES: readonly OrderStatus[] = ['scheduled', 'searching', 'assigned', 'arrived_pickup', 'picked_up'];
+export const ACTIVE_STATUSES: readonly OrderStatus[] = ['scheduled', 'searching', 'queued', 'assigned', 'arrived_pickup', 'picked_up'];
 export const isActiveStatus = (s: OrderStatus) => ACTIVE_STATUSES.includes(s);
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
@@ -27,6 +27,7 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   picked_up: 'Đang thực hiện',
   completed: 'Hoàn tất',
   no_driver_found: 'Không tìm thấy tài xế',
+  queued: 'Đang chờ thợ nhận',
   cancelled: 'Đã huỷ',
 };
 
@@ -39,7 +40,7 @@ export const STOP_STATUS_LABEL: Record<StopStatus, string> = {
 };
 
 /** Giai đoạn hiển thị của màn theo dõi */
-export type TrackingPhase = 'scheduled' | 'searching' | 'notfound' | 'accepted' | 'delivering' | 'completed' | 'cancelled';
+export type TrackingPhase = 'scheduled' | 'searching' | 'notfound' | 'queued' | 'accepted' | 'delivering' | 'completed' | 'cancelled';
 
 export function phaseOf(status: OrderStatus): TrackingPhase {
   switch (status) {
@@ -49,6 +50,8 @@ export function phaseOf(status: OrderStatus): TrackingPhase {
       return 'searching';
     case 'no_driver_found':
       return 'notfound';
+    case 'queued':
+      return 'queued';
     case 'assigned':
     case 'arrived_pickup':
       return 'accepted';
@@ -101,6 +104,11 @@ export function cancelOrder(id: string, body: ZuumRoutes['POST /v1/customer/orde
 /** Không tìm thấy tài xế → tìm lại (giữ giá đã báo trong 30 phút) */
 export function retryOrder(id: string): Promise<OrderDetail> {
   return api('POST /v1/customer/orders/:id/retry', { params: { id } });
+}
+
+/** Gọi thợ: không có thợ rảnh → xếp hàng chờ thợ tự nhận (tối đa 6 giờ) */
+export function queueOrder(id: string): Promise<OrderDetail> {
+  return api('POST /v1/customer/orders/:id/queue', { params: { id } });
 }
 
 export function rateOrder(id: string, body: ZuumRoutes['POST /v1/customer/orders/:id/rating']['body']) {

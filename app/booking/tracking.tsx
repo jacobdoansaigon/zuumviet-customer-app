@@ -10,7 +10,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { AppText, Button, Icons, Toast } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { SERVICE_GROUPS } from '@/constants/booking';
-import { circleEdgePoints, estimateEtaMinutes, getOrder, groupOfOrder, isActiveStatus, radiusLabel, retryOrder, searchPhaseAt, type OrderDetail, type OrderSearch, type SearchPhase } from '@/services/orders';
+import { circleEdgePoints, estimateEtaMinutes, getOrder, groupOfOrder, isActiveStatus, queueOrder, radiusLabel, retryOrder, searchPhaseAt, type OrderDetail, type OrderSearch, type SearchPhase } from '@/services/orders';
 import { nearbySupply, type SupplyMarkerData } from '@/services/supply';
 import type { ZMapMarker } from '@/components/map/types';
 import { ensureCatalog } from '@/services/catalog';
@@ -37,6 +37,7 @@ export default function TrackingScreen() {
   const [partnerLoc, setPartnerLoc] = useState<LatLng | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [queueing, setQueueing] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [sheetH, setSheetH] = useState(0);
@@ -186,6 +187,19 @@ export default function TrackingScreen() {
       setRetrying(false);
     }
   };
+  // anh Jacob: không có thợ → hỏi khách có xếp hàng chờ không (thợ rảnh thấy trong tab "Hàng chờ" và nhận)
+  const queue = async () => {
+    if (!orderId || queueing) return;
+    setQueueing(true);
+    try {
+      setOrder(await queueOrder(orderId));
+      setToast('Đã xếp hàng — báo ngay khi có thợ nhận việc');
+    } catch (e) {
+      setToast(errorMessage(e, 'Không xếp hàng chờ được'));
+    } finally {
+      setQueueing(false);
+    }
+  };
   const call = (phone?: string | null) => {
     if (!phone) return;
     Linking.openURL(`tel:${phone}`).catch(() => setToast('Không thể thực hiện cuộc gọi trên thiết bị này'));
@@ -219,6 +233,8 @@ export default function TrackingScreen() {
               onToggle={() => setExpanded((v) => !v)}
               onRetry={() => void retry()}
               retrying={retrying}
+              onQueue={order.allowedActions.includes('queue') ? () => void queue() : undefined}
+              queueing={queueing}
               searchHint={phase ? `Đang quét trong bán kính ${radiusLabel(phase.radiusMeters)}` : null}
               onCancel={cancellable ? () => router.push({ pathname: '/booking/cancel', params: { orderId: order.id } }) : undefined}
               cancelHint={cancellable ? cancelSublabel : null}

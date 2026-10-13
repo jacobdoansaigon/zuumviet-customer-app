@@ -4,7 +4,7 @@
 // trả id giả để màn hình "đi tiếp" khi ảnh chưa lên được.
 import { api, ZuumApiError, type ZuumRoutes } from '@/services/zuum';
 
-export type UploadPurpose = Extract<ZuumRoutes['POST /v1/customer/files']['body']['purpose'], 'avatar' | 'order_proof'>;
+export type UploadPurpose = Extract<ZuumRoutes['POST /v1/customer/files']['body']['purpose'], 'avatar' | 'order_proof' | 'order_photo'>;
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;

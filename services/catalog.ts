@@ -195,7 +195,10 @@ export function serviceInfoLines(s: CatalogService): string[] {
  * Giá ƯỚC TÍNH cho danh sách chọn dịch vụ (trước khi báo giá thật): theo bảng giá catalog + quãng đường ước lượng.
  * Không gồm phụ phí vùng/khung giờ/hẻm — luôn hiện kèm dấu "~".
  */
-export function estimatePrice(s: CatalogService, input: { distanceMeters: number; stopCount: number; durationMinutes?: number | null; weightSurcharge?: number }): number {
+export function estimatePrice(
+  s: CatalogService,
+  input: { distanceMeters: number; stopCount: number; durationMinutes?: number | null; weightSurcharge?: number; jobsTotal?: number; height?: boolean; ladder?: boolean; urgent?: boolean },
+): number {
   const p = s.pricing;
   let fare: number;
   switch (p.basis) {
@@ -229,7 +232,11 @@ export function estimatePrice(s: CatalogService, input: { distanceMeters: number
       break;
     }
     default:
-      fare = p.baseFare || s.fromPrice;
+      // gọi thợ: phí di chuyển & khảo sát + hạng mục + phụ phí leo trèo / thang / khẩn (cùng công thức với server)
+      fare = (p.baseFare || s.fromPrice) + (input.jobsTotal ?? 0) + (input.height ? p.heightFee : 0) + (input.ladder ? p.ladderFee : 0) + (input.urgent ? p.urgentFee : 0);
   }
   return Math.max(s.fromPrice, fare) + (input.weightSurcharge ?? 0);
 }
+
+/** Hạng mục công việc gọi thợ của một dịch vụ (catalog) */
+export type CatalogJob = CatalogService['jobs'][number];

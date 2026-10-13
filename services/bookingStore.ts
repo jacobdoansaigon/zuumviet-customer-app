@@ -11,6 +11,7 @@ import { findService, optionsFor, estimatePrice, type CatalogService, type Servi
 import { getProfile, localPhone } from '@/services/session';
 import { reversePlace } from '@/services/places';
 import { VN_OFFSET_MS, vnDateKey } from '@/services/vnTime';
+import { uploadFile } from '@/services/upload';
 import { api, errorMessage, isApiError, onSessionChange, ZuumApiError, type ZuumResponse, type ZuumRoutes } from '@/services/zuum';
 import { MOVING_BULKY_ITEMS, SERVICE_GROUPS, TIP_STEP, type ServiceKey, type ViewOptionId } from '@/constants/booking';
 
@@ -72,7 +73,13 @@ export interface BookingOptions {
   movingPacking: boolean;
   movingDisassembly: boolean;
   movingBulkyItems: string[];
-  /** Gọi thợ: mô tả sự cố + yêu cầu khẩn cấp (ghi chú đơn) */
+  /** Gọi thợ (anh Jacob 2026-10-13): hạng mục chọn sẵn, ảnh hiện trạng, leo trèo / thang, tầng, mô tả sự cố, khẩn cấp */
+  handymanJobs: { id: string; qty: number }[];
+  handymanHeight: boolean;
+  handymanLadder: boolean;
+  handymanFloor: string;
+  /** ảnh hiện trạng: uri cục bộ + id file sau khi tải lên kho (tải lúc đặt đơn) */
+  handymanPhotos: { uri: string; fileId?: string }[];
   handymanIssueNote: string;
   handymanUrgent: boolean;
   /** Cổng / lối vào tại điểm đón ("Cổng 2", "Sảnh A"...) — gửi trong pickup.note của đơn; xoá khi đổi điểm đón */
@@ -132,6 +139,11 @@ const defaultOptions = (): BookingOptions => ({
   movingPacking: false,
   movingDisassembly: false,
   movingBulkyItems: [],
+  handymanJobs: [],
+  handymanHeight: false,
+  handymanLadder: false,
+  handymanFloor: '',
+  handymanPhotos: [],
   handymanIssueNote: '',
   handymanUrgent: false,
   pickupNote: '',
@@ -400,12 +412,22 @@ export function estimateFor(option: ServiceOptionView, s: BookingState = state):
   const stops = completeReceivers(s);
   const weightSurcharge = stops.reduce((sum, r) => sum + (svc.weightTiers.find((t) => t.id === r.weightTierId)?.surcharge ?? 0), 0);
   const blocks = option.id === s.optionId ? s.options.laborBlocks : 1;
+  const h = option.id === s.optionId ? s.options : null;
   return estimatePrice(svc, {
     distanceMeters: routeDistanceKm(s) * 1000,
     stopCount: Math.max(1, stops.length),
     durationMinutes: option.blockMinutes ? option.blockMinutes * blocks : null,
     weightSurcharge,
+    jobsTotal: h ? handymanJobsTotal(svc, h) : 0,
+    height: h?.handymanHeight,
+    ladder: h?.handymanLadder,
+    urgent: h?.handymanUrgent,
   });
+}
+
+/** Tổng công thợ của các hạng mục đã chọn (giá theo catalog) */
+export function handymanJobsTotal(svc: CatalogService, o: Pick<BookingOptions, 'handymanJobs'>): number {
+  return o.handymanJobs.reduce((sum, j) => sum + (svc.jobs.find((x) => x.id === j.id)?.price ?? 0) * j.qty, 0);
 }
 
 // ---------------------------------------------------------------- Yêu cầu báo giá / tạo đơn
@@ -432,6 +454,8 @@ export function buildQuoteRequest(s: BookingState = state, couponCode: string | 
     scheduledAt: svc.rules.allowScheduling && o.scheduledAt ? new Date(o.scheduledAt).toISOString() : null,
     ...(blockMinutes > 0 ? { durationMinutes: Math.max(1, o.laborBlocks) * blockMinutes } : {}),
     addonIds,
+    // gọi thợ: hạng mục (chỉ gửi hạng mục còn trong catalog) + leo trèo / thang / khẩn
+    ...(svc.jobs.length ? { jobs: o.handymanJobs.filter((j) => svc.jobs.some((x) => x.id === j.id)).map((j) => ({ id: j.id, qty: j.qty })), handyman: { height: o.handymanHeight, ladder: o.handymanLadder, urgent: o.handymanUrgent } } : {}),
     tip: o.tip * TIP_STEP,
     ...(couponCode ? { couponCode } : {}),
   };
@@ -461,10 +485,6 @@ function movingNote(o: BookingOptions): string {
 }
 
 /** Gọi thợ: mô tả sự cố + khẩn cấp */
-function handymanNote(o: BookingOptions): string {
-  return joinNote([o.handymanIssueNote.trim() ? `Sự cố: ${o.handymanIssueNote.trim()}` : '', o.handymanUrgent ? 'Yêu cầu xử lý khẩn cấp' : '']);
-}
-
 /** Body POST /v1/customer/orders */
 export function buildOrderBody(s: BookingState, quoteId: string): ZuumRoutes['POST /v1/customer/orders']['body'] {
   const group = SERVICE_GROUPS[s.service];
@@ -498,7 +518,16 @@ export function buildOrderBody(s: BookingState, quoteId: string): ZuumRoutes['PO
         }))
       : stops.map((r) => ({ note: clip(r.gate, 200) || undefined })),
     note:
-      clip(joinNote([o.note, s.service === 'rental' ? movingNote(o) : '', s.service === 'handyman' ? handymanNote(o) : '']), 1000) || undefined,
+      clip(joinNote([o.note, s.service === 'rental' ? movingNote(o) : '']), 1000) || undefined,
+    // gọi thợ: ảnh hiện trạng đã tải lên kho (uploadHandymanPhotos chạy trước khi tạo đơn), tầng / vị trí, mô tả sự cố
+    // (leo trèo / thang / khẩn đi theo báo giá) — có cấu trúc riêng (jobDetails) nên không nhét vào ghi chú nữa
+    ...(s.service === 'handyman'
+      ? {
+          photoFileIds: o.handymanPhotos.map((p) => p.fileId).filter((id): id is string => !!id),
+          floor: clip(o.handymanFloor.trim(), 100) || undefined,
+          issue: clip(o.handymanIssueNote.trim(), 500) || undefined,
+        }
+      : {}),
   };
 }
 
@@ -653,7 +682,18 @@ export function effectivePrice(s: BookingState = state): { total: number; origin
 const priceChanged = (total: number) =>
   new ZuumApiError(409, 'quote.price_changed', `Giá vừa cập nhật thành ${formatVnd(total)} — vui lòng kiểm tra lại rồi bấm Xác nhận`);
 
+/** Gọi thợ: tải ảnh hiện trạng còn nằm ở máy lên kho (purpose order_photo) rồi ghi id file vào bản nháp */
+async function uploadHandymanPhotos(): Promise<void> {
+  if (state.service !== 'handyman') return;
+  const pending = state.options.handymanPhotos.filter((p) => !p.fileId);
+  if (!pending.length) return;
+  const uploaded = new Map<string, string>();
+  for (const p of pending) uploaded.set(p.uri, await uploadFile(p.uri, 'order_photo'));
+  update((s) => ({ options: { ...s.options, handymanPhotos: s.options.handymanPhotos.map((p) => (p.fileId ? p : { ...p, fileId: uploaded.get(p.uri) })) } }));
+}
+
 async function createFromQuote(quoteId: string): Promise<CreatedOrder> {
+  await uploadHandymanPhotos();
   const created = await api('POST /v1/customer/orders', { body: buildOrderBody(state, quoteId) });
   resetDraft();
   return created;

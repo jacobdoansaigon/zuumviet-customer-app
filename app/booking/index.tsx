@@ -46,6 +46,7 @@ import {
   mapBottomPadding,
   type MapStop,
   type HandymanJobDetail,
+  EMPTY_JOB_DETAIL,
 } from '@/components/booking';
 
 /** kéo bản đồ dừng bao lâu mới đổi toạ độ ghim ra địa chỉ (gom nhiều lần dừng ngắn thành 1 request) */
@@ -349,13 +350,16 @@ export default function BookingScreen() {
     setExpanded(false);
   };
   const renderOption = (o: ServiceOptionView) => {
-    const pv = previewFor(o.service.id, state);
+    // Gọi thợ: giá xem trước chỉ là phí di chuyển & khảo sát → loại thợ đang chọn hiện báo giá thật (đã gồm hạng mục, phụ phí),
+    // chưa có thì ước tính tại máy
+    const ownQuote = o.id === selected?.id && state.quote.status === 'ready' && state.quote.key === quoteKey ? state.quote.quote : null;
+    const pv = state.service === 'handyman' && o.id === selected?.id ? null : previewFor(o.service.id, state);
     return (
     <ServiceOption
       key={o.id}
       name={o.name}
       description={o.description}
-      price={o.paused ? undefined : pv && pv.total !== null ? formatVnd(pv.total) : `~${formatVnd(estimateFor(o, state))}`}
+      price={o.paused ? undefined : ownQuote ? formatVnd(ownQuote.price.total) : pv && pv.total !== null ? formatVnd(pv.total) : `~${formatVnd(estimateFor(o, state))}`}
       priceHint={o.paused ? 'Tạm ngưng' : undefined}
       icon={o.icon}
       selected={o.id === selected?.id}
@@ -578,13 +582,29 @@ export default function BookingScreen() {
         option={jobOption}
         initial={
           jobOption && jobOption.id === state.optionId
-            ? { issueNote: state.options.handymanIssueNote, urgent: state.options.handymanUrgent }
-            : { issueNote: '', urgent: false }
+            ? {
+                jobs: state.options.handymanJobs,
+                photos: state.options.handymanPhotos,
+                height: state.options.handymanHeight,
+                ladder: state.options.handymanLadder,
+                floor: state.options.handymanFloor,
+                issueNote: state.options.handymanIssueNote,
+                urgent: state.options.handymanUrgent,
+              }
+            : EMPTY_JOB_DETAIL
         }
         onClose={() => setJobOption(null)}
         onSelect={(o, detail: HandymanJobDetail) => {
           switchRideOption(o.group, o.id);
-          setOptions({ handymanIssueNote: detail.issueNote, handymanUrgent: detail.urgent });
+          setOptions({
+            handymanJobs: detail.jobs,
+            handymanPhotos: detail.photos,
+            handymanHeight: detail.height,
+            handymanLadder: detail.ladder,
+            handymanFloor: detail.floor,
+            handymanIssueNote: detail.issueNote,
+            handymanUrgent: detail.urgent,
+          });
           setJobOption(null);
           setExpanded(false);
         }}
