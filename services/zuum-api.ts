@@ -291,7 +291,7 @@ export interface ZuumRoutes {
   };
   'POST /v1/customer/files': {
     body: {
-      purpose: "partner_document" | "avatar" | "order_proof" | "vehicle_photo";
+      purpose: "partner_document" | "avatar" | "order_proof" | "vehicle_photo" | "service_image";
       contentType: string;
       size: number;
     };
@@ -315,6 +315,7 @@ export interface ZuumRoutes {
       status: string;
       createdAt: string;
       url: null | string;
+      publicUrl: null | string;
     };
   };
   'POST /v1/customer/files/:id/complete': {
@@ -327,6 +328,7 @@ export interface ZuumRoutes {
       status: string;
       createdAt: string;
       url: null | string;
+      publicUrl: null | string;
     };
   };
   'GET /v1/customer/intercity/bookings': {
@@ -2801,7 +2803,7 @@ export interface ZuumRoutes {
   /** Xin link upload. Sau đó PUT file lên `url` với đúng header `headers`, rồi gọi /complete */
   'POST /v1/partner/files': {
     body: {
-      purpose: "partner_document" | "avatar" | "order_proof" | "vehicle_photo";
+      purpose: "partner_document" | "avatar" | "order_proof" | "vehicle_photo" | "service_image";
       contentType: string;
       size: number;
     };
@@ -2825,6 +2827,7 @@ export interface ZuumRoutes {
       status: string;
       createdAt: string;
       url: null | string;
+      publicUrl: null | string;
     };
   };
   'POST /v1/partner/files/:id/complete': {
@@ -2837,6 +2840,7 @@ export interface ZuumRoutes {
       status: string;
       createdAt: string;
       url: null | string;
+      publicUrl: null | string;
     };
   };
   /** Ghi nhận khách lên xe bằng tay (khách không mở được QR) */

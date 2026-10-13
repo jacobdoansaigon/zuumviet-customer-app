@@ -2,8 +2,10 @@
 // vé theo mẫu vé xe khách (BusTicket: nhà xe, tuyến, giờ xuất bến, ghế, hành khách, số xe, điểm đón, QR + mã vé để nhà xe quét
 // khi lên xe) + chi tiết hàng gửi / giá. Huỷ vé khi canCancel (đã đặt: chỉ khi còn ≥ 24 giờ trước giờ chạy, hoàn đủ).
 // Param done=1: vừa đặt xong (hiện lời chúc mừng). Tải lại khi quay về màn (nhà xe quét xong → hiện "đã lên xe").
-import React, { useCallback, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AppHeader, AppText, Button, Dialog, EmptyState, ErrorSheet, Icon, Icons, Screen, Toast } from '@/components/ui';
 import { BusTicket } from '@/components/booking';
@@ -23,6 +25,8 @@ export default function IntercityTicketScreen() {
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const ticketRef = useRef<View>(null);
 
   const load = useCallback(async () => {
     try {
@@ -88,6 +92,24 @@ export default function IntercityTicketScreen() {
 
   const whereLabel = (w: IntercityBooking['pickup'], station: string) => (w.type === 'home' ? `Tận nơi: ${w.address ?? ''}` : `Bến: ${station}`);
 
+  /** Chụp vé thành ảnh PNG rồi mở bảng chia sẻ (Zalo, Messenger, lưu vào ảnh…) — chỉ trên điện thoại */
+  const share = async () => {
+    if (!ticketRef.current || sharing) return;
+    setSharing(true);
+    try {
+      const uri = await captureRef(ticketRef, { format: 'png', quality: 1, fileName: `ve-${booking.code}` });
+      if (!(await Sharing.isAvailableAsync())) {
+        setToast('Thiết bị không hỗ trợ chia sẻ');
+        return;
+      }
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: `Vé ${booking.code}`, UTI: 'public.png' });
+    } catch (e) {
+      setError(errorMessage(e, 'Không tạo được ảnh vé'));
+    } finally {
+      setSharing(false);
+    }
+  };
+
   return (
     <Screen
       header={<AppHeader title={justBooked ? 'Đặt vé thành công' : `Vé ${booking.code}`} variant="dark" left="close" onLeftPress={close} />}
@@ -97,6 +119,7 @@ export default function IntercityTicketScreen() {
           {booking.status === 'held' ? (
             <Button title="Tiếp tục đặt vé" onPress={() => router.replace({ pathname: '/booking/intercity/checkout/[bookingId]', params: { bookingId: booking.id } })} />
           ) : null}
+          {booking.qr && Platform.OS !== 'web' ? <Button title="Chia sẻ / lưu ảnh vé" variant="outline" iconLeft={Icons.share} loading={sharing} onPress={() => void share()} /> : null}
           {booking.canCancel && (confirmed || booking.status === 'held') ? (
             <Button title={confirmed ? 'Huỷ vé' : 'Huỷ giữ chỗ'} variant="outline" loading={cancelling} onPress={() => setConfirmCancel(true)} />
           ) : null}
@@ -126,7 +149,9 @@ export default function IntercityTicketScreen() {
           </AppText>
         </View>
 
-        <BusTicket booking={booking} />
+        <View ref={ticketRef} collapsable={false} style={{ backgroundColor: Colors.white }}>
+          <BusTicket booking={booking} />
+        </View>
 
         <View style={styles.card}>
           <Row label="Dự kiến đến" value={`${vnDateLabel(trip.arriveAt)} · ${vnTime(trip.arriveAt)} · ${trip.to.station}`} />
