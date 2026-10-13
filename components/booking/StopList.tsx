@@ -70,6 +70,8 @@ interface StopListProps {
   senderAddressOverride?: string;
   /** khối hiện ngay dưới địa chỉ điểm đón (vd chip cổng / lối vào) — thẳng cột với địa chỉ, không lẫn với điểm đến */
   senderExtra?: React.ReactNode;
+  /** phần phụ dưới từng điểm đến (cổng / lối vào) */
+  receiverExtra?: (receiver: Receiver, index: number) => React.ReactNode;
 }
 
 export const StopList: React.FC<StopListProps> = ({
@@ -83,6 +85,7 @@ export const StopList: React.FC<StopListProps> = ({
   maxStops = 10,
   senderAddressOverride,
   senderExtra,
+  receiverExtra,
 }) => {
   const complete = receivers.map((r, index) => ({ r, index })).filter((x) => isReceiverComplete(x.r));
   const senderTitle = sender.name && sender.phone ? `${sender.name} - ${formatPhone(sender.phone)}` : undefined;
@@ -104,19 +107,30 @@ export const StopList: React.FC<StopListProps> = ({
           <View style={[styles.body, maxStops > 0 && { paddingBottom: Spacing.md }]}>{senderExtra}</View>
         </View>
       ) : null}
-      {complete.map(({ r, index }, i) => (
-        <StopRow
-          key={r.id}
-          type="dropoff"
-          // Chở khách (1 điểm đến): hiện tên địa điểm; giao hàng: tên - SĐT người nhận
-          title={maxStops === 1 ? r.place?.title || r.place?.address || labels.receiverStatus : r.name && r.phone ? `${r.name} - ${formatPhone(r.phone)}` : r.place?.title || labels.receiverStatus}
-          status={labels.receiverStatus}
-          subtitle={r.place?.address}
-          connector={canAdd || i < complete.length - 1}
-          onPress={() => onPressReceiver(index)}
-          onRemove={() => onRemoveReceiver(index)}
-        />
-      ))}
+      {complete.map(({ r, index }, i) => {
+        const extra = receiverExtra?.(r, index);
+        const connector = canAdd || i < complete.length - 1;
+        return (
+          <React.Fragment key={r.id}>
+            <StopRow
+              type="dropoff"
+              // Chở khách (1 điểm đến): hiện tên địa điểm; giao hàng: tên - SĐT người nhận
+              title={maxStops === 1 ? r.place?.title || r.place?.address || labels.receiverStatus : r.name && r.phone ? `${r.name} - ${formatPhone(r.phone)}` : r.place?.title || labels.receiverStatus}
+              status={labels.receiverStatus}
+              subtitle={r.place?.address}
+              connector={connector}
+              onPress={() => onPressReceiver(index)}
+              onRemove={() => onRemoveReceiver(index)}
+            />
+            {extra ? (
+              <View style={styles.extraRow}>
+                <View style={styles.markerCol}>{connector ? <View style={[styles.connector, styles.extraConnector]} /> : null}</View>
+                <View style={[styles.body, connector && { paddingBottom: Spacing.md }]}>{extra}</View>
+              </View>
+            ) : null}
+          </React.Fragment>
+        );
+      })}
       {canAdd ? <StopRow type="dropoff" placeholder={complete.length ? labels.receiverAddPlaceholder : labels.receiverPlaceholder} onPress={onAddReceiver} /> : null}
     </View>
   );

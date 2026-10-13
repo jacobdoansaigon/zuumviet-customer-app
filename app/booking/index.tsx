@@ -20,7 +20,7 @@ import { useBooking, startBooking, syncOptionWithCatalog, hydrateSender, prefill
 import { decodePolyline } from '@/components/map/polyline';
 import type { LatLng, ZMapHandle, ZMapMarker } from '@/components/map/types';
 import { mapsAvailable } from '@/services/maps';
-import { placeEntrances, reversePlace, type PlaceEntrance } from '@/services/places';
+import { reversePlace, type PlaceEntrance } from '@/services/places';
 import { loadSavedAddresses, useSavedAddresses, SAVED_KIND_LABEL, type SavedAddress } from '@/services/addresses';
 import { ensureCatalog, optionsFor, useCatalog, type ServiceOptionView } from '@/services/catalog';
 import { ensureIntercityCities, matchIntercityCity, nearestCity, useIntercityCities } from '@/services/intercity';
@@ -39,12 +39,15 @@ import {
   useCurrentLocation,
   getCurrentLatLng,
   EntranceChips,
+  ReceiverGates,
+  gateLabel,
+  samePlace,
+  useEntrances,
   mapBottomPadding,
   type MapStop,
   type HandymanJobDetail,
 } from '@/components/booking';
 
-const samePlace = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6;
 /** kéo bản đồ dừng bao lâu mới đổi toạ độ ghim ra địa chỉ (gom nhiều lần dừng ngắn thành 1 request) */
 const PIN_SETTLE_MS = 1000;
 
@@ -73,7 +76,6 @@ export default function BookingScreen() {
   const [resolving, setResolving] = useState(false);
   const [locating, setLocating] = useState(false);
   // cổng / lối vào của địa điểm tại điểm đón (API bản đồ) — chỉ có với siêu thị, bệnh viện, trường, chung cư…; anchor = điểm của địa điểm
-  const [entrances, setEntrances] = useState<{ anchor: Place; parent: string | null; items: PlaceEntrance[] } | null>(null);
   const savedAddresses = useSavedAddresses();
 
   const loadCatalog = useCallback(() => {
@@ -233,27 +235,8 @@ export default function BookingScreen() {
     [pinMode, savedAddresses, pickSaved],
   );
   useEffect(() => () => cancelPendingResolve.current?.(), []);
-  // Điểm đón đổi (không phải do chọn cổng) → hỏi cổng / lối vào của địa điểm đó; không có → không hiện gì
-  useEffect(() => {
-    if (!pickup || pickup.source === 'gate') return;
-    if (entrances && samePlace(entrances.anchor, pickup)) return;
-    setEntrances(null);
-    let alive = true;
-    const anchor = pickup;
-    // tên địa điểm chỉ chắc chắn khi khách chọn từ tìm kiếm (ghim / GPS / vị trí lưu: title không phải tên nơi)
-    const name = anchor.source === 'search' && anchor.title && anchor.title !== anchor.address ? anchor.title : undefined;
-    placeEntrances(anchor.lat, anchor.lng, name)
-      .then((r) => {
-        if (alive && r.items.length) setEntrances({ anchor, parent: r.parent, items: r.items });
-      })
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickup?.lat, pickup?.lng, pickup?.source, pickup?.placeId]);
-  const selectedGate = pickup?.source === 'gate' && entrances ? (entrances.items.find((g) => samePlace(g, pickup)) ?? null) : null;
-  const showEntrances = !!entrances && !!pickup && !resolving && (pickup.source === 'gate' || samePlace(entrances.anchor, pickup));
+  // Cổng / lối vào của điểm đón (điểm đến dùng ReceiverGates dưới từng dòng)
+  const { entrances, selectedGate, show: showEntrances } = useEntrances(pickup, resolving);
   // Chọn cổng: điểm đón = toạ độ cổng (tài xế tới đúng cổng), địa chỉ giữ của địa điểm, ghi chú = tên cổng; bấm lại → về điểm cũ
   const pickGate = (g: PlaceEntrance) => {
     if (!entrances) return;
@@ -264,7 +247,7 @@ export default function BookingScreen() {
       return;
     }
     setSenderPlace({ ...a, lat: g.lat, lng: g.lng, source: 'gate' });
-    setOptions({ pickupNote: entrances.parent ? `${g.name} (${entrances.parent})` : g.name });
+    setOptions({ pickupNote: gateLabel(g, entrances.parent) });
   };
 
   const tabKeys = URBAN_RIDE_KEYS.includes(state.service) ? URBAN_RIDE_KEYS : null;
@@ -567,6 +550,7 @@ export default function BookingScreen() {
             maxStops={maxStops}
             senderAddressOverride={pinMode && resolving ? 'Đang xác định địa chỉ…' : undefined}
             senderExtra={showEntrances && entrances ? <EntranceChips parent={entrances.parent} items={entrances.items} selectedId={selectedGate?.placeId ?? null} onPick={pickGate} /> : undefined}
+            receiverExtra={(r, index) => <ReceiverGates receiver={r} index={index} />}
           />
         </ScrollView>
 

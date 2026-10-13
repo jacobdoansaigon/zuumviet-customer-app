@@ -44,6 +44,8 @@ export interface Receiver {
   viewOption: ViewOptionId;
   /** Vận tải: hàng lớn/nặng cần người bốc xếp — ghi vào ghi chú điểm (API chưa có phụ phí riêng) */
   needsLoadingHelp: boolean;
+  /** cổng / lối vào đã chọn của điểm đến ("Cửa Nam (Chợ Bến Thành)") — toạ độ điểm đã dời tới cổng; '' = không */
+  gate: string;
 }
 
 export type PaymentMethod = 'cash' | 'wallet';
@@ -145,6 +147,7 @@ const emptyReceiver = (): Receiver => ({
   weightTierId: null,
   viewOption: 'view',
   needsLoadingHelp: false,
+  gate: '',
 });
 
 const idleQuote = (): ServerQuote => ({ status: 'idle', key: '', quote: null, error: null, errorCode: null });
@@ -302,7 +305,15 @@ export function updateReceiver(index: number, patch: Partial<Receiver>) {
 }
 
 export function setReceiverPlace(index: number, place: Place) {
-  updateReceiver(index, { place });
+  ensureReceiver(index);
+  update((s) => ({
+    receivers: s.receivers.map((r, i) => {
+      if (i !== index) return r;
+      // đổi sang vị trí khác (> ~5 m) → cổng đã chọn của chỗ cũ không còn đúng
+      const moved = !r.place || Math.abs(r.place.lat - place.lat) > 5e-5 || Math.abs(r.place.lng - place.lng) > 5e-5;
+      return { ...r, place, gate: moved ? '' : r.gate };
+    }),
+  }));
 }
 
 export function removeReceiver(index: number) {
@@ -477,6 +488,7 @@ export function buildOrderBody(s: BookingState, quoteId: string): ZuumRoutes['PO
           note:
             clip(
               joinNote([
+                r.gate,
                 r.note,
                 s.service === 'delivery' ? VIEW_NOTE[r.viewOption] : '',
                 s.service === 'transport' && r.needsLoadingHelp ? 'Cần người bốc xếp' : '',
@@ -484,7 +496,7 @@ export function buildOrderBody(s: BookingState, quoteId: string): ZuumRoutes['PO
               500,
             ) || undefined,
         }))
-      : [],
+      : stops.map((r) => ({ note: clip(r.gate, 200) || undefined })),
     note:
       clip(joinNote([o.note, s.service === 'rental' ? movingNote(o) : '', s.service === 'handyman' ? handymanNote(o) : '']), 1000) || undefined,
   };
