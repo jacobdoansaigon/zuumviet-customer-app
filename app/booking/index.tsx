@@ -413,6 +413,8 @@ export default function BookingScreen() {
         ref={mapRef}
         stops={stops}
         routePath={routePath}
+        // chưa có tuyến theo đường (đang báo giá) → không nối thẳng hai điểm
+        showRoute={!!routePath}
         bottomPadding={mapPad}
         center={pinMode && pickup ? { lat: pickup.lat, lng: pickup.lng } : undefined}
         extraMarkers={savedMarkers}
