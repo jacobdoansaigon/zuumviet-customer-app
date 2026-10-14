@@ -12,7 +12,7 @@ const SERVICE_GRADIENTS: Partial<Record<ServiceKey, [string, string]>> = {
   bike: ['#E65100', '#FF9800'], // cam — năng động, gắn với xe máy/2 bánh
   car: [Colors.infoDark, Colors.info], // xanh dương — an toàn, thoải mái
   intercity: [Palette.danger[600], Palette.danger[300]], // đỏ cam — đường dài
-  rental: ['#1E8C41', Colors.green], // xanh lá — dọn nhà, chuyển đi
+  rental: ['#1E8C41', Colors.green], // xanh lá — chuyển nhà, chuyển đi
   driver: [Palette.primary[600], Palette.primary[300]], // tím nhạt — tài xế riêng
   handyman: [Palette.warning[800], Palette.warning[600]], // vàng đậm — sửa chữa
   labor: ['#455A64', '#78909C'], // xám xanh — nhân công, công cụ

@@ -1,4 +1,4 @@
-// FloorAccessPicker — Dọn nhà: tầng + thang máy của MỘT đầu (nhà cũ hoặc nhà mới). Dùng ở cả
+// FloorAccessPicker — Chuyển nhà: tầng + thang máy của MỘT đầu (nhà cũ hoặc nhà mới). Dùng ở cả
 // app/booking/sender.tsx (điểm đi) và app/booking/receiver.tsx (điểm đến). Gửi kèm ghi chú đơn để đội chuyển nhà
 // chuẩn bị nhân lực — API chưa có phụ phí tầng lầu nên app không cộng giá.
 import React from 'react';

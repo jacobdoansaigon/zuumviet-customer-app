@@ -1,5 +1,5 @@
 // app/booking/sender.tsx — GH 1.3 "Thông tin người gửi" (giao hàng / gọi thợ): địa chỉ + họ tên, SĐT → "Xác Nhận"
-// Dọn nhà: thêm tầng/thang máy của nhà cũ (điểm đi) — gửi kèm ghi chú đơn cho đội chuyển nhà.
+// Chuyển nhà: thêm tầng/thang máy của nhà cũ (điểm đi) — gửi kèm ghi chú đơn cho đội chuyển nhà.
 // Gọi thợ: mô tả sự cố/khẩn cấp hỏi ở bước chọn loại thợ (HandymanJobDialog), KHÔNG hỏi ở đây.
 // Chở khách (Xe máy / Xe hơi / Xe đường dài / Tài xế lái thay): chỉ địa chỉ + bản đồ tràn khung (chạm để đổi) → "Xác Nhận";
 // tên/SĐT lấy sẵn từ hồ sơ đăng nhập (hydrateSender), không cần hỏi lại.

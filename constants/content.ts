@@ -288,8 +288,8 @@ export const PROMOS: PromoItem[] = [
   },
   {
     id: 'p6',
-    title: 'Dọn nhà cuối tuần giảm 200K',
-    tag: 'Dọn nhà',
+    title: 'Chuyển nhà cuối tuần giảm 200K',
+    tag: 'Chuyển nhà',
     discount: '-200K',
     code: 'CHUYENNHA200',
     expiry: '31/12/2026',

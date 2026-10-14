@@ -2,7 +2,7 @@
 // Giao hàng: địa chỉ, họ tên/SĐT, COD (khi dịch vụ cho thu hộ, tối đa theo catalog), ghi chú, mức cân nặng (catalog),
 // tuỳ chọn xem hàng (ghi chú điểm) → "Xác Nhận"
 // Vận tải: không có tuỳ chọn xem hàng; "Cần người bốc xếp" ghi chú cho tài xế (API chưa có phụ phí riêng)
-// Dọn nhà: KHÔNG phải giao hàng — tầng/thang máy nhà mới, đóng gói, tháo lắp, đồ đặc biệt: gửi kèm ghi chú đơn.
+// Chuyển nhà: KHÔNG phải giao hàng — tầng/thang máy nhà mới, đóng gói, tháo lắp, đồ đặc biệt: gửi kèm ghi chú đơn.
 // Chở khách: chỉ địa chỉ điểm đến + bản đồ tràn khung (chạm để đổi) → "Xác Nhận"; tên/SĐT lấy của người đặt
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';

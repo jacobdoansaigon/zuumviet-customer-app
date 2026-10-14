@@ -102,10 +102,10 @@ export const RIDE_LABELS: ServiceLabels = {
   trackingDone: 'Chuyến đi hoàn thành',
 };
 
-/** Dọn nhà: 2 địa chỉ (nhà cũ/nhà mới) nhưng không phải "giao hàng" — đổi hết nhãn cho đúng ngữ cảnh */
+/** Chuyển nhà: 2 địa chỉ (nhà cũ/nhà mới) nhưng không phải "giao hàng" — đổi hết nhãn cho đúng ngữ cảnh */
 export const RENTAL_LABELS: ServiceLabels = {
   provider: 'Đội chuyển nhà',
-  feeLabel: 'Cước dọn nhà',
+  feeLabel: 'Cước chuyển nhà',
   senderPlaceholder: 'Nhập thông tin nhà cũ',
   senderStatus: 'Đang đến lấy đồ',
   senderScreenTitle: 'Thông tin nhà cũ (điểm đi)',
@@ -119,7 +119,7 @@ export const RENTAL_LABELS: ServiceLabels = {
   receiverScreenTitle: 'Thông tin nhà mới (điểm đến)',
   receiverLocationTitle: 'Địa chỉ nhà mới',
   receiverLocationPlaceholder: 'Nhập địa chỉ nhà/căn hộ mới',
-  confirmTitle: 'Xác nhận dọn nhà',
+  confirmTitle: 'Xác nhận chuyển nhà',
   confirmHint: 'Vui lòng chọn địa chỉ nhà mới',
   stopUnit: 'điểm đến',
   mapPickupLabel: 'Nhà cũ',
@@ -127,7 +127,7 @@ export const RENTAL_LABELS: ServiceLabels = {
   trackingAccepted: 'Đội chuyển nhà đang đến',
   trackingEta: 'Khoảng {eta} phút nữa đội chuyển nhà đến nơi',
   trackingDelivering: 'Đang vận chuyển',
-  trackingDone: 'Dọn nhà thành công',
+  trackingDone: 'Chuyển nhà thành công',
 };
 
 export const ONSITE_LABELS: ServiceLabels = {
@@ -186,7 +186,7 @@ export interface ServiceGroupDef {
 export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
   delivery: { key: 'delivery', title: 'Giao hàng', icon: Icons.deliveryBike, kind: 'delivery', labels: DELIVERY_LABELS, maxStops: 10 },
   transport: { key: 'transport', title: 'Vận tải', icon: Icons.truck, kind: 'delivery', labels: DELIVERY_LABELS, maxStops: 5 },
-  rental: { key: 'rental', title: 'Dọn nhà', icon: Icons.van, kind: 'delivery', labels: RENTAL_LABELS, maxStops: 1 },
+  rental: { key: 'rental', title: 'Chuyển nhà', icon: Icons.van, kind: 'delivery', labels: RENTAL_LABELS, maxStops: 1 },
   bike: { key: 'bike', title: 'Xe máy', icon: Icons.scooter, kind: 'ride', labels: RIDE_LABELS, maxStops: 1 },
   car: { key: 'car', title: 'Xe hơi', icon: Icons.carSide, kind: 'ride', labels: RIDE_LABELS, maxStops: 1 },
   driver: { key: 'driver', title: 'Tài xế lái thay', icon: Icons.steering, kind: 'ride', labels: RIDE_LABELS, maxStops: 1 },
@@ -278,7 +278,7 @@ export const SERVICE_PRESENTATION: Record<string, ServicePresentation> = {
 /** Tiền tip: mỗi lần bấm + là 5.000đ */
 export const TIP_STEP = 5000;
 
-/** Dọn nhà: đồ đặc biệt cần báo trước cho đội bốc xếp (ghi vào ghi chú đơn) */
+/** Chuyển nhà: đồ đặc biệt cần báo trước cho đội bốc xếp (ghi vào ghi chú đơn) */
 export const MOVING_BULKY_ITEMS: { id: string; label: string }[] = [
   { id: 'fridge', label: 'Tủ lạnh lớn' },
   { id: 'washer', label: 'Máy giặt' },

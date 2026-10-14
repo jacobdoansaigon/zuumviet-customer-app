@@ -8224,7 +8224,7 @@ export interface ZuumRoutes {
     response: {
       categories: Array<{
         key: "delivery" | "transport" | "rental" | "bike" | "car" | "driver" | "intercity" | "handyman" | "labor";
-        label: "Giao hàng" | "Vận tải" | "Dọn nhà" | "Xe máy" | "Xe hơi" | "Tài xế lái thay" | "Xe đường dài" | "Gọi thợ" | "Thuê nhân công";
+        label: "Giao hàng" | "Vận tải" | "Chuyển nhà" | "Xe máy" | "Xe hơi" | "Tài xế lái thay" | "Xe đường dài" | "Gọi thợ" | "Thuê nhân công";
         services: Array<{
           id: string;
           code: string;

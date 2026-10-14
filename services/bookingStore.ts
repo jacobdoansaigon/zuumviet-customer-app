@@ -4,7 +4,7 @@
 //   chọn dịch vụ chỉ là ước tính từ bảng giá catalog.
 // - Tạo đơn: POST /v1/customer/orders {quoteId, paymentMethod, pickup/stops (liên hệ + ghi chú theo đúng thứ tự
 //   điểm trong báo giá), note}. Server tự chuyển "đang tìm tài xế" / "đã hẹn giờ" — app không gọi thêm bước nào.
-// - Chi tiết không có trường riêng trên API (tầng lầu/đóng gói khi dọn nhà, mô tả sự cố gọi thợ, bốc xếp vận tải,
+// - Chi tiết không có trường riêng trên API (tầng lầu/đóng gói khi chuyển nhà, mô tả sự cố gọi thợ, bốc xếp vận tải,
 //   tuỳ chọn xem hàng) được ghi vào ghi chú đơn / ghi chú điểm, KHÔNG cộng giá trên app.
 import { useSyncExternalStore } from 'react';
 import { findService, optionsFor, estimatePrice, type CatalogService, type ServiceOptionView } from '@/services/catalog';
@@ -65,7 +65,7 @@ export interface BookingOptions {
   addonIds: string[];
   /** Thuê nhân công (tính theo block giờ): số block đã chọn → durationMinutes */
   laborBlocks: number;
-  /** Dọn nhà: tầng/thang máy 2 đầu + đóng gói / tháo lắp / đồ đặc biệt (ghi chú đơn) */
+  /** Chuyển nhà: tầng/thang máy 2 đầu + đóng gói / tháo lắp / đồ đặc biệt (ghi chú đơn) */
   movingFloorFrom: number;
   movingElevatorFrom: boolean;
   movingFloorTo: number;
@@ -470,7 +470,7 @@ const VIEW_NOTE: Record<ViewOptionId, string> = {
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 const joinNote = (parts: string[]) => parts.map((p) => p.trim()).filter(Boolean).join(' · ');
 
-/** Dọn nhà: tầng lầu/thang máy 2 đầu + đóng gói + tháo lắp + đồ đặc biệt */
+/** Chuyển nhà: tầng lầu/thang máy 2 đầu + đóng gói + tháo lắp + đồ đặc biệt */
 function movingNote(o: BookingOptions): string {
   const floorText = (label: string, floor: number, elevator: boolean) =>
     floor > 0 ? `${label}: tầng ${floor}${elevator ? ' (có thang máy)' : ' (không thang máy)'}` : '';
@@ -500,7 +500,7 @@ export function buildOrderBody(s: BookingState, quoteId: string): ZuumRoutes['PO
       contactPhone: contactPhone(s.sender.phone),
       note: clip(o.pickupNote.trim(), 200) || undefined,
     },
-    // Giao hàng / dọn nhà / vận tải: liên hệ + ghi chú từng điểm; chở khách: không có người nhận riêng
+    // Giao hàng / chuyển nhà / vận tải: liên hệ + ghi chú từng điểm; chở khách: không có người nhận riêng
     stops: isDelivery
       ? stops.map((r) => ({
           contactName: r.name.trim() || undefined,
