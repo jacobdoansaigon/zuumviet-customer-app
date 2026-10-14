@@ -1,5 +1,5 @@
 // Trang chủ — Figma HOME 1.2 (3385-663): header tím chào theo giờ + avatar, lưới dịch vụ đè header,
-// thẻ ví thưởng gradient (pill số thành viên bên phải),
+// thẻ ví gradient (số dư ví chính + Ví thưởng khi có tiền, pill số thành viên bên phải),
 // "Gợi ý cho bạn" (đặt lại chuyến gần đây của chính khách, bấm → mở đặt với lộ trình thật của đơn cũ),
 // "Tại sao chọn ZuumViet?" (1 thẻ / màn, cuộn ngang 4 khác biệt),
 // "Dành cho bạn / Tất cả" (2 hàng × 2 thẻ, cuộn ngang), "Đối tác của ZuumViet" (banner quảng cáo cuộn ngang),
@@ -31,7 +31,8 @@ import { useRealtime, useRealtimeRefetch } from '@/hooks/useRealtime';
 import { displayName, formatPhone, refreshProfile, restoreSession, useProfile } from '@/services/session';
 import { PROMOS, getGreeting } from '@/constants/content';
 import { isMember, loadAffiliate, totalMembers, useAffiliate } from '@/services/affiliate';
-import { useWalletBalance } from '@/hooks/useWalletBalance';
+import { useWalletSummary } from '@/hooks/useWalletBalance';
+import { refreshWallet } from '@/services/wallet';
 import { useStatusBarStyle } from '@/hooks/useStatusBarStyle';
 
 const HEADER_OVERLAP = 40;
@@ -43,7 +44,7 @@ export default function HomeScreen() {
   const [suggestions, setSuggestions] = useState<ReorderSuggestion[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [greeting, setGreeting] = useState(getGreeting());
-  const walletBalance = useWalletBalance();
+  const wallet = useWalletSummary();
   const affiliate = useAffiliate();
 
   const loadOrders = useCallback(async () => {
@@ -73,6 +74,7 @@ export default function HomeScreen() {
       setGreeting(getGreeting());
       void refreshProfile().catch(() => undefined);
       void loadAffiliate().catch(() => undefined);
+      void refreshWallet().catch(() => undefined);
       void loadOrders();
     }, [loadOrders])
   );
@@ -113,7 +115,8 @@ export default function HomeScreen() {
 
           <View style={styles.section}>
             <WalletCard
-              balance={walletBalance}
+              balance={wallet?.available ?? 0}
+              bonus={wallet?.bonus}
               label="Số dư ví ZuumViet"
               members={isMember(affiliate) ? totalMembers(affiliate) : undefined}
               onPress={() => router.push('/wallet')}

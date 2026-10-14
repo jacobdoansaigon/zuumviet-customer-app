@@ -5,7 +5,7 @@ import { View, ScrollView, Linking, StyleSheet } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppHeader, AppText, Dialog, EmptyState, Icons, Screen } from '@/components/ui';
-import { ENTRY_TYPE_LABEL, getCachedEntry } from '@/services/wallet';
+import { entryTitle, getCachedEntry, isBonusEntry } from '@/services/wallet';
 import { DashedDivider } from '@/components/wallet/DashedDivider';
 import { KeyValueRow } from '@/components/wallet/KeyValueRow';
 import { LinkRow } from '@/components/wallet/LinkRow';
@@ -37,14 +37,15 @@ export default function TransactionDetailScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <AppText size={14} color={Colors.textSecondary} align="center">
-            {entry.description || ENTRY_TYPE_LABEL[entry.type]}
+            {entry.description || entryTitle(entry)}
           </AppText>
           <AppText weight="bold" size={30} color={Colors.primary} align="center" style={styles.amount}>
             {formatVndSigned(entry.amount, { plus: true })}
           </AppText>
 
           <DashedDivider style={styles.dash} />
-          <KeyValueRow label="Loại giao dịch" value={ENTRY_TYPE_LABEL[entry.type]} bold />
+          <KeyValueRow label="Loại giao dịch" value={entryTitle(entry)} bold />
+          <KeyValueRow label="Ví" value={isBonusEntry(entry.id) ? 'Ví thưởng' : 'Ví chính'} />
           <KeyValueRow label="Mã giao dịch" value={entry.transactionId.slice(0, 8).toUpperCase()} />
           <KeyValueRow label="Thời gian" value={formatDateTime(Date.parse(entry.createdAt), ' - ')} />
           <KeyValueRow label="Số dư sau giao dịch" value={formatVndSigned(entry.balanceAfter)} />
@@ -60,7 +61,7 @@ export default function TransactionDetailScreen() {
         visible={dialog === 'info'}
         onClose={() => setDialog(null)}
         title="Chi tiết giao dịch"
-        message="Mỗi dòng là một lần số dư ví thay đổi: nạp tiền, giữ / thanh toán / hoàn tiền đơn hàng, phí huỷ, vé xe."
+        message="Mỗi dòng là một lần số dư ví thay đổi: nạp tiền, giữ / thanh toán / hoàn tiền đơn hàng, phí huỷ, vé xe, thưởng cộng đồng, chuyển tiền từ Ví thưởng sang ví chính."
         actions={[{ label: 'Đồng ý', onPress: () => setDialog(null) }]}
       />
       <Dialog

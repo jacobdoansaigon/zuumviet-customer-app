@@ -105,14 +105,14 @@ export default function CommunityRewardsScreen() {
             </View>
           ) : null}
 
-          <Pressable onPress={() => router.push('/wallet')} style={({ pressed }) => [styles.note, pressed && { opacity: 0.85 }]} accessibilityRole="button">
+          <Pressable onPress={() => router.push('/wallet/bonus')} style={({ pressed }) => [styles.note, pressed && { opacity: 0.85 }]} accessibilityRole="button">
             <Icon name="mci:gift-outline" size={20} color={Colors.primary} />
             <View style={{ flex: 1, marginLeft: Spacing.sm }}>
               <AppText size={14} color={Colors.text} style={{ lineHeight: 20 }}>
                 {COMMUNITY_REWARD_NOTE}
               </AppText>
               <AppText size={13} weight="semiBold" color={Colors.primary} style={{ marginTop: 2 }}>
-                Xem ví
+                Xem Ví thưởng
               </AppText>
             </View>
             <Icon name={Icons.chevronRight} size={18} color={Colors.primary} />

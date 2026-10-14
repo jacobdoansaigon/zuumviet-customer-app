@@ -295,11 +295,13 @@ export async function getAccessToken(): Promise<string | null> {
 }
 
 // ---------------------------------------------------------------- client + lỗi
+const baseHeaders = (): Record<string, string> => (deviceIdCache ? { 'x-device-id': deviceIdCache } : {});
+
 const client = createZuumClient({
   baseUrl: API_BASE_URL,
   getAccessToken,
   onUnauthorized: refreshSession,
-  headers: (): Record<string, string> => (deviceIdCache ? { 'x-device-id': deviceIdCache } : {}),
+  headers: baseHeaders,
 });
 
 /** Lỗi bất kỳ → ZuumApiError (mất mạng: status 0, code "network") */
@@ -324,6 +326,23 @@ export async function api<K extends ZuumRouteKey>(route: K, ...args: CallArgs<K>
   await getDeviceId();
   try {
     return await client.call(route, ...args);
+  } catch (e) {
+    throw toZuumError(e);
+  }
+}
+
+/**
+ * Như api() nhưng gửi thêm header riêng cho đúng lần gọi này (vd Idempotency-Key — client sinh tự động không khai
+ * header theo route). Thử lại sau khi làm mới token vẫn gửi cùng header.
+ */
+export async function apiWithHeaders<K extends ZuumRouteKey>(route: K, headers: Record<string, string>, ...args: CallArgs<K>): Promise<ZuumResponse<K>> {
+  if (!API_BASE_URL) {
+    throw new ZuumApiError(0, 'config.missing_api_url', 'Ứng dụng chưa được cấu hình địa chỉ máy chủ (EXPO_PUBLIC_API_URL)');
+  }
+  await getDeviceId();
+  const once = createZuumClient({ baseUrl: API_BASE_URL, getAccessToken, onUnauthorized: refreshSession, headers: () => ({ ...baseHeaders(), ...headers }) });
+  try {
+    return await once.call(route, ...args);
   } catch (e) {
     throw toZuumError(e);
   }

@@ -1,5 +1,6 @@
 // WalletCard — thẻ ví thưởng gradient tím → vệt cam/vàng bên phải (Figma Home 3385-663):
-// icon ví trắng, "đ 10.000" bold 18 trắng, "Ví thưởng của bạn" 13, pill trắng bên phải = số thành viên cộng đồng của bạn
+// icon ví trắng, "đ 10.000" bold 18 trắng, "Số dư ví ZuumViet" 13 (+ dòng "Ví thưởng đ 12.000" khi Ví thưởng có tiền),
+// pill trắng bên phải = số thành viên cộng đồng của bạn
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,6 +10,8 @@ import { formatMoney } from '@/constants/content';
 
 interface WalletCardProps {
   balance: number;
+  /** số dư Ví thưởng — chỉ hiện khi > 0 */
+  bonus?: number;
   /** số thành viên trong cộng đồng của bạn (hiện ở pill bên phải) */
   members?: number;
   onPress?: () => void;
@@ -17,7 +20,7 @@ interface WalletCardProps {
   membersLabel?: string;
 }
 
-export const WalletCard: React.FC<WalletCardProps> = ({ balance, members, onPress, onMembersPress, label = 'Ví thưởng của bạn', membersLabel = 'thành viên' }) => (
+export const WalletCard: React.FC<WalletCardProps> = ({ balance, bonus, members, onPress, onMembersPress, label = 'Số dư ví ZuumViet', membersLabel = 'thành viên' }) => (
   <Pressable onPress={onPress} style={({ pressed }) => [styles.wrap, pressed && { opacity: 0.94 }]} accessibilityRole="button" accessibilityLabel={label}>
     <LinearGradient colors={[Colors.primary, '#6E2F98', '#7E37AF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
       {/* vệt cam/vàng góc phải */}
@@ -35,6 +38,14 @@ export const WalletCard: React.FC<WalletCardProps> = ({ balance, members, onPres
           <AppText size={13} color="rgba(255,255,255,0.9)">
             {label}
           </AppText>
+          {bonus && bonus > 0 ? (
+            <View style={styles.bonus}>
+              <Icon name="mci:gift-outline" size={13} color={Colors.white} />
+              <AppText size={12} weight="semiBold" color={Colors.white} style={{ marginLeft: 4 }}>
+                Ví thưởng {formatMoney(bonus, true)}
+              </AppText>
+            </View>
+          ) : null}
         </View>
         {typeof members === 'number' ? (
           <Pressable
@@ -84,6 +95,16 @@ const styles = StyleSheet.create({
     borderRadius: 80,
   },
   row: { flexDirection: 'row', alignItems: 'center' },
+  bonus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
   iconWrap: {
     width: 44,
     height: 44,

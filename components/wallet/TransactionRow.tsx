@@ -1,10 +1,10 @@
 // TransactionRow — dòng lịch sử ví (Figma Lịch sử GD): icon tròn theo loại bút toán, tiêu đề 15, ngày 13 (+ mã đơn),
-// số tiền đậm 16 có dấu. Dữ liệu: GET /v1/customer/wallet/entries.
+// số tiền đậm 16 có dấu. Dữ liệu: GET /v1/customer/wallet/entries (ví chính) hoặc GET /wallet/bonus (Ví thưởng).
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, Icon, Icons, type IconName } from '@/components/ui';
-import { ENTRY_TYPE_LABEL, type WalletEntry, type WalletEntryType } from '@/services/wallet';
+import { entryTitle, type WalletEntry, type WalletEntryType } from '@/services/wallet';
 import { formatDateTime, formatVndSigned } from './walletUtils';
 
 type Tone = { name: IconName; color: string; bg: string };
@@ -47,7 +47,7 @@ export const TransactionRow: React.FC<{ entry: WalletEntry; onPress?: () => void
       </View>
       <View style={styles.texts}>
         <AppText size={15} weight="medium" numberOfLines={1}>
-          {ENTRY_TYPE_LABEL[entry.type]}
+          {entryTitle(entry)}
         </AppText>
         <AppText size={13} color={Colors.textSecondary} style={{ marginTop: 2 }} numberOfLines={1}>
           {formatDateTime(Date.parse(entry.createdAt))}

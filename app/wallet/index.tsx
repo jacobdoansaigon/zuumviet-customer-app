@@ -1,6 +1,7 @@
-// Tài khoản (Ví) — Figma "Tài khoản 1.1": header tím, thẻ ví (gradient) + Lịch sử giao dịch.
-// GET /v1/customer/wallet: số dư khả dụng (tiền giữ cho đơn đang chạy đã trừ sẵn), nợ phí huỷ (khi số dư âm). Một ví duy nhất — không có ví thưởng
-// / rút tiền cho khách. Tự cập nhật khi có sự kiện realtime wallet.updated (services/wallet.ts).
+// Tài khoản (Ví) — Figma "Tài khoản 1.1": header tím, thẻ ví chính (gradient tím) + thẻ Ví thưởng (xám, pill tím),
+// Lịch sử giao dịch / Lịch sử Ví thưởng. GET /v1/customer/wallet: số dư khả dụng (tiền giữ cho đơn đang chạy đã trừ sẵn),
+// nợ phí huỷ (khi số dư âm), `bonus` = Ví thưởng (thưởng cộng đồng cộng vào mỗi sáng thứ Hai) → "Chuyển sang ví chính"
+// (components/wallet/BonusTransfer.tsx). Khách không rút tiền. Tự cập nhật khi có sự kiện realtime wallet.updated.
 import React, { useCallback, useState } from 'react';
 import { View, ScrollView, ActivityIndicator, StyleSheet, RefreshControl } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -10,12 +11,14 @@ import { displayName, useProfile } from '@/services/session';
 import { refreshWallet, useWallet } from '@/services/wallet';
 import { errorMessage } from '@/services/zuum';
 import { BalanceCard } from '@/components/wallet/BalanceCard';
+import { useBonusTransfer } from '@/components/wallet/BonusTransfer';
+import { COMMUNITY_REWARD_NOTE } from '@/services/affiliate';
 import { formatVnd } from '@/components/wallet/walletUtils';
 
 export default function WalletScreen() {
   const wallet = useWallet();
   const profile = useProfile();
-  const [info, setInfo] = useState(false);
+  const [info, setInfo] = useState<'main' | 'bonus' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -34,6 +37,7 @@ export default function WalletScreen() {
     }, [load]),
   );
 
+  const transfer = useBonusTransfer();
   const name = displayName(profile);
 
   return (
@@ -56,12 +60,12 @@ export default function WalletScreen() {
         >
           <BalanceCard
             tone="main"
-            title="Ví ZuumViet"
+            title="Ví chính"
             amount={wallet.available}
             actionLabel="Nạp tiền"
             actionIcon={Icons.plusCircle}
             onAction={() => router.push('/wallet/topup')}
-            onInfo={() => setInfo(true)}
+            onInfo={() => setInfo('main')}
           />
           {wallet.debt > 0 ? (
             <View style={styles.debt}>
@@ -70,12 +74,27 @@ export default function WalletScreen() {
               </AppText>
             </View>
           ) : null}
+          <BalanceCard
+            tone="reward"
+            title="Ví thưởng"
+            amount={wallet.bonus}
+            actionLabel="Chuyển sang ví chính"
+            actionIcon={Icons.swap}
+            onAction={transfer.start}
+            onInfo={() => setInfo('bonus')}
+          />
+          <AppText size={13} color={Colors.textSecondary} style={styles.note}>
+            {COMMUNITY_REWARD_NOTE}
+          </AppText>
           {error ? (
             <AppText size={13} color={Colors.error}>
               {error}
             </AppText>
           ) : null}
-          <ListRow icon="mci:history" label="Lịch sử giao dịch" onPress={() => router.push('/wallet/history')} style={styles.historyRow} divider={false} />
+          <View>
+            <ListRow icon="mci:history" label="Lịch sử giao dịch" onPress={() => router.push('/wallet/history')} style={styles.historyRow} />
+            <ListRow icon="mci:gift-outline" label="Lịch sử Ví thưởng" onPress={() => router.push('/wallet/bonus')} style={styles.historyRow} divider={false} />
+          </View>
         </ScrollView>
       ) : (
         <View style={styles.center}>
@@ -90,12 +109,17 @@ export default function WalletScreen() {
       )}
 
       <Dialog
-        visible={info}
-        onClose={() => setInfo(false)}
-        title="Ví ZuumViet"
-        message="Ví dùng để thanh toán cước phí chuyến đi, vé xe và các dịch vụ trên ZuumViet. Nạp tiền qua cổng thanh toán; tiền được giữ lại khi bạn đặt đơn trả bằng ví và hoàn lại nếu đơn bị huỷ."
-        actions={[{ label: 'Đồng ý', onPress: () => setInfo(false) }]}
+        visible={info !== null}
+        onClose={() => setInfo(null)}
+        title={info === 'bonus' ? 'Ví thưởng' : 'Ví chính'}
+        message={
+          info === 'bonus'
+            ? `${COMMUNITY_REWARD_NOTE} Bấm "Chuyển sang ví chính" để dùng số tiền này thanh toán chuyến đi, vé xe và các dịch vụ trên ZuumViet.`
+            : 'Ví ZuumViet dùng để thanh toán cước phí chuyến đi, vé xe và các dịch vụ trên ZuumViet. Nạp tiền qua cổng thanh toán; tiền được giữ lại khi bạn đặt đơn trả bằng ví và hoàn lại nếu đơn bị huỷ.'
+        }
+        actions={[{ label: 'Đồng ý', onPress: () => setInfo(null) }]}
       />
+      {transfer.element}
     </Screen>
   );
 }
@@ -104,5 +128,6 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.screen, gap: Spacing.base },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.screen },
   debt: { padding: Spacing.md, borderRadius: 8, backgroundColor: Colors.errorBg },
-  historyRow: { paddingHorizontal: 0, marginTop: Spacing.xs },
+  note: { marginTop: -Spacing.sm, lineHeight: 19 },
+  historyRow: { paddingHorizontal: 0 },
 });
