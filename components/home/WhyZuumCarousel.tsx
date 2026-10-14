@@ -1,23 +1,18 @@
-// WhyZuumCarousel — "Tại sao chọn ZuumViet?": 1 thẻ / màn, cuộn ngang qua 4 khác biệt, có chấm chỉ trang.
-// Mỗi thẻ 1 gradient riêng (thay vì tím lặp lại cả 4 — dễ chìm giữa header/nút cũng tím) — chọn theo
-// đúng ý nghĩa nội dung: vàng (thưởng/thu nhập), teal (giá/tiền bạc, trùng màu "thành công" sẵn có),
-// xanh dương (an toàn/xác minh), tím thương hiệu dành riêng cho thẻ nói về chính ứng dụng ZuumViet.
+// WhyZuumCarousel — "Tại sao chọn ZuumViet?": banner ảnh 2:1 (người thật, áo tím ZuumViet), cuộn ngang 4 thẻ.
+// Ảnh để chủ thể bên phải; nửa trái phủ gradient tím thương hiệu để chữ trắng luôn đọc rõ (chữ do app vẽ, không in
+// trên ảnh — tiếng Việt luôn đúng dấu, sửa nội dung không phải vẽ lại). Thẻ hẹp hơn màn một chút để lộ mép thẻ sau.
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, useWindowDimensions, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
+import { View, ScrollView, Pressable, ImageBackground, StyleSheet, useWindowDimensions, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Palette, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { AppText, Icon, type IconName } from '@/components/ui';
+import { router, type Href } from 'expo-router';
+import { Colors, Spacing, Shadow } from '@/constants/theme';
+import { AppText } from '@/components/ui';
 import { WHY_ZUUM, type WhyZuumItem } from '@/constants/content';
 
 const GAP = Spacing.md;
-
-/** [đậm, nhạt] theo id trong WHY_ZUUM (constants/content.ts) — lặp vòng nếu sau này thêm thẻ mới */
-const CARD_GRADIENTS: [string, string][] = [
-  [Palette.warning[700], Colors.warning], // w1 Cộng đồng chia sẻ thu nhập
-  [Palette.success[700], Colors.success], // w2 Giá rõ ràng, không phụ phí ẩn
-  [Colors.infoDark, Colors.info], // w3 Tài xế được xác minh
-  [Colors.primary, Colors.primaryLight], // w4 Một ứng dụng, mọi nhu cầu (giữ tím thương hiệu)
-];
+/** phần thẻ sau lộ ra ở mép phải — báo cho khách biết vuốt được */
+const PEEK = 28;
+const RADIUS = 16;
 
 interface WhyZuumCarouselProps {
   items?: WhyZuumItem[];
@@ -27,7 +22,7 @@ interface WhyZuumCarouselProps {
 
 export const WhyZuumCarousel: React.FC<WhyZuumCarouselProps> = ({ items = WHY_ZUUM, inset = Spacing.screen }) => {
   const { width } = useWindowDimensions();
-  const cardWidth = width - inset * 2;
+  const cardWidth = width - inset * 2 - PEEK;
   const [active, setActive] = useState(0);
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -48,38 +43,49 @@ export const WhyZuumCarousel: React.FC<WhyZuumCarouselProps> = ({ items = WHY_ZU
         style={{ marginHorizontal: -inset }}
         contentContainerStyle={[styles.content, { paddingHorizontal: inset, gap: GAP }]}
       >
-        {items.map((it, idx) => (
-          <LinearGradient
-            key={it.id}
-            colors={CARD_GRADIENTS[idx % CARD_GRADIENTS.length]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.card, { width: cardWidth }]}
-          >
-            <View style={styles.iconWrap}>
-              <Icon name={it.icon as IconName} size={28} color={Colors.white} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <AppText size={11} weight="semiBold" color="rgba(255,255,255,0.75)">
-                {`${idx + 1}/${items.length}`}
-              </AppText>
-              <AppText size={16} weight="bold" color={Colors.white} numberOfLines={2} style={styles.title}>
-                {it.title}
-              </AppText>
-              <AppText size={13} color="rgba(255,255,255,0.92)" numberOfLines={3} style={styles.desc}>
-                {it.description}
-              </AppText>
-            </View>
-          </LinearGradient>
-        ))}
+        {items.map((it) => {
+          const go = it.cta ? () => router.push(it.cta!.href as Href) : undefined;
+          return (
+            <Pressable
+              key={it.id}
+              onPress={go}
+              disabled={!go}
+              style={({ pressed }) => [styles.card, { width: cardWidth }, pressed && { opacity: 0.94 }]}
+              accessibilityRole={go ? 'button' : undefined}
+              accessibilityLabel={`${it.title}. ${it.description}`}
+            >
+              <ImageBackground source={it.image} resizeMode="cover" style={styles.image} imageStyle={styles.imageFill}>
+                <LinearGradient
+                  colors={['rgba(52,18,76,0.95)', 'rgba(89,38,124,0.78)', 'rgba(89,38,124,0)']}
+                  locations={[0, 0.45, 0.78]}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={[StyleSheet.absoluteFill, styles.imageRadius]}
+                />
+                <View style={styles.text}>
+                  <AppText size={17} weight="extraBold" color={Colors.white} numberOfLines={2} style={styles.title}>
+                    {it.title}
+                  </AppText>
+                  <AppText size={12.5} color="rgba(255,255,255,0.9)" numberOfLines={2} style={styles.desc}>
+                    {it.description}
+                  </AppText>
+                  {it.cta ? (
+                    <View style={styles.cta}>
+                      <AppText size={12} weight="extraBold" color={Colors.primaryDark}>
+                        {it.cta.label}
+                      </AppText>
+                    </View>
+                  ) : null}
+                </View>
+              </ImageBackground>
+            </Pressable>
+          );
+        })}
       </ScrollView>
 
       <View style={styles.dots}>
         {items.map((it, i) => (
-          <View
-            key={it.id}
-            style={[styles.dot, i === active && [styles.dotActive, { backgroundColor: CARD_GRADIENTS[i % CARD_GRADIENTS.length][1] }]]}
-          />
+          <View key={it.id} style={[styles.dot, i === active && styles.dotActive]} />
         ))}
       </View>
     </View>
@@ -88,28 +94,26 @@ export const WhyZuumCarousel: React.FC<WhyZuumCarouselProps> = ({ items = WHY_ZU
 
 const styles = StyleSheet.create({
   content: { paddingVertical: Spacing.xs },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.base,
-    minHeight: 128,
-    ...Shadow.md,
+  card: { borderRadius: RADIUS, backgroundColor: Colors.primary, ...Shadow.md },
+  image: { width: '100%', aspectRatio: 2, justifyContent: 'center' },
+  imageRadius: { borderRadius: RADIUS },
+  // ImageBackground lấy width/height của style cho ảnh bên trong — style chỉ có aspectRatio nên phải ép ảnh lấp khung
+  // (không thì web hiện ảnh theo kích thước gốc, phóng to và tràn khung)
+  imageFill: { width: '100%', height: '100%', borderRadius: RADIUS },
+  text: { width: '60%', paddingLeft: Spacing.base, paddingRight: Spacing.xs },
+  title: { lineHeight: 22 },
+  desc: { marginTop: 4, lineHeight: 17 },
+  cta: {
+    alignSelf: 'flex-start',
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.secondary,
+    borderRadius: 99,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
   },
-  iconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
-  },
-  title: { marginTop: 2, lineHeight: 22 },
-  desc: { marginTop: 4, lineHeight: 18 },
   dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: Spacing.sm },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.gray300 },
-  dotActive: { width: 18 },
+  dotActive: { width: 18, backgroundColor: Colors.primary },
 });
 
 export default WhyZuumCarousel;

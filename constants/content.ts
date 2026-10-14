@@ -2,6 +2,7 @@
 // tin tức, khuyến mãi trên Home, "Tại sao chọn ZuumViet", banner đối tác, footer, chính sách, hotline.
 // API chưa có nội dung banner/tin tức → giữ tĩnh trong app. Mọi dữ liệu của người dùng lấy từ API (services/*).
 
+import type { ImageSourcePropType } from 'react-native';
 import type { IconName } from '@/components/ui/Icon';
 
 /* ------------------------------------------------------------------ */
@@ -111,36 +112,41 @@ export const NEWS: NewsItem[] = [
 
 export type WhyZuumItem = {
   id: string;
-  /** IconName dạng chuỗi (ion:/mci:) */
-  icon: string;
   title: string;
+  /** 1 câu ngắn (banner chỉ có chỗ cho 2 dòng) */
   description: string;
+  /** ảnh banner 2:1 (assets/banners) — chủ thể bên phải, nửa trái để chữ */
+  image: ImageSourcePropType;
+  /** nút vàng trên banner (bấm cả banner cũng đi tới đây) */
+  cta?: { label: string; href: string };
 };
 
 export const WHY_ZUUM: WhyZuumItem[] = [
   {
     id: 'w1',
-    icon: 'mci:graph-outline',
     title: 'Cộng đồng chia sẻ thu nhập',
-    description: 'Mỗi chuyến của thành viên bạn giới thiệu đều mang điểm thưởng về cho bạn. Càng mời nhiều, càng nhận nhiều.',
+    description: 'Mời bạn bè, nhận thưởng từ mỗi chuyến của họ',
+    image: require('@/assets/banners/why-w1.jpg'),
+    cta: { label: 'Mời bạn bè', href: '/community' },
   },
   {
     id: 'w2',
-    icon: 'mci:cash-check',
     title: 'Giá rõ ràng, không phụ phí ẩn',
-    description: 'Báo giá trước khi đặt, đã gồm VAT. Bạn thấy đúng số tiền phải trả trước khi bấm Xác nhận.',
+    description: 'Biết trước giá trước khi đặt, đã gồm VAT',
+    image: require('@/assets/banners/why-w2.jpg'),
+    cta: { label: 'Đặt xe', href: '/booking?service=car' },
   },
   {
     id: 'w3',
-    icon: 'ion:shield-checkmark-outline',
     title: 'Tài xế được xác minh',
-    description: 'Tài xế và thợ đều được kiểm tra CMND, bằng lái, phương tiện. Đánh giá sau mỗi chuyến hiển thị công khai.',
+    description: 'Giấy tờ, phương tiện kiểm tra kỹ, đánh giá công khai',
+    image: require('@/assets/banners/why-w3.jpg'),
   },
   {
     id: 'w4',
-    icon: 'mci:view-grid-outline',
     title: 'Một ứng dụng, mọi nhu cầu',
-    description: 'Xe máy, xe hơi, đường dài, giao hàng, vận tải, tài xế riêng. Một tài khoản, một ví, đặt trong 30 giây.',
+    description: '9 dịch vụ, một tài khoản, một ví',
+    image: require('@/assets/banners/why-w4.jpg'),
   },
 ];
 
@@ -226,6 +232,8 @@ export type PromoItem = {
   expiry: string;
   /** ServiceKey mở màn đặt khi bấm "Đặt ngay" — cũng dùng để suy ra icon/màu minh hoạ, xem promoVisual() */
   service: string;
+  /** ảnh minh hoạ 16:10 (assets/banners) — không có thì hiện khối màu + icon theo dịch vụ */
+  image?: ImageSourcePropType;
   summary: string;
   conditions: string[];
 };
@@ -233,6 +241,7 @@ export type PromoItem = {
 export const PROMOS: PromoItem[] = [
   {
     id: 'p1',
+    image: require('@/assets/banners/promo-p1.jpg'),
     title: 'Giảm 20% đơn giao hàng đầu tiên',
     tag: 'Giao hàng',
     discount: '-20%',
@@ -244,6 +253,7 @@ export const PROMOS: PromoItem[] = [
   },
   {
     id: 'p2',
+    image: require('@/assets/banners/promo-p2.jpg'),
     title: 'Xe máy đồng giá 10K nội thành',
     tag: 'Xe máy',
     discount: '10K',
@@ -255,6 +265,7 @@ export const PROMOS: PromoItem[] = [
   },
   {
     id: 'p3',
+    image: require('@/assets/banners/promo-p3.jpg'),
     title: 'Giảm 30K chuyến xe hơi đầu tiên',
     tag: 'Xe hơi',
     discount: '-30K',
@@ -266,6 +277,7 @@ export const PROMOS: PromoItem[] = [
   },
   {
     id: 'p4',
+    image: require('@/assets/banners/promo-p4.jpg'),
     title: 'Đi sân bay giảm 15% xe 6 chỗ',
     tag: 'Xe 6 chỗ',
     discount: '-15%',
@@ -277,6 +289,7 @@ export const PROMOS: PromoItem[] = [
   },
   {
     id: 'p5',
+    image: require('@/assets/banners/promo-p5.jpg'),
     title: 'Xe đường dài giảm 10% chuyến liên tỉnh',
     tag: 'Xe đường dài',
     discount: '-10%',
@@ -288,6 +301,7 @@ export const PROMOS: PromoItem[] = [
   },
   {
     id: 'p6',
+    image: require('@/assets/banners/promo-p6.jpg'),
     title: 'Chuyển nhà cuối tuần giảm 200K',
     tag: 'Chuyển nhà',
     discount: '-200K',
@@ -299,6 +313,7 @@ export const PROMOS: PromoItem[] = [
   },
   {
     id: 'p7',
+    image: require('@/assets/banners/promo-p7.jpg'),
     title: 'Tài xế lái thay Xe hơi, giảm 20K',
     tag: 'Tài xế lái thay',
     discount: '-20K',

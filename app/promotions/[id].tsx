@@ -1,8 +1,8 @@
-// Chi tiết khuyến mãi: khối hero icon+gradient theo đúng dịch vụ (promoVisual) + nhãn ưu đãi, tiêu đề,
+// Chi tiết khuyến mãi: ảnh hero của chương trình (chưa có ảnh thì icon+gradient theo dịch vụ, promoVisual) + nhãn ưu đãi, tiêu đề,
 // mã (khung gạch đứt) + HSD — CHỈ khi mã của chương trình đúng là mã khách dùng được (GET /v1/customer/coupons), điều
 // kiện, nút "Đặt ngay". Nội dung chương trình là tĩnh; mã thật luôn lấy từ API.
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Spacing, BorderRadius } from '@/constants/theme';
@@ -52,11 +52,17 @@ export default function PromotionDetailScreen() {
       footer={<Button title={`Đặt ${serviceTitle} ngay`} onPress={() => router.push({ pathname: '/booking', params: { service: serviceKey } })} />}
     >
       <View style={styles.heroWrap}>
-        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
-          <View style={styles.heroIconWrap}>
-            <Icon name={icon} size={48} color={Colors.white} />
+        {item.image ? (
+          <View style={styles.hero}>
+            <Image source={item.image} resizeMode="cover" style={styles.heroImage} />
           </View>
-        </LinearGradient>
+        ) : (
+          <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+            <View style={styles.heroIconWrap}>
+              <Icon name={icon} size={48} color={Colors.white} />
+            </View>
+          </LinearGradient>
+        )}
         <View style={styles.badge}>
           <AppText size={14} weight="extraBold" color={Colors.dark}>
             {item.discount}
@@ -124,7 +130,8 @@ export default function PromotionDetailScreen() {
 
 const styles = StyleSheet.create({
   heroWrap: { backgroundColor: Colors.primaryBg },
-  hero: { width: '100%', aspectRatio: 16 / 9, alignItems: 'center', justifyContent: 'center' },
+  hero: { width: '100%', aspectRatio: 16 / 9, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  heroImage: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   heroIconWrap: {
     width: 84,
     height: 84,
