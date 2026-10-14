@@ -2,6 +2,7 @@
 import React from 'react';
 import { View, Pressable, Linking, StyleSheet } from 'react-native';
 import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppText, Icon, Icons, LogoMark } from '@/components/ui';
 import { APP_FOOTER } from '@/constants/content';
@@ -14,7 +15,9 @@ interface AppFooterProps {
 const openUrl = (url: string) => Linking.openURL(url).catch(() => undefined);
 
 export const AppFooter: React.FC<AppFooterProps> = ({ note }) => {
-  const version = Constants.expoConfig?.version ?? '1.0.0';
+  // số build (versionCode, EAS tự tăng mỗi lần build) để biết máy đang chạy đúng bản APK nào — web không có thì bỏ
+  const build = Application.nativeBuildVersion;
+  const version = `${Constants.expoConfig?.version ?? '1.0.0'}${build ? ` (${build})` : ''}`;
   const year = new Date().getFullYear();
 
   return (
