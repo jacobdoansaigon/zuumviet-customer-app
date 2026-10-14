@@ -362,6 +362,7 @@ export default function BookingScreen() {
       price={o.paused ? undefined : ownQuote ? formatVnd(ownQuote.price.total) : pv && pv.total !== null ? formatVnd(pv.total) : `~${formatVnd(estimateFor(o, state))}`}
       priceHint={o.paused ? 'Tạm ngưng' : undefined}
       icon={o.icon}
+      art={o.art}
       selected={o.id === selected?.id}
       onPress={() => onOptionPress(o)}
       onInfoPress={() => (state.service === 'handyman' ? setJobOption(o) : setInfo(o))}

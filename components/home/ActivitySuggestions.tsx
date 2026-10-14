@@ -4,9 +4,9 @@
 import React, { useMemo } from 'react';
 import { View, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { AppText, Icon, Icons } from '@/components/ui';
+import { AppText, Icon, Icons, ServiceIcon } from '@/components/ui';
 import { groupOfOrder, type OrderListItem } from '@/services/orders';
-import { formatDayLabel, orderIcon } from '@/components/activity/orderUtils';
+import { formatDayLabel, orderArt } from '@/components/activity/orderUtils';
 import type { ServiceKey } from '@/constants/booking';
 
 const ROW_H = 64;
@@ -75,7 +75,7 @@ export const ActivitySuggestions: React.FC<ActivitySuggestionsProps> = ({ items,
             accessibilityLabel={s.title}
           >
             <View style={styles.iconWrap}>
-              <Icon name={orderIcon(s.order)} size={24} color={Colors.primary} />
+              <ServiceIcon name={orderArt(s.order)} size={30} />
             </View>
             <View style={{ flex: 1 }}>
               <View style={styles.titleRow}>

@@ -3,9 +3,9 @@
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { AppText, Icon, type IconName } from '@/components/ui';
+import { AppText, ServiceIcon, type ServiceIconName } from '@/components/ui';
 import type { OrderListItem } from '@/services/orders';
-import { activeStatusLabel, formatTime12, orderIcon } from '@/components/activity/orderUtils';
+import { activeStatusLabel, formatTime12, orderArt } from '@/components/activity/orderUtils';
 
 export type ActiveTripInfo = {
   id: string;
@@ -13,7 +13,7 @@ export type ActiveTripInfo = {
   address: string;
   service: string;
   time: string;
-  icon: IconName;
+  art: ServiceIconName;
 };
 
 /** Thông tin hiển thị của 1 đơn đang chạy */
@@ -25,7 +25,7 @@ export function describeActiveOrder(o: OrderListItem): ActiveTripInfo {
     address: target,
     service: o.service.name,
     time: formatTime12(Date.parse(o.scheduledAt ?? o.createdAt)),
-    icon: orderIcon(o),
+    art: orderArt(o),
   };
 }
 
@@ -39,7 +39,7 @@ export const ActiveTripBanner: React.FC<ActiveTripBannerProps> = ({ trip, onPres
   <View pointerEvents="box-none" style={[styles.wrap, { bottom }]}>
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && { opacity: 0.94 }]}>
       <View style={styles.iconWrap}>
-        <Icon name={trip.icon} size={28} color={Colors.primary} />
+        <ServiceIcon name={trip.art} size={32} />
       </View>
       <View style={{ flex: 1 }}>
         <AppText size={11} weight="semiBold" color={Colors.primary}>

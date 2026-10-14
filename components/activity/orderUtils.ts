@@ -1,9 +1,10 @@
 // Tiện ích cho "Hoạt động của tôi": nhãn/màu trạng thái (trạng thái CHUỖI của API mới), lọc theo nhóm dịch vụ,
 // định dạng ngày & tiền.
 import { Colors } from '@/constants/theme';
-import { SERVICE_GROUPS, type ServiceKey } from '@/constants/booking';
+import { SERVICE_GROUPS, SERVICE_PRESENTATION, type ServiceKey } from '@/constants/booking';
 import { groupOfOrder, ORDER_STATUS_LABEL, type OrderListItem, type OrderStatus } from '@/services/orders';
-import { type IconName } from '@/components/ui';
+import { findService } from '@/services/catalog';
+import { type IconName, type ServiceIconName } from '@/components/ui';
 
 export type ActivityFilter = 'all' | ServiceKey;
 
@@ -60,6 +61,12 @@ export function statusColor(status: OrderStatus) {
 
 export function orderIcon(order: Pick<OrderListItem, 'service'>): IconName {
   return SERVICE_GROUPS[groupOfOrder(order.service)].icon;
+}
+
+/** Icon minh hoạ của đơn: theo gói (code, danh sách đơn không có code thì tra catalog theo id), không thì theo nhóm */
+export function orderArt(order: { service: Parameters<typeof groupOfOrder>[0] & { code?: string } }): ServiceIconName {
+  const code = order.service.code ?? findService(order.service.id)?.code;
+  return (code ? SERVICE_PRESENTATION[code]?.art : undefined) ?? SERVICE_GROUPS[groupOfOrder(order.service)].art;
 }
 
 export function filterOrders(orders: OrderListItem[], filter: ActivityFilter) {

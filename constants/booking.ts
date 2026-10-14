@@ -2,6 +2,7 @@
 // Dịch vụ, giá, luật (COD, hẹn giờ, số điểm…), cân nặng, dịch vụ cộng thêm đều lấy từ GET /v1/public/catalog
 // (services/catalog.ts) — file này KHÔNG chứa giá hay id dịch vụ.
 import { Icons, type IconName } from '@/components/ui/Icon';
+import type { ServiceIconName } from '@/components/ui/ServiceIcon';
 
 /** Khớp `category` của catalog API */
 export type ServiceKey = 'delivery' | 'transport' | 'rental' | 'bike' | 'car' | 'intercity' | 'driver' | 'handyman' | 'labor';
@@ -176,7 +177,10 @@ export const LABOR_LABELS: ServiceLabels = {
 export interface ServiceGroupDef {
   key: ServiceKey;
   title: string;
+  /** glyph 1 màu (chip, tab nhỏ) */
   icon: IconName;
+  /** icon minh hoạ (lưới Trang chủ, dòng chọn gói, thẻ đơn, bản đồ) */
+  art: ServiceIconName;
   kind: ServiceKind;
   labels: ServiceLabels;
   /** số điểm đến tối đa khi catalog chưa tải (thực tế dùng rules.maxStops của dịch vụ đang chọn) */
@@ -184,15 +188,15 @@ export interface ServiceGroupDef {
 }
 
 export const SERVICE_GROUPS: Record<ServiceKey, ServiceGroupDef> = {
-  delivery: { key: 'delivery', title: 'Giao hàng', icon: Icons.deliveryBike, kind: 'delivery', labels: DELIVERY_LABELS, maxStops: 10 },
-  transport: { key: 'transport', title: 'Vận tải', icon: Icons.truck, kind: 'delivery', labels: DELIVERY_LABELS, maxStops: 5 },
-  rental: { key: 'rental', title: 'Chuyển nhà', icon: Icons.van, kind: 'delivery', labels: RENTAL_LABELS, maxStops: 1 },
-  bike: { key: 'bike', title: 'Xe máy', icon: Icons.scooter, kind: 'ride', labels: RIDE_LABELS, maxStops: 1 },
-  car: { key: 'car', title: 'Xe hơi', icon: Icons.carSide, kind: 'ride', labels: RIDE_LABELS, maxStops: 1 },
-  driver: { key: 'driver', title: 'Tài xế lái thay', icon: Icons.steering, kind: 'ride', labels: RIDE_LABELS, maxStops: 1 },
-  intercity: { key: 'intercity', title: 'Xe đường dài', icon: Icons.vanPassenger, kind: 'ride', labels: RIDE_LABELS, maxStops: 1 },
-  handyman: { key: 'handyman', title: 'Gọi thợ', icon: Icons.tools, kind: 'onsite', labels: ONSITE_LABELS, maxStops: 0 },
-  labor: { key: 'labor', title: 'Thuê nhân công', icon: Icons.hardHat, kind: 'onsite', labels: LABOR_LABELS, maxStops: 0 },
+  delivery: { key: 'delivery', title: 'Giao hàng', icon: Icons.deliveryBike, art: 'delivery', kind: 'delivery', labels: DELIVERY_LABELS, maxStops: 10 },
+  transport: { key: 'transport', title: 'Vận tải', icon: Icons.truck, art: 'transport', kind: 'delivery', labels: DELIVERY_LABELS, maxStops: 5 },
+  rental: { key: 'rental', title: 'Chuyển nhà', icon: Icons.van, art: 'rental', kind: 'delivery', labels: RENTAL_LABELS, maxStops: 1 },
+  bike: { key: 'bike', title: 'Xe máy', icon: Icons.scooter, art: 'bike', kind: 'ride', labels: RIDE_LABELS, maxStops: 1 },
+  car: { key: 'car', title: 'Xe hơi', icon: Icons.carSide, art: 'car', kind: 'ride', labels: RIDE_LABELS, maxStops: 1 },
+  driver: { key: 'driver', title: 'Tài xế lái thay', icon: Icons.steering, art: 'driver', kind: 'ride', labels: RIDE_LABELS, maxStops: 1 },
+  intercity: { key: 'intercity', title: 'Xe đường dài', icon: Icons.vanPassenger, art: 'intercity', kind: 'ride', labels: RIDE_LABELS, maxStops: 1 },
+  handyman: { key: 'handyman', title: 'Gọi thợ', icon: Icons.tools, art: 'handyman', kind: 'onsite', labels: ONSITE_LABELS, maxStops: 0 },
+  labor: { key: 'labor', title: 'Thuê nhân công', icon: Icons.hardHat, art: 'labor', kind: 'onsite', labels: LABOR_LABELS, maxStops: 0 },
 };
 
 /**
@@ -207,6 +211,8 @@ export const URBAN_RIDE_KEYS: ServiceKey[] = ['bike', 'car'];
  */
 export interface ServicePresentation {
   icon: IconName;
+  /** icon minh hoạ riêng của gói (components/ui/ServiceIcon) */
+  art: ServiceIconName;
   description?: string;
   /** Thuê nhân công: số block tối đa cho chọn (mặc định 4) */
   maxBlocks?: number;
@@ -214,36 +220,36 @@ export interface ServicePresentation {
 }
 
 export const SERVICE_PRESENTATION: Record<string, ServicePresentation> = {
-  'delivery-sieu-toc': { icon: Icons.deliveryBike, description: 'Giao hàng nội thành nhanh trong ngày' },
-  'delivery-sieu-re': { icon: Icons.deliveryBike, description: 'Giao hàng tiết kiệm' },
-  'delivery-dong-gia-25k': { icon: Icons.deliveryBike, description: 'Đồng giá theo điểm giao' },
-  'transport-ban-tai': { icon: Icons.truck, description: 'Xe bán tải, hàng cồng kềnh' },
-  'transport-tai-nho': { icon: Icons.truck, description: 'Xe tải nhỏ, chở đồ gia dụng' },
-  'transport-tai-trung': { icon: Icons.truck, description: 'Xe tải trung, chuyển kho' },
-  'rental-phong-tro': { icon: Icons.van, description: 'Phù hợp phòng trọ, ít đồ' },
-  'rental-can-ho': { icon: Icons.truck, description: 'Phù hợp căn hộ' },
-  'rental-nha-pho': { icon: Icons.truck, description: 'Nhà phố, văn phòng' },
-  'bike-xe-may': { icon: Icons.scooter, description: 'Đón tận nơi, 1 hành khách' },
-  'bike-xe-may-plus': { icon: Icons.scooter, description: 'Xe đời mới, tài xế đánh giá cao' },
-  'car-xe-4-cho': { icon: Icons.carSide, description: 'Sedan / hatchback, tối đa 4 khách' },
-  'car-xe-6-cho': { icon: Icons.carSeat, description: 'SUV / MPV, tối đa 6 khách' },
-  'car-xe-7-cho': { icon: Icons.carSeat, description: 'Tối đa 7 khách' },
-  'car-xe-cao-cap': { icon: Icons.luxuryCar, description: 'Xe sang đời mới' },
-  'car-xe-6-cho-san-bay': { icon: Icons.carSeat, description: 'Đưa đón sân bay' },
-  'driver-xe-may': { icon: Icons.scooter, description: 'Tài xế lái xe máy của bạn' },
-  'driver-xe-hoi': { icon: Icons.carSide, description: 'Tài xế lái xe hơi của bạn' },
-  'intercity-4-cho': { icon: Icons.carSide, description: 'Liên tỉnh, sedan 4 chỗ, đón tận nơi' },
-  'intercity-7-cho': { icon: Icons.carSeat, description: 'SUV / MPV 7 chỗ' },
-  'intercity-limousine-9': { icon: Icons.vanPassenger, description: 'Limousine 9 chỗ' },
-  'intercity-16-cho': { icon: 'mci:bus', description: 'Xe 16 chỗ cho nhóm / gia đình' },
-  'intercity-29-cho': { icon: 'mci:bus', description: 'Xe 29 chỗ cho đoàn' },
-  'intercity-45-cho': { icon: 'mci:bus', description: 'Xe khách cỡ lớn' },
-  'handyman-dien': { icon: Icons.flash, description: 'Chập điện, ổ cắm, đèn, quạt, CB' },
-  'handyman-nuoc': { icon: 'mci:water-pump', description: 'Rò rỉ, tắc nghẽn, vòi sen, bồn cầu' },
-  'handyman-dien-lanh': { icon: 'mci:snowflake', description: 'Vệ sinh, bơm gas máy lạnh / tủ lạnh' },
-  'handyman-khoa': { icon: Icons.lock, description: 'Mở khoá, thay ổ, làm chìa' },
+  'delivery-sieu-toc': { icon: Icons.deliveryBike, art: 'delivery', description: 'Giao hàng nội thành nhanh trong ngày' },
+  'delivery-sieu-re': { icon: Icons.deliveryBike, art: 'delivery', description: 'Giao hàng tiết kiệm' },
+  'delivery-dong-gia-25k': { icon: Icons.deliveryBike, art: 'delivery', description: 'Đồng giá theo điểm giao' },
+  'transport-ban-tai': { icon: Icons.truck, art: 'pickup', description: 'Xe bán tải, hàng cồng kềnh' },
+  'transport-tai-nho': { icon: Icons.truck, art: 'transport', description: 'Xe tải nhỏ, chở đồ gia dụng' },
+  'transport-tai-trung': { icon: Icons.truck, art: 'transport', description: 'Xe tải trung, chuyển kho' },
+  'rental-phong-tro': { icon: Icons.van, art: 'rental', description: 'Phù hợp phòng trọ, ít đồ' },
+  'rental-can-ho': { icon: Icons.truck, art: 'rental', description: 'Phù hợp căn hộ' },
+  'rental-nha-pho': { icon: Icons.truck, art: 'rental', description: 'Nhà phố, văn phòng' },
+  'bike-xe-may': { icon: Icons.scooter, art: 'bike', description: 'Đón tận nơi, 1 hành khách' },
+  'bike-xe-may-plus': { icon: Icons.scooter, art: 'bike-plus', description: 'Xe đời mới, tài xế đánh giá cao' },
+  'car-xe-4-cho': { icon: Icons.carSide, art: 'car', description: 'Sedan / hatchback, tối đa 4 khách' },
+  'car-xe-6-cho': { icon: Icons.carSeat, art: 'car-7', description: 'SUV / MPV, tối đa 6 khách' },
+  'car-xe-7-cho': { icon: Icons.carSeat, art: 'car-7', description: 'Tối đa 7 khách' },
+  'car-xe-cao-cap': { icon: Icons.luxuryCar, art: 'car-luxury', description: 'Xe sang đời mới' },
+  'car-xe-6-cho-san-bay': { icon: Icons.carSeat, art: 'car-7', description: 'Đưa đón sân bay' },
+  'driver-xe-may': { icon: Icons.scooter, art: 'driver', description: 'Tài xế lái xe máy của bạn' },
+  'driver-xe-hoi': { icon: Icons.carSide, art: 'driver', description: 'Tài xế lái xe hơi của bạn' },
+  'intercity-4-cho': { icon: Icons.carSide, art: 'car', description: 'Liên tỉnh, sedan 4 chỗ, đón tận nơi' },
+  'intercity-7-cho': { icon: Icons.carSeat, art: 'car-7', description: 'SUV / MPV 7 chỗ' },
+  'intercity-limousine-9': { icon: Icons.vanPassenger, art: 'limousine', description: 'Limousine 9 chỗ' },
+  'intercity-16-cho': { icon: 'mci:bus', art: 'van-16', description: 'Xe 16 chỗ cho nhóm / gia đình' },
+  'intercity-29-cho': { icon: 'mci:bus', art: 'intercity', description: 'Xe 29 chỗ cho đoàn' },
+  'intercity-45-cho': { icon: 'mci:bus', art: 'intercity', description: 'Xe khách cỡ lớn' },
+  'handyman-dien': { icon: Icons.flash, art: 'electrician', description: 'Chập điện, ổ cắm, đèn, quạt, CB' },
+  'handyman-nuoc': { icon: 'mci:water-pump', art: 'plumber', description: 'Rò rỉ, tắc nghẽn, vòi sen, bồn cầu' },
+  'handyman-dien-lanh': { icon: 'mci:snowflake', art: 'aircon', description: 'Vệ sinh, bơm gas máy lạnh / tủ lạnh' },
+  'handyman-khoa': { icon: Icons.lock, art: 'locksmith', description: 'Mở khoá, thay ổ, làm chìa' },
   'labor-boc-xep': {
-    icon: Icons.hardHat,
+    icon: Icons.hardHat, art: 'porter',
     description: 'Khuân vác, sắp xếp kho',
     maxBlocks: 3,
     workRules: [
@@ -253,7 +259,7 @@ export const SERVICE_PRESENTATION: Record<string, ServicePresentation> = {
     ],
   },
   'labor-giup-viec': {
-    icon: 'mci:broom',
+    icon: 'mci:broom', art: 'cleaning',
     description: 'Dọn dẹp, lau nhà, giặt ủi',
     maxBlocks: 4,
     workRules: [
@@ -262,13 +268,13 @@ export const SERVICE_PRESENTATION: Record<string, ServicePresentation> = {
     ],
   },
   'labor-phu-ho': {
-    icon: 'mci:shovel',
+    icon: 'mci:shovel', art: 'mason',
     description: 'Phụ việc xây dựng, sửa chữa',
     maxBlocks: 2,
     workRules: ['Khách cung cấp đầy đủ vật tư, dụng cụ thi công tại chỗ', 'Nhân công chỉ phụ việc, không chịu trách nhiệm kỹ thuật thi công chính'],
   },
   'labor-su-kien': {
-    icon: 'mci:account-group-outline',
+    icon: 'mci:account-group-outline', art: 'event',
     description: 'Chạy bàn, tạp vụ, hỗ trợ sự kiện',
     maxBlocks: 3,
     workRules: ['Có mặt trước giờ sự kiện 30 phút để chuẩn bị'],

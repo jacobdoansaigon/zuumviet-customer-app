@@ -4,6 +4,7 @@ import { View, Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'rea
 import { Colors, BorderRadius, Spacing } from '@/constants/theme';
 import { AppText } from './Text';
 import { Icon, Icons, type IconName } from './Icon';
+import { ServiceIcon, type ServiceIconName } from './ServiceIcon';
 
 interface ServiceOptionProps {
   name: string;
@@ -12,16 +13,18 @@ interface ServiceOptionProps {
   /** hiện thay cho price khi chưa đủ thông tin để tính giá (vd chưa chọn điểm đến) */
   priceHint?: string;
   icon?: IconName;
+  /** icon minh hoạ của gói — có thì hiện thay cho glyph `icon` */
+  art?: ServiceIconName;
   selected?: boolean;
   onPress?: () => void;
   onInfoPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }
 
-export const ServiceOption: React.FC<ServiceOptionProps> = ({ name, description, price, priceHint, icon = Icons.scooter, selected, onPress, onInfoPress, style }) => (
+export const ServiceOption: React.FC<ServiceOptionProps> = ({ name, description, price, priceHint, icon = Icons.scooter, art, selected, onPress, onInfoPress, style }) => (
   <Pressable onPress={onPress} style={[styles.row, selected && styles.rowSelected, style]}>
     <View style={styles.iconWrap}>
-      <Icon name={icon} size={30} color={Colors.primary} />
+      {art ? <ServiceIcon name={art} size={40} /> : <Icon name={icon} size={30} color={Colors.primary} />}
     </View>
     <View style={{ flex: 1 }}>
       <View style={styles.nameRow}>

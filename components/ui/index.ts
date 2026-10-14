@@ -22,4 +22,5 @@ export * from './Selection';
 export * from './SectionHeader';
 export * from './StatCard';
 export * from './ServiceOption';
+export * from './ServiceIcon';
 export * from './Screen';

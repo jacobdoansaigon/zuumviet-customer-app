@@ -103,6 +103,7 @@ export default function CharterScreen() {
               price={o.paused ? undefined : priceOf(o)}
               priceHint={o.paused ? 'Tạm ngưng' : undefined}
               icon={o.icon}
+              art={o.art}
               selected={o.id === selected?.id}
               onPress={() => pick(o)}
               onInfoPress={() => setInfo(o)}

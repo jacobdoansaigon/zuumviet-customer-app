@@ -5,7 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Colors, Spacing } from '@/constants/theme';
-import { AppText, Dialog, Icon, Stepper } from '@/components/ui';
+import { AppText, Dialog, Icon, ServiceIcon, Stepper } from '@/components/ui';
 import { formatVnd } from '@/services/bookingStore';
 import { serviceInfoLines, type ServiceOptionView } from '@/services/catalog';
 
@@ -51,7 +51,7 @@ export const ServiceInfoDialog: React.FC<Props> = ({ option, initialBlocks = 1, 
         <View>
           <View style={styles.head}>
             <View style={styles.iconWrap}>
-              <Icon name={option.icon} size={30} color={Colors.primary} />
+              <ServiceIcon name={option.art} size={44} />
             </View>
             <View style={{ flex: 1 }}>
               <AppText weight="bold" size={18}>

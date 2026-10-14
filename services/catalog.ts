@@ -7,6 +7,7 @@ import { createStore } from '@/services/store';
 import { api, type ZuumResponse } from '@/services/zuum';
 import { SERVICE_GROUPS, SERVICE_PRESENTATION, type ServiceKey } from '@/constants/booking';
 import type { IconName } from '@/components/ui/Icon';
+import type { ServiceIconName } from '@/components/ui/ServiceIcon';
 
 export type Catalog = ZuumResponse<'GET /v1/public/catalog'>;
 export type CatalogService = Catalog['categories'][number]['services'][number];
@@ -103,6 +104,7 @@ export interface ServiceOptionView {
   name: string;
   description: string;
   icon: IconName;
+  art: ServiceIconName;
   paused: boolean;
   service: CatalogService;
   /** Thuê theo block giờ (pricing.basis = time_block): độ dài 1 block (phút); null = không theo block */
@@ -121,6 +123,7 @@ export function toOptionView(s: CatalogService): ServiceOptionView {
     name: s.name,
     description: s.shortDescription?.trim() || p?.description || '',
     icon: p?.icon ?? SERVICE_GROUPS[group].icon,
+    art: p?.art ?? SERVICE_GROUPS[group].art,
     paused: s.status !== 'active',
     service: s,
     blockMinutes: s.pricing.basis === 'time_block' && s.pricing.blockMinutes > 0 ? s.pricing.blockMinutes : null,

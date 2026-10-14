@@ -262,6 +262,7 @@ export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, on
           description={presentation?.description}
           price={formatVnd(total)}
           icon={presentation?.icon ?? group.icon}
+          art={presentation?.art ?? group.art}
           selected
         />
       </View>

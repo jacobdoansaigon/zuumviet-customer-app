@@ -21,6 +21,7 @@ import { cancelFeePending, mmss, useFreeCancelCountdown } from '@/hooks/useCance
 import { BookingMap, RoundIconButton, SupplyMarkerView, TrackingSheet, mapBottomPadding, type MapStop } from '@/components/booking';
 import { SUPPORT_HOTLINE as SUPPORT_PHONE } from '@/constants/content';
 import { decodePolyline } from '@/components/map/polyline';
+import { orderArt } from '@/components/activity/orderUtils';
 
 const FALLBACK_POLL_MS = 30_000;
 /** hỏi "tài xế quanh bạn" mỗi bao lâu khi đang tìm */
@@ -138,9 +139,11 @@ export default function TrackingScreen() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplyRadius, serviceId, pickupKey]);
+  // icon theo đúng gói đang đặt (danh sách đã lọc theo serviceId)
+  const serviceArt = order ? orderArt(order) : undefined;
   const supplyMarkers = useMemo<ZMapMarker[]>(
-    () => supply.map((m) => ({ id: `supply-${m.key}`, at: { lat: m.lat, lng: m.lng }, anchor: 'center', children: <SupplyMarkerView marker={m} /> })),
-    [supply],
+    () => supply.map((m) => ({ id: `supply-${m.key}`, at: { lat: m.lat, lng: m.lng }, anchor: 'center', children: <SupplyMarkerView marker={m} serviceArt={serviceArt} /> })),
+    [supply, serviceArt],
   );
 
   const stops = useMemo<MapStop[]>(() => {

@@ -4,7 +4,7 @@
 import React from 'react';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { Colors, Palette, Spacing, BorderRadius } from '@/constants/theme';
-import { AppText, Icon, RouteStops, type RouteStop } from '@/components/ui';
+import { AppText, Icon, RouteStops, ServiceIcon, type RouteStop } from '@/components/ui';
 import type { OrderListItem } from '@/services/orders';
 import {
   activeStatusLabel,
@@ -14,7 +14,7 @@ import {
   historyStatusLabel,
   isCancelledStatus,
   isCompletedStatus,
-  orderIcon,
+  orderArt,
 } from './orderUtils';
 
 interface CardProps {
@@ -32,7 +32,7 @@ export const ActiveTripCard: React.FC<CardProps> = ({ order, onPress }) => {
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, styles.active, pressed && styles.pressed]}>
       <View style={styles.headRow}>
         <View style={styles.iconBox}>
-          <Icon name={orderIcon(order)} size={28} color={Colors.primary} />
+          <ServiceIcon name={orderArt(order)} size={36} />
         </View>
         <View style={styles.headTexts}>
           <AppText weight="bold" size={14}>
@@ -62,7 +62,7 @@ export const HistoryTripCard: React.FC<CardProps> = ({ order, onPress }) => {
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, styles.history, pressed && styles.pressed]}>
       <View style={styles.headRow}>
         <View style={styles.iconBox}>
-          <Icon name={orderIcon(order)} size={28} color={Colors.primary} />
+          <ServiceIcon name={orderArt(order)} size={36} />
         </View>
         <View style={styles.headTexts}>
           {!completed ? (

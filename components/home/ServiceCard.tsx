@@ -1,21 +1,21 @@
-// ServiceCard — card trắng bo 12 đè lên header: lưới dịch vụ 3 cột × 3 hàng (icon tím + label)
+// ServiceCard — card trắng bo 12 đè lên header: lưới dịch vụ 3 cột × 3 hàng (icon minh hoạ ServiceIcon, không ô nền + label)
 // Hàng 1: Xe máy / Xe hơi / Xe đường dài — Hàng 2: Giao hàng / Vận tải / Chuyển nhà — Hàng 3: Tài xế lái thay / Gọi thợ / Thuê nhân công
 import React from 'react';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
-import { AppText, Icon, type IconName } from '@/components/ui';
+import { AppText, ServiceIcon, type ServiceIconName } from '@/components/ui';
 import { SERVICE_GROUPS, type ServiceKey } from '@/constants/booking';
 
 export type HomeServiceKey = ServiceKey;
 
-export type HomeService = { key: HomeServiceKey; label: string; icon: IconName };
+export type HomeService = { key: HomeServiceKey; label: string; art: ServiceIconName };
 
 const HOME_ORDER: HomeServiceKey[] = ['bike', 'car', 'intercity', 'delivery', 'transport', 'rental', 'driver', 'handyman', 'labor'];
 
 export const HOME_SERVICES: HomeService[] = HOME_ORDER.map((key) => ({
   key,
   label: SERVICE_GROUPS[key].title,
-  icon: SERVICE_GROUPS[key].icon,
+  art: SERVICE_GROUPS[key].art,
 }));
 
 interface ServiceCardProps {
@@ -36,7 +36,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ onSelect, services = H
         accessibilityLabel={s.label}
       >
         <View style={styles.iconWrap}>
-          <Icon name={s.icon} size={36} color={Colors.primary} />
+          <ServiceIcon name={s.art} size={44} />
         </View>
         <AppText size={14} weight="semiBold" color={Colors.text} align="center" numberOfLines={1}>
           {s.label}
@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
   },
   item: { alignItems: 'center', paddingVertical: Spacing.sm, paddingHorizontal: 2, borderRadius: BorderRadius.md },
   pressed: { backgroundColor: Colors.primaryBg },
-  iconWrap: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  iconWrap: { width: 52, height: 46, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
 });
 
 export default ServiceCard;
