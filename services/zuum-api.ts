@@ -110,7 +110,7 @@ export interface ZuumRoutes {
       joinedAt: string;
       earnings: {
         paid: number;
-        lastPayout: {
+        lastPayout: null | {
           period: string;
           label: string;
           amount: number;
@@ -207,7 +207,7 @@ export interface ZuumRoutes {
       joinedAt: string;
       earnings: {
         paid: number;
-        lastPayout: {
+        lastPayout: null | {
           period: string;
           label: string;
           amount: number;
@@ -383,7 +383,7 @@ export interface ZuumRoutes {
         };
         id: string;
         code: string;
-        status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
+        status: "expired" | "held" | "confirmed" | "completed" | "cancelled";
         seatIds: string[];
         unitPrice: number;
         price: null | {
@@ -488,7 +488,7 @@ export interface ZuumRoutes {
       };
       id: string;
       code: string;
-      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
+      status: "expired" | "held" | "confirmed" | "completed" | "cancelled";
       seatIds: string[];
       unitPrice: number;
       price: null | {
@@ -589,7 +589,7 @@ export interface ZuumRoutes {
       };
       id: string;
       code: string;
-      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
+      status: "expired" | "held" | "confirmed" | "completed" | "cancelled";
       seatIds: string[];
       unitPrice: number;
       price: null | {
@@ -714,7 +714,7 @@ export interface ZuumRoutes {
       };
       id: string;
       code: string;
-      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
+      status: "expired" | "held" | "confirmed" | "completed" | "cancelled";
       seatIds: string[];
       unitPrice: number;
       price: null | {
@@ -816,7 +816,7 @@ export interface ZuumRoutes {
       };
       id: string;
       code: string;
-      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
+      status: "expired" | "held" | "confirmed" | "completed" | "cancelled";
       seatIds: string[];
       unitPrice: number;
       price: null | {
@@ -921,7 +921,7 @@ export interface ZuumRoutes {
       };
       id: string;
       code: string;
-      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
+      status: "expired" | "held" | "confirmed" | "completed" | "cancelled";
       seatIds: string[];
       unitPrice: number;
       price: null | {
@@ -2652,7 +2652,7 @@ export interface ZuumRoutes {
       joinedAt: string;
       earnings: {
         paid: number;
-        lastPayout: {
+        lastPayout: null | {
           period: string;
           label: string;
           amount: number;
@@ -2749,7 +2749,7 @@ export interface ZuumRoutes {
       joinedAt: string;
       earnings: {
         paid: number;
-        lastPayout: {
+        lastPayout: null | {
           period: string;
           label: string;
           amount: number;
@@ -3428,7 +3428,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
+      status: "expired" | "held" | "confirmed" | "completed" | "cancelled";
       seatIds: string[];
       contactName: null | string;
       contactPhone: null | string;
@@ -3474,7 +3474,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
+      status: "expired" | "held" | "confirmed" | "completed" | "cancelled";
       seatIds: string[];
       contactName: null | string;
       contactPhone: null | string;
@@ -3677,7 +3677,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
+      status: "expired" | "held" | "confirmed" | "completed" | "cancelled";
       seatIds: string[];
       contactName: null | string;
       contactPhone: null | string;
@@ -3728,7 +3728,7 @@ export interface ZuumRoutes {
       ticket: {
         id: string;
         code: string;
-        status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
+        status: "expired" | "held" | "confirmed" | "completed" | "cancelled";
         seatIds: string[];
         contactName: null | string;
         contactPhone: null | string;
@@ -4017,7 +4017,7 @@ export interface ZuumRoutes {
       bookings: Array<{
         id: string;
         code: string;
-        status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
+        status: "expired" | "held" | "confirmed" | "completed" | "cancelled";
         seatIds: string[];
         customer: {
           code: string;
