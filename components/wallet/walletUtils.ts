@@ -18,6 +18,12 @@ export function formatDateTime(ms: number, sep = ' ') {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}${sep}${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/** "10/04/2020" */
+export function formatDate(ms: number) {
+  const d = new Date(ms);
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+
 /** Chuỗi người nhập ("50.000", "50,000", "50000đ") → số */
 export function parseAmountInput(text: string): number {
   const digits = text.replace(/\D/g, '');

@@ -27,12 +27,14 @@ export const ENTRY_TYPE_LABEL: Record<WalletEntryType, string> = {
   withdrawal_paid: 'Rút tiền',
   withdrawal_rejected: 'Hoàn yêu cầu rút tiền',
   adjustment: 'Điều chỉnh',
-  affiliate_accrual: 'Thưởng giới thiệu (tạm tính)',
-  affiliate_payout: 'Thưởng giới thiệu',
-  affiliate_forfeit: 'Thu hồi thưởng giới thiệu',
+  affiliate_accrual: 'Thưởng cộng đồng',
+  affiliate_payout: 'Thưởng cộng đồng',
+  affiliate_forfeit: 'Điều chỉnh thưởng cộng đồng',
   intercity_hold: 'Giữ tiền vé xe',
   intercity_refund: 'Hoàn tiền vé xe',
   intercity_settle: 'Thanh toán vé xe',
+  pass_purchase: 'Mua gói ngày',
+  bonus_transfer: 'Chuyển ví thưởng',
 };
 
 export const PROVIDER_LABEL: Record<TopupProvider, string> = { vnpay: 'VNPay', mock: 'Cổng thử nghiệm' };

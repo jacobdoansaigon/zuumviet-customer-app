@@ -1,6 +1,7 @@
 // services/affiliate.ts — Cộng đồng (giới thiệu nhiều tầng) của khách: GET /v1/customer/affiliate (mã của tôi, cấp,
-// số F1/F2/F3, người giới thiệu, thưởng tạm tính / đã nhận, chính sách), thành viên theo tầng, thưởng theo đơn,
-// xem trước + nhập mã người giới thiệu.
+// số F1/F2/F3, người giới thiệu, tổng thưởng đã nhận + lần nhận gần nhất, các cấp), thành viên theo tầng, thưởng cộng
+// đồng đã nhận theo TUẦN (GET /affiliate/earnings), xem trước + nhập mã người giới thiệu.
+// App KHÔNG hiển thị tỷ lệ thưởng, điều kiện nhận, thưởng tạm tính hay ước tính thu nhập — chỉ số tiền đã nhận.
 import { createStore } from '@/services/store';
 import { api, onSessionChange, type ZuumResponse } from '@/services/zuum';
 
@@ -8,8 +9,12 @@ export type AffiliateSummary = ZuumResponse<'GET /v1/customer/affiliate'>;
 /** Đã là thành viên (có mã, cấp, số liệu) */
 export type AffiliateMember = Extract<AffiliateSummary, { code: string }>;
 export type AffiliateMemberItem = ZuumResponse<'GET /v1/customer/affiliate/members'>['items'][number];
+/** Một tuần đã nhận thưởng: { period '2026-W42', label 'Tuần 42/2026 (12/10–18/10)', amount, paidAt } */
 export type AffiliateEarning = ZuumResponse<'GET /v1/customer/affiliate/earnings'>['items'][number];
 export type ReferrerPreview = ZuumResponse<'GET /v1/customer/affiliate/referrer-preview'>;
+
+/** Câu trung tính về thưởng cộng đồng (KHÔNG nêu tỷ lệ / điều kiện) — màn Thưởng cộng đồng, Ví, Ví thưởng */
+export const COMMUNITY_REWARD_NOTE = 'Thưởng cộng đồng được cộng vào Ví thưởng mỗi sáng thứ Hai.';
 
 export function isMember(a: AffiliateSummary | null): a is AffiliateMember {
   return !!a && 'code' in a;
@@ -49,18 +54,6 @@ export async function setReferrer(code: string): Promise<AffiliateSummary> {
 export function totalMembers(a: AffiliateMember): number {
   return a.counts.f1 + a.counts.f2 + a.counts.f3;
 }
-
-/** "1%" từ basis point */
-export function bpsLabel(bps: number): string {
-  const pct = bps / 100;
-  return `${Number.isInteger(pct) ? pct : pct.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}%`;
-}
-
-export const EARNING_STATUS_LABEL: Record<AffiliateEarning['status'], string> = {
-  accrued: 'Tạm tính',
-  paid: 'Đã nhận',
-  forfeited: 'Không đủ điều kiện',
-};
 
 onSessionChange((event) => {
   if (event !== 'login') store.set(null);

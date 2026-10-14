@@ -109,13 +109,15 @@ export interface ZuumRoutes {
       canSetReferrer: boolean;
       joinedAt: string;
       earnings: {
-        thisMonthPending: number;
-        pending: number;
         paid: number;
-        forfeited: number;
+        lastPayout: {
+          period: string;
+          label: string;
+          amount: number;
+          paidAt: null | string;
+        };
       };
       policy: {
-        commissionBps: number[];
         levels: Array<{
           key: string;
           name: string;
@@ -124,11 +126,6 @@ export interface ZuumRoutes {
           minF3: number;
         }>;
         maxF1: number;
-        payout: {
-          minMonthlyOrders: number;
-          minMonthlyAmount: number;
-          minSupportPoints: number;
-        };
       };
     });
   };
@@ -139,13 +136,10 @@ export interface ZuumRoutes {
     };
     response: {
       items: Array<{
-        id: string;
-        orderCode: string;
-        depth: number;
+        period: string;
+        label: string;
         amount: number;
-        month: string;
-        status: "accrued" | "paid" | "forfeited";
-        createdAt: string;
+        paidAt: null | string;
       }>;
       page: number;
       pageSize: number;
@@ -212,13 +206,15 @@ export interface ZuumRoutes {
       canSetReferrer: boolean;
       joinedAt: string;
       earnings: {
-        thisMonthPending: number;
-        pending: number;
         paid: number;
-        forfeited: number;
+        lastPayout: {
+          period: string;
+          label: string;
+          amount: number;
+          paidAt: null | string;
+        };
       };
       policy: {
-        commissionBps: number[];
         levels: Array<{
           key: string;
           name: string;
@@ -227,11 +223,6 @@ export interface ZuumRoutes {
           minF3: number;
         }>;
         maxF1: number;
-        payout: {
-          minMonthlyOrders: number;
-          minMonthlyAmount: number;
-          minSupportPoints: number;
-        };
       };
     });
   };
@@ -343,7 +334,7 @@ export interface ZuumRoutes {
         trip: {
           id: string;
           kind: "bus" | "carpool";
-          status: "scheduled" | "completed" | "cancelled" | "departed";
+          status: "completed" | "cancelled" | "scheduled" | "departed";
           operator: {
             id: string;
             code: string;
@@ -392,7 +383,7 @@ export interface ZuumRoutes {
         };
         id: string;
         code: string;
-        status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+        status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
         seatIds: string[];
         unitPrice: number;
         price: null | {
@@ -448,7 +439,7 @@ export interface ZuumRoutes {
       trip: {
         id: string;
         kind: "bus" | "carpool";
-        status: "scheduled" | "completed" | "cancelled" | "departed";
+        status: "completed" | "cancelled" | "scheduled" | "departed";
         operator: {
           id: string;
           code: string;
@@ -497,7 +488,7 @@ export interface ZuumRoutes {
       };
       id: string;
       code: string;
-      status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
       seatIds: string[];
       unitPrice: number;
       price: null | {
@@ -549,7 +540,7 @@ export interface ZuumRoutes {
       trip: {
         id: string;
         kind: "bus" | "carpool";
-        status: "scheduled" | "completed" | "cancelled" | "departed";
+        status: "completed" | "cancelled" | "scheduled" | "departed";
         operator: {
           id: string;
           code: string;
@@ -598,7 +589,7 @@ export interface ZuumRoutes {
       };
       id: string;
       code: string;
-      status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
       seatIds: string[];
       unitPrice: number;
       price: null | {
@@ -674,7 +665,7 @@ export interface ZuumRoutes {
       trip: {
         id: string;
         kind: "bus" | "carpool";
-        status: "scheduled" | "completed" | "cancelled" | "departed";
+        status: "completed" | "cancelled" | "scheduled" | "departed";
         operator: {
           id: string;
           code: string;
@@ -723,7 +714,7 @@ export interface ZuumRoutes {
       };
       id: string;
       code: string;
-      status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
       seatIds: string[];
       unitPrice: number;
       price: null | {
@@ -776,7 +767,7 @@ export interface ZuumRoutes {
       trip: {
         id: string;
         kind: "bus" | "carpool";
-        status: "scheduled" | "completed" | "cancelled" | "departed";
+        status: "completed" | "cancelled" | "scheduled" | "departed";
         operator: {
           id: string;
           code: string;
@@ -825,7 +816,7 @@ export interface ZuumRoutes {
       };
       id: string;
       code: string;
-      status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
       seatIds: string[];
       unitPrice: number;
       price: null | {
@@ -881,7 +872,7 @@ export interface ZuumRoutes {
       trip: {
         id: string;
         kind: "bus" | "carpool";
-        status: "scheduled" | "completed" | "cancelled" | "departed";
+        status: "completed" | "cancelled" | "scheduled" | "departed";
         operator: {
           id: string;
           code: string;
@@ -930,7 +921,7 @@ export interface ZuumRoutes {
       };
       id: string;
       code: string;
-      status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
       seatIds: string[];
       unitPrice: number;
       price: null | {
@@ -1071,7 +1062,7 @@ export interface ZuumRoutes {
       items: Array<{
         id: string;
         code: string;
-        status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+        status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
         service: {
           id: string;
           kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -1130,7 +1121,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -1251,6 +1242,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -1325,7 +1333,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -1446,6 +1454,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -1526,7 +1551,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -1647,6 +1672,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -1722,7 +1764,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -1843,6 +1885,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -1932,7 +1991,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -2053,6 +2112,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -2342,16 +2418,6 @@ export interface ZuumRoutes {
         address: string;
       };
       serviceIds: string[];
-      scheduledAt?: null | string;
-      returnToPickup?: boolean;
-      durationMinutes?: number;
-      stops?: Array<{
-        lat: number;
-        lng: number;
-        address: string;
-        codAmount?: number;
-        weightTierId?: null | string;
-      }>;
       jobs?: Array<{
         id: string;
         qty?: number;
@@ -2361,6 +2427,16 @@ export interface ZuumRoutes {
         ladder?: boolean;
         urgent?: boolean;
       };
+      durationMinutes?: number;
+      scheduledAt?: null | string;
+      returnToPickup?: boolean;
+      stops?: Array<{
+        lat: number;
+        lng: number;
+        address: string;
+        codAmount?: number;
+        weightTierId?: null | string;
+      }>;
     };
     response: {
       items: Array<{
@@ -2421,6 +2497,67 @@ export interface ZuumRoutes {
       balance: number;
       available: number;
       debt: number;
+      bonus: number;
+    };
+  };
+  /** Ví thưởng (thưởng cộng đồng mỗi tuần): số dư + lịch sử */
+  'GET /v1/customer/wallet/bonus': {
+    query?: {
+      page?: number;
+      pageSize?: number;
+    };
+    response: {
+      balance: number;
+      entries: {
+        items: Array<{
+          id: string;
+          amount: number;
+          balanceAfter: number;
+          type: "topup" | "order_hold" | "order_settle" | "order_refund" | "cancel_fee" | "withdrawal_request" | "withdrawal_paid" | "withdrawal_rejected" | "adjustment" | "affiliate_accrual" | "affiliate_payout" | "affiliate_forfeit" | "intercity_hold" | "intercity_refund" | "intercity_settle" | "pass_purchase" | "bonus_transfer";
+          description: string;
+          transactionId: string;
+          order: null | {
+            id: string;
+            code: string;
+          };
+          createdAt: string;
+        }>;
+        page: number;
+        pageSize: number;
+        total: number;
+      };
+    };
+  };
+  /** Chuyển ví thưởng sang ví chính (bỏ trống amount = chuyển hết); gửi kèm Idempotency-Key để bấm 2 lần không chuyển 2 lần */
+  'POST /v1/customer/wallet/bonus/transfer': {
+    body: {
+      amount?: null | number;
+    };
+    response: {
+      transactionId: string;
+      duplicate: boolean;
+      wallet: {
+        balance: number;
+        available: number;
+        debt: number;
+        bonus: number;
+      } | {
+        balance: number;
+        bonus: number;
+        withdrawable: number;
+        pendingWithdrawal: null | {
+          id: string;
+          amount: number;
+        };
+        minBalanceForOrders: number;
+        company: null | {
+          id: string;
+          name: string;
+          status: "active" | "suspended" | "rejected" | "pending";
+          balance: number;
+        };
+        canReceiveOrders: boolean;
+      };
     };
   };
   'GET /v1/customer/wallet/entries': {
@@ -2433,7 +2570,7 @@ export interface ZuumRoutes {
         id: string;
         amount: number;
         balanceAfter: number;
-        type: "topup" | "order_hold" | "order_settle" | "order_refund" | "cancel_fee" | "withdrawal_request" | "withdrawal_paid" | "withdrawal_rejected" | "adjustment" | "affiliate_accrual" | "affiliate_payout" | "affiliate_forfeit" | "intercity_hold" | "intercity_refund" | "intercity_settle";
+        type: "topup" | "order_hold" | "order_settle" | "order_refund" | "cancel_fee" | "withdrawal_request" | "withdrawal_paid" | "withdrawal_rejected" | "adjustment" | "affiliate_accrual" | "affiliate_payout" | "affiliate_forfeit" | "intercity_hold" | "intercity_refund" | "intercity_settle" | "pass_purchase" | "bonus_transfer";
         description: string;
         transactionId: string;
         order: null | {
@@ -2514,13 +2651,15 @@ export interface ZuumRoutes {
       canSetReferrer: boolean;
       joinedAt: string;
       earnings: {
-        thisMonthPending: number;
-        pending: number;
         paid: number;
-        forfeited: number;
+        lastPayout: {
+          period: string;
+          label: string;
+          amount: number;
+          paidAt: null | string;
+        };
       };
       policy: {
-        commissionBps: number[];
         levels: Array<{
           key: string;
           name: string;
@@ -2529,11 +2668,6 @@ export interface ZuumRoutes {
           minF3: number;
         }>;
         maxF1: number;
-        payout: {
-          minMonthlyOrders: number;
-          minMonthlyAmount: number;
-          minSupportPoints: number;
-        };
       };
     });
   };
@@ -2544,13 +2678,10 @@ export interface ZuumRoutes {
     };
     response: {
       items: Array<{
-        id: string;
-        orderCode: string;
-        depth: number;
+        period: string;
+        label: string;
         amount: number;
-        month: string;
-        status: "accrued" | "paid" | "forfeited";
-        createdAt: string;
+        paidAt: null | string;
       }>;
       page: number;
       pageSize: number;
@@ -2617,13 +2748,15 @@ export interface ZuumRoutes {
       canSetReferrer: boolean;
       joinedAt: string;
       earnings: {
-        thisMonthPending: number;
-        pending: number;
         paid: number;
-        forfeited: number;
+        lastPayout: {
+          period: string;
+          label: string;
+          amount: number;
+          paidAt: null | string;
+        };
       };
       policy: {
-        commissionBps: number[];
         levels: Array<{
           key: string;
           name: string;
@@ -2632,11 +2765,6 @@ export interface ZuumRoutes {
           minF3: number;
         }>;
         maxF1: number;
-        payout: {
-          minMonthlyOrders: number;
-          minMonthlyAmount: number;
-          minSupportPoints: number;
-        };
       };
     });
   };
@@ -2683,6 +2811,144 @@ export interface ZuumRoutes {
         name: string;
       }>;
       eligibleVehicleIds: string[];
+    };
+  };
+  'GET /v1/partner/company': {
+    response: {
+      membership: null | {
+        id: string;
+        role: "driver" | "owner" | "manager";
+        createdAt: string;
+        joinedAt: null | string;
+        company: {
+          id: string;
+          code: string;
+          phone: string;
+          status: "active" | "suspended" | "rejected" | "pending";
+          taxCode: string;
+          legalName: string;
+          shortName: null | string;
+        };
+      };
+      invitations: Array<{
+        id: string;
+        role: "driver" | "owner" | "manager";
+        createdAt: string;
+        joinedAt: null | string;
+        company: {
+          id: string;
+          code: string;
+          phone: string;
+          status: "active" | "suspended" | "rejected" | "pending";
+          taxCode: string;
+          legalName: string;
+          shortName: null | string;
+        };
+      }>;
+    };
+  };
+  'POST /v1/partner/company/invitations/:id/accept': {
+    params: { id: string };
+    response: {
+      membership: null | {
+        id: string;
+        role: "driver" | "owner" | "manager";
+        createdAt: string;
+        joinedAt: null | string;
+        company: {
+          id: string;
+          code: string;
+          phone: string;
+          status: "active" | "suspended" | "rejected" | "pending";
+          taxCode: string;
+          legalName: string;
+          shortName: null | string;
+        };
+      };
+      invitations: Array<{
+        id: string;
+        role: "driver" | "owner" | "manager";
+        createdAt: string;
+        joinedAt: null | string;
+        company: {
+          id: string;
+          code: string;
+          phone: string;
+          status: "active" | "suspended" | "rejected" | "pending";
+          taxCode: string;
+          legalName: string;
+          shortName: null | string;
+        };
+      }>;
+    };
+  };
+  'POST /v1/partner/company/invitations/:id/decline': {
+    params: { id: string };
+    response: {
+      membership: null | {
+        id: string;
+        role: "driver" | "owner" | "manager";
+        createdAt: string;
+        joinedAt: null | string;
+        company: {
+          id: string;
+          code: string;
+          phone: string;
+          status: "active" | "suspended" | "rejected" | "pending";
+          taxCode: string;
+          legalName: string;
+          shortName: null | string;
+        };
+      };
+      invitations: Array<{
+        id: string;
+        role: "driver" | "owner" | "manager";
+        createdAt: string;
+        joinedAt: null | string;
+        company: {
+          id: string;
+          code: string;
+          phone: string;
+          status: "active" | "suspended" | "rejected" | "pending";
+          taxCode: string;
+          legalName: string;
+          shortName: null | string;
+        };
+      }>;
+    };
+  };
+  'POST /v1/partner/company/leave': {
+    response: {
+      membership: null | {
+        id: string;
+        role: "driver" | "owner" | "manager";
+        createdAt: string;
+        joinedAt: null | string;
+        company: {
+          id: string;
+          code: string;
+          phone: string;
+          status: "active" | "suspended" | "rejected" | "pending";
+          taxCode: string;
+          legalName: string;
+          shortName: null | string;
+        };
+      };
+      invitations: Array<{
+        id: string;
+        role: "driver" | "owner" | "manager";
+        createdAt: string;
+        joinedAt: null | string;
+        company: {
+          id: string;
+          code: string;
+          phone: string;
+          status: "active" | "suspended" | "rejected" | "pending";
+          taxCode: string;
+          legalName: string;
+          shortName: null | string;
+        };
+      }>;
     };
   };
   'PUT /v1/partner/devices/:deviceId': {
@@ -3162,7 +3428,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
       seatIds: string[];
       contactName: null | string;
       contactPhone: null | string;
@@ -3186,7 +3452,7 @@ export interface ZuumRoutes {
       boardedAt: null | string;
       trip: {
         id: string;
-        status: "scheduled" | "completed" | "cancelled" | "departed";
+        status: "completed" | "cancelled" | "scheduled" | "departed";
         departAt: string;
         arriveAt: string;
         from: {
@@ -3208,7 +3474,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
       seatIds: string[];
       contactName: null | string;
       contactPhone: null | string;
@@ -3232,7 +3498,7 @@ export interface ZuumRoutes {
       boardedAt: null | string;
       trip: {
         id: string;
-        status: "scheduled" | "completed" | "cancelled" | "departed";
+        status: "completed" | "cancelled" | "scheduled" | "departed";
         departAt: string;
         arriveAt: string;
         from: {
@@ -3303,9 +3569,9 @@ export interface ZuumRoutes {
       updatedAt: string;
       partnerId: string;
       status: "active" | "inactive";
-      durationMinutes: number;
       fromCityId: string;
       toCityId: string;
+      durationMinutes: number;
     }>;
   };
   'POST /v1/partner/intercity/routes': {
@@ -3351,9 +3617,9 @@ export interface ZuumRoutes {
       updatedAt: string;
       partnerId: string;
       status: "active" | "inactive";
-      durationMinutes: number;
       fromCityId: string;
       toCityId: string;
+      durationMinutes: number;
     };
   };
   'PATCH /v1/partner/intercity/routes/:id': {
@@ -3400,9 +3666,9 @@ export interface ZuumRoutes {
       updatedAt: string;
       partnerId: string;
       status: "active" | "inactive";
-      durationMinutes: number;
       fromCityId: string;
       toCityId: string;
+      durationMinutes: number;
     };
   };
   /** Tra vé theo mã (chỉ vé trên chuyến của mình) — không ghi nhận gì */
@@ -3411,7 +3677,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+      status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
       seatIds: string[];
       contactName: null | string;
       contactPhone: null | string;
@@ -3435,7 +3701,7 @@ export interface ZuumRoutes {
       boardedAt: null | string;
       trip: {
         id: string;
-        status: "scheduled" | "completed" | "cancelled" | "departed";
+        status: "completed" | "cancelled" | "scheduled" | "departed";
         departAt: string;
         arriveAt: string;
         from: {
@@ -3462,7 +3728,7 @@ export interface ZuumRoutes {
       ticket: {
         id: string;
         code: string;
-        status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+        status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
         seatIds: string[];
         contactName: null | string;
         contactPhone: null | string;
@@ -3486,7 +3752,7 @@ export interface ZuumRoutes {
         boardedAt: null | string;
         trip: {
           id: string;
-          status: "scheduled" | "completed" | "cancelled" | "departed";
+          status: "completed" | "cancelled" | "scheduled" | "departed";
           departAt: string;
           arriveAt: string;
           from: {
@@ -3509,7 +3775,7 @@ export interface ZuumRoutes {
   'GET /v1/partner/intercity/trips': {
     query?: {
       from?: string;
-      status?: "scheduled" | "completed" | "cancelled" | "departed";
+      status?: "completed" | "cancelled" | "scheduled" | "departed";
     };
     response: Array<{
       id: string;
@@ -3518,9 +3784,27 @@ export interface ZuumRoutes {
       createdAt: string;
       updatedAt: string;
       partnerId: string;
-      status: "scheduled" | "completed" | "cancelled" | "departed";
+      status: "completed" | "cancelled" | "scheduled" | "departed";
       commissionBps: number;
+      routeId: string;
       vehicleId: string;
+      departAt: string;
+      arriveAt: string;
+      pricePerSeat: number;
+      seatKind: "seat" | "bed";
+      seatCount: number;
+      amenities: string[];
+      luggagePolicy: unknown;
+      homePickupFee: null | number;
+      homeDropoffFee: null | number;
+      salesCloseMinutes: number;
+      passCommissionBps: null | number;
+      settlementModel: null | "platform" | "agency";
+      vatBps: number;
+      serviceVatBps: number;
+      pitBps: number;
+      companyId: null | string;
+      cancelledReason: null | string;
       route: {
         fromCity: {
           id: string;
@@ -3556,9 +3840,9 @@ export interface ZuumRoutes {
         updatedAt: string;
         partnerId: string;
         status: "active" | "inactive";
-        durationMinutes: number;
         fromCityId: string;
         toCityId: string;
+        durationMinutes: number;
       };
       vehicle: {
         type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
@@ -3566,18 +3850,6 @@ export interface ZuumRoutes {
         plate: string;
         brand: null | string;
       };
-      routeId: string;
-      departAt: string;
-      arriveAt: string;
-      pricePerSeat: number;
-      seatKind: "seat" | "bed";
-      seatCount: number;
-      amenities: string[];
-      luggagePolicy: unknown;
-      homePickupFee: null | number;
-      homeDropoffFee: null | number;
-      salesCloseMinutes: number;
-      cancelledReason: null | string;
       seatMap: Array<{
         id: string;
         row: string;
@@ -3620,10 +3892,10 @@ export interface ZuumRoutes {
       createdAt: string;
       updatedAt: string;
       partnerId: string;
-      status: "scheduled" | "completed" | "cancelled" | "departed";
+      status: "completed" | "cancelled" | "scheduled" | "departed";
       commissionBps: number;
-      vehicleId: string;
       routeId: string;
+      vehicleId: string;
       departAt: string;
       arriveAt: string;
       pricePerSeat: number;
@@ -3634,6 +3906,12 @@ export interface ZuumRoutes {
       homePickupFee: null | number;
       homeDropoffFee: null | number;
       salesCloseMinutes: number;
+      passCommissionBps: null | number;
+      settlementModel: null | "platform" | "agency";
+      vatBps: number;
+      serviceVatBps: number;
+      pitBps: number;
+      companyId: null | string;
       cancelledReason: null | string;
       seatMap: Array<{
         id: string;
@@ -3663,9 +3941,27 @@ export interface ZuumRoutes {
           };
         };
         partnerId: string;
-        status: "scheduled" | "completed" | "cancelled" | "departed";
+        status: "completed" | "cancelled" | "scheduled" | "departed";
         commissionBps: number;
+        routeId: string;
         vehicleId: string;
+        departAt: string;
+        arriveAt: string;
+        pricePerSeat: number;
+        seatKind: "seat" | "bed";
+        seatCount: number;
+        amenities: string[];
+        luggagePolicy: unknown;
+        homePickupFee: null | number;
+        homeDropoffFee: null | number;
+        salesCloseMinutes: number;
+        passCommissionBps: null | number;
+        settlementModel: null | "platform" | "agency";
+        vatBps: number;
+        serviceVatBps: number;
+        pitBps: number;
+        companyId: null | string;
+        cancelledReason: null | string;
         route: {
           fromCity: {
             id: string;
@@ -3701,9 +3997,9 @@ export interface ZuumRoutes {
           updatedAt: string;
           partnerId: string;
           status: "active" | "inactive";
-          durationMinutes: number;
           fromCityId: string;
           toCityId: string;
+          durationMinutes: number;
         };
         vehicle: {
           type: "car" | "none" | "motorbike" | "van" | "truck" | "bus";
@@ -3711,18 +4007,6 @@ export interface ZuumRoutes {
           plate: string;
           brand: null | string;
         };
-        routeId: string;
-        departAt: string;
-        arriveAt: string;
-        pricePerSeat: number;
-        seatKind: "seat" | "bed";
-        seatCount: number;
-        amenities: string[];
-        luggagePolicy: unknown;
-        homePickupFee: null | number;
-        homeDropoffFee: null | number;
-        salesCloseMinutes: number;
-        cancelledReason: null | string;
         seatMap: Array<{
           id: string;
           row: string;
@@ -3733,7 +4017,7 @@ export interface ZuumRoutes {
       bookings: Array<{
         id: string;
         code: string;
-        status: "completed" | "cancelled" | "expired" | "held" | "confirmed";
+        status: "completed" | "expired" | "held" | "confirmed" | "cancelled";
         seatIds: string[];
         customer: {
           code: string;
@@ -3774,7 +4058,7 @@ export interface ZuumRoutes {
     };
     response: {
       id: string;
-      status: "scheduled" | "completed" | "cancelled" | "departed";
+      status: "completed" | "cancelled" | "scheduled" | "departed";
       departAt: string;
       arriveAt: string;
       cancelledReason: null | string;
@@ -3784,7 +4068,7 @@ export interface ZuumRoutes {
     params: { id: string };
     response: {
       id: string;
-      status: "scheduled" | "completed" | "cancelled" | "departed";
+      status: "completed" | "cancelled" | "scheduled" | "departed";
       departAt: string;
       arriveAt: string;
       cancelledReason: null | string;
@@ -3794,7 +4078,7 @@ export interface ZuumRoutes {
     params: { id: string };
     response: {
       id: string;
-      status: "scheduled" | "completed" | "cancelled" | "departed";
+      status: "completed" | "cancelled" | "scheduled" | "departed";
       departAt: string;
       arriveAt: string;
       cancelledReason: null | string;
@@ -3959,7 +4243,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -4080,6 +4364,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -4164,7 +4465,7 @@ export interface ZuumRoutes {
       items: Array<{
         id: string;
         code: string;
-        status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+        status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
         service: {
           id: string;
           kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -4206,7 +4507,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -4327,6 +4628,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -4405,7 +4723,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -4526,6 +4844,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -4601,7 +4936,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -4722,6 +5057,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -4796,7 +5148,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -4917,6 +5269,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -4994,7 +5363,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -5115,6 +5484,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -5201,7 +5587,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -5322,6 +5708,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -5401,7 +5804,7 @@ export interface ZuumRoutes {
     response: {
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -5522,6 +5925,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -5595,7 +6015,7 @@ export interface ZuumRoutes {
     response: null | ({
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -5716,6 +6136,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -5798,7 +6235,7 @@ export interface ZuumRoutes {
       items: Array<{
         id: string;
         code: string;
-        status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+        status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
         service: {
           id: string;
           kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -5847,7 +6284,7 @@ export interface ZuumRoutes {
       distanceMeters: null | number;
       id: string;
       code: string;
-      status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+      status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
       service: {
         id: string;
         kind: "delivery" | "ride" | "driver_hire" | "moving" | "charter" | "on_site";
@@ -5959,6 +6396,23 @@ export interface ZuumRoutes {
       debtAmount: number;
       cashToCollect: number;
       walletHeld: number;
+      earnings: null | {
+        model: "platform" | "agency";
+        final: boolean;
+        gross: number;
+        vatBps: number;
+        serviceVat: number;
+        commissionBps: number;
+        commission: number;
+        serviceVatBps: number;
+        commissionVat: number;
+        pitBps: number;
+        pit: number;
+        tip: number;
+        partnerNet: number;
+        withPass: boolean;
+        companyId: null | string;
+      };
       timeline: {
         createdAt: string;
         searchStartedAt: null | string;
@@ -6020,6 +6474,128 @@ export interface ZuumRoutes {
       canRate: boolean;
       cancelFreeUntil: null | string;
       cancelFeeIfNow?: number;
+    };
+  };
+  'GET /v1/partner/passes': {
+    response: {
+      date: string;
+      policyVersion: number;
+      managedByCompany: null | {
+        id: string;
+        name: string;
+      };
+      autoRenew: string[];
+      taxes: {
+        model: "platform" | "agency";
+        vatBps: number;
+        serviceVatBps: number;
+        pitBps: {
+          transport: number;
+          service: number;
+          goods: number;
+        };
+      };
+      groups: Array<{
+        key: string;
+        name: string;
+        enabled: boolean;
+        serviceCodes: string[];
+        includesIntercityTrips: boolean;
+        fee: {
+          net: number;
+          vat: number;
+          total: number;
+        };
+        standardCommissionBps: number;
+        passCommissionBps: number;
+        breakEven: null | number;
+        todayRevenue: number;
+        autoRenew: boolean;
+        todayPass: null | {
+          id: string;
+          partnerId: string;
+          companyId: null | string;
+          groupKey: string;
+          groupName: string;
+          serviceCodes: string[];
+          includesIntercity: boolean;
+          serviceDate: string;
+          validFrom: string;
+          validUntil: string;
+          fee: number;
+          feeNet: number;
+          feeVat: number;
+          vatBps: number;
+          standardCommissionBps: number;
+          passCommissionBps: number;
+          source: "staff" | "manual" | "auto";
+          createdAt: string;
+        };
+      }>;
+    };
+  };
+  'POST /v1/partner/passes': {
+    body: {
+      groupKey: string;
+    };
+    response: {
+      id: string;
+      partnerId: string;
+      companyId: null | string;
+      groupKey: string;
+      groupName: string;
+      serviceCodes: string[];
+      includesIntercity: boolean;
+      serviceDate: string;
+      validFrom: string;
+      validUntil: string;
+      fee: number;
+      feeNet: number;
+      feeVat: number;
+      vatBps: number;
+      standardCommissionBps: number;
+      passCommissionBps: number;
+      source: "staff" | "manual" | "auto";
+      createdAt: string;
+    };
+  };
+  'PUT /v1/partner/passes/auto-renew': {
+    body: {
+      groupKeys: string[];
+    };
+    response: {
+      passAutoRenew: string[];
+    };
+  };
+  'GET /v1/partner/passes/history': {
+    query?: {
+      page?: number;
+      pageSize?: number;
+    };
+    response: {
+      items: Array<{
+        id: string;
+        partnerId: string;
+        companyId: null | string;
+        groupKey: string;
+        groupName: string;
+        serviceCodes: string[];
+        includesIntercity: boolean;
+        serviceDate: string;
+        validFrom: string;
+        validUntil: string;
+        fee: number;
+        feeNet: number;
+        feeVat: number;
+        vatBps: number;
+        standardCommissionBps: number;
+        passCommissionBps: number;
+        source: "staff" | "manual" | "auto";
+        createdAt: string;
+      }>;
+      page: number;
+      pageSize: number;
+      total: number;
     };
   };
   'GET /v1/partner/profile': {
@@ -7399,13 +7975,80 @@ export interface ZuumRoutes {
     response: {
       topupProviders: Array<"vnpay" | "mock">;
       balance: number;
+      bonus: number;
       withdrawable: number;
       pendingWithdrawal: null | {
         id: string;
         amount: number;
       };
       minBalanceForOrders: number;
+      company: null | {
+        id: string;
+        name: string;
+        status: "active" | "suspended" | "rejected" | "pending";
+        balance: number;
+      };
       canReceiveOrders: boolean;
+    };
+  };
+  /** Ví thưởng (thưởng cộng đồng mỗi tuần): số dư + lịch sử */
+  'GET /v1/partner/wallet/bonus': {
+    query?: {
+      page?: number;
+      pageSize?: number;
+    };
+    response: {
+      balance: number;
+      entries: {
+        items: Array<{
+          id: string;
+          amount: number;
+          balanceAfter: number;
+          type: "topup" | "order_hold" | "order_settle" | "order_refund" | "cancel_fee" | "withdrawal_request" | "withdrawal_paid" | "withdrawal_rejected" | "adjustment" | "affiliate_accrual" | "affiliate_payout" | "affiliate_forfeit" | "intercity_hold" | "intercity_refund" | "intercity_settle" | "pass_purchase" | "bonus_transfer";
+          description: string;
+          transactionId: string;
+          order: null | {
+            id: string;
+            code: string;
+          };
+          createdAt: string;
+        }>;
+        page: number;
+        pageSize: number;
+        total: number;
+      };
+    };
+  };
+  /** Chuyển ví thưởng sang ví chính (bỏ trống amount = chuyển hết); gửi kèm Idempotency-Key để bấm 2 lần không chuyển 2 lần */
+  'POST /v1/partner/wallet/bonus/transfer': {
+    body: {
+      amount?: null | number;
+    };
+    response: {
+      transactionId: string;
+      duplicate: boolean;
+      wallet: {
+        balance: number;
+        available: number;
+        debt: number;
+        bonus: number;
+      } | {
+        balance: number;
+        bonus: number;
+        withdrawable: number;
+        pendingWithdrawal: null | {
+          id: string;
+          amount: number;
+        };
+        minBalanceForOrders: number;
+        company: null | {
+          id: string;
+          name: string;
+          status: "active" | "suspended" | "rejected" | "pending";
+          balance: number;
+        };
+        canReceiveOrders: boolean;
+      };
     };
   };
   'GET /v1/partner/wallet/entries': {
@@ -7418,7 +8061,7 @@ export interface ZuumRoutes {
         id: string;
         amount: number;
         balanceAfter: number;
-        type: "topup" | "order_hold" | "order_settle" | "order_refund" | "cancel_fee" | "withdrawal_request" | "withdrawal_paid" | "withdrawal_rejected" | "adjustment" | "affiliate_accrual" | "affiliate_payout" | "affiliate_forfeit" | "intercity_hold" | "intercity_refund" | "intercity_settle";
+        type: "topup" | "order_hold" | "order_settle" | "order_refund" | "cancel_fee" | "withdrawal_request" | "withdrawal_paid" | "withdrawal_rejected" | "adjustment" | "affiliate_accrual" | "affiliate_payout" | "affiliate_forfeit" | "intercity_hold" | "intercity_refund" | "intercity_settle" | "pass_purchase" | "bonus_transfer";
         description: string;
         transactionId: string;
         order: null | {
@@ -7476,6 +8119,11 @@ export interface ZuumRoutes {
           code: string;
           phone: string;
           fullName: string;
+        };
+        company: null | {
+          id: string;
+          code: string;
+          legalName: string;
         };
         reviewedBy: null | {
           id: string;
@@ -7755,7 +8403,7 @@ export interface ZuumRoutes {
       seatsAvailable: number;
       id: string;
       kind: "bus" | "carpool";
-      status: "scheduled" | "completed" | "cancelled" | "departed";
+      status: "completed" | "cancelled" | "scheduled" | "departed";
       operator: {
         id: string;
         code: string;
@@ -7818,7 +8466,7 @@ export interface ZuumRoutes {
       seatsAvailable: number;
       id: string;
       kind: "bus" | "carpool";
-      status: "scheduled" | "completed" | "cancelled" | "departed";
+      status: "completed" | "cancelled" | "scheduled" | "departed";
       operator: {
         id: string;
         code: string;
@@ -7944,7 +8592,7 @@ export interface ZuumRoutes {
 export interface ZuumCustomerEvents {
   "order.updated": {
     orderId: string;
-    status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled";
+    status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued";
   };
   "partner.location": {
     orderId: string;
@@ -7975,7 +8623,7 @@ export interface ZuumCustomerEvents {
 export interface ZuumPartnerEvents {
   "order.updated": {
     orderId: string;
-    status: "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "completed" | "no_driver_found" | "queued" | "cancelled" | "released";
+    status: "completed" | "cancelled" | "scheduled" | "searching" | "assigned" | "arrived_pickup" | "picked_up" | "no_driver_found" | "queued" | "released";
   };
   "offer.new": {
     offerId: string;

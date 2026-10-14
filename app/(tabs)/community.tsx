@@ -1,8 +1,8 @@
 // Cộng đồng của tôi — Figma Cộng đồng (0-9085). Dữ liệu GET /v1/customer/affiliate (+ /members?depth=1):
-//   hồ sơ (cấp, mã giới thiệu của tôi, thưởng đã nhận); người giới thiệu (hoặc nút nhập mã nếu còn được nhập);
-//   2 stat card (tổng thành viên 3 tầng / thưởng tạm tính tháng này); tiến độ lên cấp; danh sách F1
-//   "Thành viên cấp 1: n/maxF1" hoặc "Rất tiếc bạn chưa có thành viên nào!" + "Mời thành viên tham gia".
-// Khách tự vào cộng đồng khi đăng ký — không có "rời cộng đồng".
+//   hồ sơ (cấp, mã giới thiệu của tôi, tổng thưởng đã nhận); người giới thiệu (hoặc nút nhập mã nếu còn được nhập);
+//   2 stat card (tổng thành viên 3 tầng / thưởng tuần gần nhất đã nhận); lối vào "Thưởng cộng đồng" + tiến độ lên cấp;
+//   danh sách F1 "Thành viên cấp 1: n/maxF1" hoặc "Rất tiếc bạn chưa có thành viên nào!" + "Mời thành viên tham gia".
+// Không hiển thị tỷ lệ thưởng / điều kiện / thưởng tạm tính. Khách tự vào cộng đồng khi đăng ký — không có "rời cộng đồng".
 import React, { useCallback, useState } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -127,7 +127,7 @@ export default function CommunityScreen() {
         <View style={styles.stats}>
           <StatCard icon={Icons.network} value={String(totalMembers(aff))} label="thành viên" />
           <Pressable style={{ flex: 1 }} onPress={() => router.push('/community/rewards')}>
-            <StatCard icon={Icons.chart} value={formatVnd(aff.earnings.thisMonthPending)} label="Thưởng tháng" />
+            <StatCard icon="mci:gift-outline" value={formatVnd(aff.earnings.lastPayout?.amount ?? 0)} label="thưởng tuần" />
           </Pressable>
         </View>
 
@@ -135,7 +135,7 @@ export default function CommunityScreen() {
           <Icon name="mci:gift-outline" size={20} color={Colors.primary} />
           <View style={{ flex: 1, marginLeft: Spacing.sm }}>
             <AppText size={14} weight="semiBold" color={Colors.primary}>
-              Tiền thưởng & chính sách
+              Thưởng cộng đồng
             </AppText>
             {next ? (
               <AppText size={12} color={Colors.textSecondary} style={{ marginTop: 2 }}>

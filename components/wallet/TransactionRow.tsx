@@ -15,6 +15,8 @@ const REFUND: Tone = { name: 'mci:cash-refund', color: Colors.primary, bg: Color
 const REWARD: Tone = { name: 'mci:cash-multiple', color: Colors.primary, bg: Colors.primaryTint };
 const OUT: Tone = { name: 'mci:wallet-outline', color: '#E07A2F', bg: '#FDEBDD' };
 const BUS: Tone = { name: 'mci:bus', color: Colors.primary, bg: Colors.primaryTint };
+const PASS: Tone = { name: Icons.ticket, color: '#E07A2F', bg: '#FDEBDD' };
+const TRANSFER: Tone = { name: Icons.swap, color: Colors.primary, bg: Colors.primaryTint };
 
 export const ENTRY_ICON: Record<WalletEntryType, Tone> = {
   topup: TOPUP,
@@ -32,6 +34,8 @@ export const ENTRY_ICON: Record<WalletEntryType, Tone> = {
   intercity_hold: BUS,
   intercity_refund: REFUND,
   intercity_settle: BUS,
+  pass_purchase: PASS,
+  bonus_transfer: TRANSFER,
 };
 
 export const TransactionRow: React.FC<{ entry: WalletEntry; onPress?: () => void }> = ({ entry, onPress }) => {

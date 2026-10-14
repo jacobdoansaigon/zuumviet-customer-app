@@ -70,13 +70,13 @@ export const NEWS: NewsItem[] = [
   },
   {
     id: 'n3',
-    title: 'Mời bạn bè tham gia cộng đồng, nhận tiền thưởng mỗi chuyến',
+    title: 'Mời bạn bè tham gia cộng đồng, nhận thưởng cộng đồng mỗi tuần',
     excerpt:
-      'Chia sẻ mã giới thiệu để xây dựng cộng đồng của bạn. Mỗi chuyến xe của thành viên cấp dưới sẽ mang lại tiền thưởng cho bạn.',
+      'Chia sẻ mã giới thiệu để xây dựng cộng đồng của bạn. Thưởng cộng đồng được cộng vào Ví thưởng của bạn mỗi tuần.',
     image: 'https://picsum.photos/seed/zuum-news-3/800/450',
     date: '10/09/2026',
     body: [
-      'Tính năng Cộng đồng cho phép bạn kết nối với những người dùng khác thông qua mã giới thiệu (mã tài khoản của bạn). Khi thành viên trong cộng đồng hoàn thành chuyến đi, bạn nhận được phần thưởng tương ứng vào ví ZuumViet.',
+      'Tính năng Cộng đồng cho phép bạn kết nối với những người dùng khác thông qua mã giới thiệu (mã tài khoản của bạn). Khi thành viên trong cộng đồng hoàn thành chuyến đi, bạn nhận thưởng cộng đồng — được cộng vào Ví thưởng mỗi sáng thứ Hai, chuyển sang ví chính để sử dụng.',
       'Vào tab Cộng đồng → "Mời thành viên tham gia" để lấy mã giới thiệu của bạn.',
     ],
   },
