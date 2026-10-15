@@ -22,6 +22,7 @@ import { BookingMap, RoundIconButton, SupplyMarkerView, TrackingSheet, mapBottom
 import { SUPPORT_HOTLINE as SUPPORT_PHONE } from '@/constants/content';
 import { decodePolyline } from '@/components/map/polyline';
 import { orderArt } from '@/components/activity/orderUtils';
+import { useAnimatedSupply } from '@/components/booking/useAnimatedSupply';
 
 const FALLBACK_POLL_MS = 30_000;
 /** hỏi "tài xế quanh bạn" mỗi bao lâu khi đang tìm */
@@ -141,9 +142,17 @@ export default function TrackingScreen() {
   }, [supplyRadius, serviceId, pickupKey]);
   // icon theo đúng gói đang đặt (danh sách đã lọc theo serviceId)
   const serviceArt = order ? orderArt(order) : undefined;
+  // xe trượt mượt giữa hai lần hỏi, đầu xe theo hướng chạy (xe mô phỏng chạy trên đường thật — server)
+  const animatedSupply = useAnimatedSupply(supply, SUPPLY_POLL_MS);
   const supplyMarkers = useMemo<ZMapMarker[]>(
-    () => supply.map((m) => ({ id: `supply-${m.key}`, at: { lat: m.lat, lng: m.lng }, anchor: 'center', children: <SupplyMarkerView marker={m} serviceArt={serviceArt} /> })),
-    [supply, serviceArt],
+    () =>
+      animatedSupply.map((m) => ({
+        id: `supply-${m.key}`,
+        at: { lat: m.lat, lng: m.lng },
+        anchor: 'center',
+        children: <SupplyMarkerView marker={m} heading={m.heading} serviceArt={serviceArt} />,
+      })),
+    [animatedSupply, serviceArt],
   );
 
   const stops = useMemo<MapStop[]>(() => {
