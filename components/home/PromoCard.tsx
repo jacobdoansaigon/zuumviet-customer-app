@@ -54,7 +54,8 @@ export const PromoCard: React.FC<PromoCardProps> = ({ item, width, onPress, styl
           {item.title}
         </AppText>
         <AppText size={11} color={Colors.textMuted} numberOfLines={1} style={styles.expiry}>
-          HSD {item.expiry}
+          {/* sắp hết hạn thì bỏ năm cho vừa một dòng trên thẻ hẹp ("HSD 15/10 · hết hạn hôm nay") */}
+          HSD {soon ? item.expiry.replace(/\/\d{4}$/, '') : item.expiry}
           {soon ? (
             <AppText size={11} weight="bold" color={Colors.error}>
               {left === 0 ? ' · hết hạn hôm nay' : ` · còn ${left} ngày`}
