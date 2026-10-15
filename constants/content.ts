@@ -203,15 +203,9 @@ export const SUPPORT_HOTLINE_LABEL = '1900 1234';
 
 /** Thông tin hiển thị ở footer app */
 export const APP_FOOTER = {
-  tagline: 'Đi lại, giao hàng, vận tải. Một ứng dụng cho mọi nhu cầu.',
-  company: 'Công ty TNHH ZuumViet',
-  address: 'Tầng 5, 182 Lê Đại Hành, Phường 15, Quận 11, TP. Hồ Chí Minh',
-  hotline: SUPPORT_HOTLINE_LABEL,
-  hotlineTel: SUPPORT_HOTLINE,
-  email: 'support@zuumviet.vn',
+  tagline: 'Trợ lý cho mọi nhu cầu',
   termsUrl: 'https://zuumviet.vn/terms',
   privacyUrl: 'https://zuumviet.vn/privacy',
-  website: 'https://zuumviet.vn',
 } as const;
 
 /* ------------------------------------------------------------------ */
