@@ -25,6 +25,11 @@ function bearing(a: Pos, b: Pos): number {
   return (((Math.atan2(dx, dy) * 180) / Math.PI) % 360 + 360) % 360;
 }
 
+/** góc lệch (0–180°) giữa hai hướng */
+function angleBetween(a: number, b: number): number {
+  return Math.abs(((a - b + 540) % 360) - 180);
+}
+
 function positionAt(t: Track, now: number, durationMs: number): Pos {
   const k = Math.min(1, Math.max(0, (now - t.start) / durationMs));
   return { lat: t.from.lat + (t.to.lat - t.from.lat) * k, lng: t.from.lng + (t.to.lng - t.from.lng) * k };
@@ -43,7 +48,11 @@ export function useAnimatedSupply(targets: SupplyMarkerData[], durationMs: numbe
       const from = prev ? positionAt(prev, now, durationMs) : { lat: t.lat, lng: t.lng };
       const to = { lat: t.lat, lng: t.lng };
       const moved = metersBetween(from, to);
-      const heading = t.heading ?? (prev && moved > 3 ? bearing(from, to) : (prev?.heading ?? null));
+      const glide = moved > 3 ? bearing(from, to) : null;
+      // heading server là hướng ở thời điểm mới; nếu xe vừa quay đầu giữa hai lần hỏi thì đoạn trượt trên màn hình vẫn đi
+      // theo chiều cũ → lấy hướng đoạn trượt cho khỏi thấy xe chạy lùi
+      const serverOk = t.heading != null && (glide == null || angleBetween(t.heading, glide) <= 90);
+      const heading = serverOk ? t.heading : (glide ?? t.heading ?? prev?.heading ?? null);
       next.set(t.key, { from, to, heading, start: now, data: t });
     }
     tracks.current = next;

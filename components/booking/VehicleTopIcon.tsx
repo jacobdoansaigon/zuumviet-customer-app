@@ -27,9 +27,9 @@ export const VEHICLE_TOP_BOX: Record<VehicleTopKind, [number, number]> = {
 
 /** chiều dài hiển thị (px) trên bản đồ theo loại xe */
 export const VEHICLE_TOP_LENGTH: Record<VehicleTopKind, number> = {
-  // xe máy to gấp đôi (anh Jacob 15/10/2026)
-  moto: 64,
-  'moto-box': 68,
+  // xe máy: gấp đôi rồi nhỏ lại 20 % (anh Jacob 15/10/2026)
+  moto: 51,
+  'moto-box': 54,
   car: 38,
   van: 42,
   truck: 46,
