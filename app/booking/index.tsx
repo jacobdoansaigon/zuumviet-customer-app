@@ -259,6 +259,20 @@ export default function BookingScreen() {
   );
   const selected = options.find((o) => o.id === state.optionId) ?? null;
   const canConfirm = senderReady && hasDestination && !!selected && !selected.paused;
+  // Gọi thợ: loại thợ được chọn sẵn khi vào màn nên khách có thể bấm "Xác nhận" mà chưa chọn hạng mục công việc / ảnh hiện
+  // trạng (server báo order.job_required ở màn xác nhận, không có đường quay lại chọn) → mở "Chi tiết công việc" trước, chọn
+  // xong đi tiếp sang màn xác nhận.
+  const needsJobs =
+    state.service === 'handyman' && !!selected?.service.jobs.length && !state.options.handymanJobs.some((j) => selected.service.jobs.some((x) => x.id === j.id));
+  const confirmAfterJobs = useRef(false);
+  const onConfirm = () => {
+    if (needsJobs && selected) {
+      confirmAfterJobs.current = true;
+      setJobOption(selected);
+      return;
+    }
+    router.push('/booking/confirm');
+  };
 
   const isIntercity = state.service === 'intercity';
   const destPlace = complete[0]?.place ?? null;
@@ -562,7 +576,7 @@ export default function BookingScreen() {
         </ScrollView>
 
         {isIntercity && hasDestination ? null : (
-          <FlatFooter title={canConfirm ? 'Xác nhận' : labels.confirmHint} disabled={!canConfirm} onPress={() => router.push('/booking/confirm')} />
+          <FlatFooter title={canConfirm ? 'Xác nhận' : labels.confirmHint} disabled={!canConfirm} onPress={onConfirm} />
         )}
       </View>
 
@@ -594,7 +608,10 @@ export default function BookingScreen() {
               }
             : EMPTY_JOB_DETAIL
         }
-        onClose={() => setJobOption(null)}
+        onClose={() => {
+          confirmAfterJobs.current = false;
+          setJobOption(null);
+        }}
         onSelect={(o, detail: HandymanJobDetail) => {
           switchRideOption(o.group, o.id);
           setOptions({
@@ -608,6 +625,10 @@ export default function BookingScreen() {
           });
           setJobOption(null);
           setExpanded(false);
+          if (confirmAfterJobs.current) {
+            confirmAfterJobs.current = false;
+            router.push('/booking/confirm');
+          }
         }}
       />
 

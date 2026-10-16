@@ -131,7 +131,10 @@ export const HandymanJobDialog: React.FC<Props> = ({ option, initial, onClose, o
                         </Pressable>
                       </View>
                     ) : (
-                      <Icon name={'ion:add-circle-outline' as never} size={22} color={Colors.gray400} />
+                      // dấu "+" trông như nút → bấm vào cũng chọn việc (trước đây chỉ phần chữ bên trái bấm được)
+                      <Pressable onPress={() => setQty(job, 1)} hitSlop={10} accessibilityLabel={`Chọn ${job.name}`}>
+                        <Icon name={'ion:add-circle-outline' as never} size={22} color={Colors.gray400} />
+                      </Pressable>
                     )}
                   </View>
                 );
