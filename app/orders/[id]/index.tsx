@@ -15,6 +15,7 @@ import { DriverRow } from '@/components/activity/DriverRow';
 import { PaymentSummary } from '@/components/activity/PaymentSummary';
 import { RatingStars } from '@/components/activity/RatingStars';
 import { Pill } from '@/components/activity/Pill';
+import { OrderProofs, proofGroups } from '@/components/activity/OrderProofs';
 import { SUPPORT_HOTLINE as SUPPORT_PHONE } from '@/constants/content';
 
 
@@ -82,14 +83,14 @@ export default function OrderDetailScreen() {
   const picked = order.status === 'picked_up' || order.status === 'completed';
   const stops: RouteStop[] = [
     {
-      title: order.pickup.contactName ? `${order.pickup.contactName} · ${formatPhone(order.pickup.contactPhone)}` : order.pickup.address,
+      title: order.pickup.contactName ? [order.pickup.contactName, formatPhone(order.pickup.contactPhone)].filter(Boolean).join(' · ') : order.pickup.address,
       subtitle: order.pickup.contactName ? order.pickup.address : undefined,
       type: 'pickup',
       status: isActiveStatus(order.status) && picked ? order.steps.pickUp : undefined,
       statusTone: picked ? 'success' : undefined,
     },
     ...order.stops.map<RouteStop>((s) => ({
-      title: s.contactName ? `${s.contactName} · ${formatPhone(s.contactPhone)}` : s.address,
+      title: s.contactName ? [s.contactName, formatPhone(s.contactPhone)].filter(Boolean).join(' · ') : s.address,
       subtitle: s.contactName ? s.address : s.failReason ?? undefined,
       type: 'dropoff',
       status: s.status !== 'pending' ? STOP_STATUS_LABEL[s.status] : undefined,
@@ -165,6 +166,15 @@ export default function OrderDetailScreen() {
             </View>
           ) : null}
         </View>
+
+        {proofGroups(order).length ? (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.section}>
+              <OrderProofs order={order} />
+            </View>
+          </>
+        ) : null}
 
         <View style={styles.divider} />
         <View style={styles.section}>

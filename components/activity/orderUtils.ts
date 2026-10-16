@@ -42,7 +42,7 @@ export function activeStatusLabel(status: OrderStatus, service: Parameters<typeo
     case 'arrived_pickup':
       return `${provider} đã đến`;
     case 'picked_up':
-      return group.kind === 'onsite' ? group.labels.trackingDelivering : 'Đang trong chuyến';
+      return group.kind === 'ride' ? 'Đang trong chuyến' : group.labels.trackingDelivering;
     default:
       return ORDER_STATUS_LABEL[status];
   }

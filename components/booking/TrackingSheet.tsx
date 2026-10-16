@@ -10,6 +10,7 @@ import { SUPPORT_HOTLINE_LABEL } from '@/constants/content';
 import { formatVnd, formatScheduleLabel } from '@/services/bookingStore';
 import { formatPhone } from '@/services/session';
 import { groupOfOrder, phaseOf, STOP_STATUS_LABEL, type OrderDetail, type StopStatus, type TrackingPhase } from '@/services/orders';
+import { OrderProofs, proofGroups } from '@/components/activity/OrderProofs';
 
 const STOP_TONE: Record<StopStatus, RouteStop['statusTone']> = {
   pending: 'default',
@@ -87,14 +88,14 @@ export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, on
   const stops: RouteStop[] = [
     {
       type: 'pickup',
-      title: order.pickup.contactName ? `${order.pickup.contactName} - ${formatPhone(order.pickup.contactPhone)}` : order.pickup.address,
+      title: order.pickup.contactName ? [order.pickup.contactName, formatPhone(order.pickup.contactPhone)].filter(Boolean).join(' - ') : order.pickup.address,
       subtitle: order.pickup.address,
       status: pickedUp ? order.steps.pickUp : order.status === 'arrived_pickup' ? order.steps.arrive : undefined,
       statusTone: pickedUp ? 'success' : order.status === 'arrived_pickup' ? 'warning' : 'default',
     },
     ...order.stops.map<RouteStop>((s) => ({
       type: 'dropoff',
-      title: s.contactName ? `${s.contactName} - ${formatPhone(s.contactPhone)}` : s.address,
+      title: s.contactName ? [s.contactName, formatPhone(s.contactPhone)].filter(Boolean).join(' - ') : s.address,
       subtitle: s.failReason ? `${s.address} · ${s.failReason}` : s.address,
       status: pickedUp || s.status !== 'pending' ? STOP_STATUS_LABEL[s.status] : undefined,
       statusTone: STOP_TONE[s.status],
@@ -310,6 +311,13 @@ export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, on
             <AppText size={13} color={Colors.textSecondary} style={{ marginTop: Spacing.sm }}>
               Thời gian thuê: {Math.round((order.durationMinutes / 60) * 10) / 10} giờ
             </AppText>
+          ) : null}
+
+          {/* ảnh tài xế / thợ chụp (lấy hàng, giao hàng, bắt đầu làm) — xem ngay khi đơn còn đang chạy */}
+          {proofGroups(order).length ? (
+            <View style={{ marginTop: Spacing.md }}>
+              <OrderProofs order={order} />
+            </View>
           ) : null}
 
           <AppText weight="bold" size={14} style={{ marginTop: Spacing.md }}>

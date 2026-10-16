@@ -166,7 +166,7 @@ export default function IntercityTicketScreen() {
                 : 'Không'
             }
           />
-          {booking.contactName ? <Row label="Người đi" value={`${booking.contactName} · ${formatPhone(booking.contactPhone)}`} /> : null}
+          {booking.contactName ? <Row label="Người đi" value={[booking.contactName, formatPhone(booking.contactPhone)].filter(Boolean).join(' · ')} /> : null}
           {booking.cancelReason ? <Row label="Lý do huỷ" value={booking.cancelReason} /> : null}
         </View>
 
