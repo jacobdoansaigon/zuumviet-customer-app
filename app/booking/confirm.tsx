@@ -1,6 +1,8 @@
 // app/booking/confirm.tsx — GH 1.6 / VT 1.6 "Xác nhận giao hàng": tuỳ chọn theo luật của dịch vụ (catalog):
 // quay về điểm đón (allowReturnToPickup), dịch vụ cộng thêm (addons), tiền tip, hẹn giờ (allowScheduling, tối thiểu
 // minScheduleLeadMinutes, tối đa maxScheduleDays), ghi chú; footer Mã giảm giá | Tiền mặt/Ví, giá, "Xác nhận" → tạo đơn.
+// Đầu màn: "Bản đồ hành trình" (TripPreviewCard — anh Jacob 16/10/2026 thay bảng chi tiết giá); chi tiết giá xem qua link
+// "Xem chi tiết giá" ở footer (vẫn minh bạch phụ thu giá động).
 // Giá ở footer là giá server báo (POST /v1/customer/quotes) — trong lúc chờ chỉ hiện ước tính "~" và KHÔNG cho xác nhận.
 // Chỉ tạo đơn với đúng giá đang hiện: báo giá tự làm mới trước khi hết hạn; phải báo giá lại mà giá khác → hiện giá mới,
 // khách bấm xác nhận lần nữa. Trả tiền mặt mà còn nợ phí huỷ đơn trước → báo trước khoản tài xế sẽ thu thêm.
@@ -26,6 +28,7 @@ import {
 import { errorMessage, isApiError } from '@/services/zuum';
 import { vnDateKey, vnDateTime } from '@/services/vnTime';
 import { FlatFooter, OptionRow, PaymentSheet } from '@/components/booking';
+import { TripPreviewCard } from '@/components/booking/TripPreviewCard';
 import { useWalletSummary } from '@/hooks/useWalletBalance';
 
 type ScheduleChoice = { label: string; minutes?: number; tomorrowAt?: number };
@@ -62,6 +65,7 @@ export default function ConfirmScreen() {
   useBlurOnLeave(noteRef);
   const [timeSheet, setTimeSheet] = useState(false);
   const [paySheet, setPaySheet] = useState(false);
+  const [priceSheet, setPriceSheet] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
   const wallet = useWalletSummary();
@@ -172,9 +176,18 @@ export default function ConfirmScreen() {
             {price.distanceKm ? `${price.distanceKm.toFixed(1)}km · ` : ''}
             {stopsCount === 0 ? `${labels.provider} đến tận nơi` : `${stopsCount} ${labels.stopUnit}`}
           </AppText>
-          <AppText size={11} color={quote.status === 'error' ? Colors.error : Colors.textMuted} numberOfLines={3} style={{ maxWidth: 220, textAlign: 'right' }}>
-            {quote.status === 'error' ? quote.error : price.fromServer ? 'Giá ZuumViet báo' : 'Giá ước tính'}
-          </AppText>
+          {quote.status !== 'error' && quoteData ? (
+            <Pressable onPress={() => setPriceSheet(true)} hitSlop={8} style={styles.detailLink} accessibilityLabel="Xem chi tiết giá">
+              <AppText size={12} weight="semiBold" color={Colors.primary}>
+                Xem chi tiết giá
+              </AppText>
+              <Icon name={Icons.chevronRight} size={14} color={Colors.primary} />
+            </Pressable>
+          ) : (
+            <AppText size={11} color={quote.status === 'error' ? Colors.error : Colors.textMuted} numberOfLines={3} style={{ maxWidth: 220, textAlign: 'right' }}>
+              {quote.status === 'error' ? quote.error : price.fromServer ? 'Giá ZuumViet báo' : 'Giá ước tính'}
+            </AppText>
+          )}
           {couponError ? (
             <Pressable onPress={removeCoupon} hitSlop={6}>
               <AppText size={12} weight="semiBold" color={Colors.primary}>
@@ -207,6 +220,7 @@ export default function ConfirmScreen() {
 
   return (
     <Screen header={<AppHeader variant="dark" title={labels.confirmTitle} left="arrow" />} scroll edges={['left', 'right']} footer={footer} footerPadded={false}>
+      <TripPreviewCard state={state} svc={svc} quote={quoteData} />
       {rules?.allowReturnToPickup ? (
         <OptionRow
           icon={Icons.refresh}
@@ -262,23 +276,29 @@ export default function ConfirmScreen() {
         />
       </View>
 
-      {quoteData ? (
-        <View style={styles.breakdown}>
-          <AppText weight="bold" size={14} style={{ marginBottom: Spacing.xs }}>
-            Chi tiết giá
+      <BottomSheet visible={priceSheet && !!quoteData} onClose={() => setPriceSheet(false)} title="Chi tiết giá" showClose showHandle={false}>
+        {quoteData?.price.lines.map((l, i) => (
+          <View key={`${l.code}-${i}`} style={styles.lineRow}>
+            <AppText size={14} color={Colors.textSecondary} style={{ flex: 1 }}>
+              {l.label}
+            </AppText>
+            <AppText size={14} color={l.amount < 0 ? Colors.success : Colors.text}>
+              {formatVnd(l.amount)}
+            </AppText>
+          </View>
+        ))}
+        <View style={[styles.lineRow, styles.totalRow]}>
+          <AppText size={15} weight="bold" style={{ flex: 1 }}>
+            Tổng cộng
           </AppText>
-          {quoteData.price.lines.map((l, i) => (
-            <View key={`${l.code}-${i}`} style={styles.lineRow}>
-              <AppText size={13} color={Colors.textSecondary} style={{ flex: 1 }}>
-                {l.label}
-              </AppText>
-              <AppText size={13} color={l.amount < 0 ? Colors.success : Colors.text}>
-                {formatVnd(l.amount)}
-              </AppText>
-            </View>
-          ))}
+          <AppText size={15} weight="bold" color={Colors.primary}>
+            {formatVnd(price.total)}
+          </AppText>
         </View>
-      ) : null}
+        <AppText size={12} color={Colors.textMuted} style={{ marginTop: Spacing.xs, marginBottom: Spacing.md }}>
+          Giá ZuumViet báo cho chuyến này{price.distanceKm ? ` · ${price.distanceKm.toFixed(1)} km` : ''}
+        </AppText>
+      </BottomSheet>
 
       <BottomSheet visible={timeSheet} onClose={() => setTimeSheet(false)} title="Thời gian lựa chọn" showClose showHandle={false} contentStyle={{ paddingHorizontal: 0 }}>
         {choices.map((c) => {
@@ -315,8 +335,9 @@ export default function ConfirmScreen() {
 const styles = StyleSheet.create({
   noteRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: Spacing.screen, paddingVertical: Spacing.md },
   noteInput: { flex: 1, fontSize: 15, color: Colors.text, paddingVertical: 0, minHeight: 44, textAlignVertical: 'top', ...NO_WEB_OUTLINE },
-  breakdown: { paddingHorizontal: Spacing.screen, paddingVertical: Spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border },
-  lineRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 3 },
+  lineRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
+  totalRow: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border, marginTop: Spacing.xs, paddingTop: Spacing.sm },
+  detailLink: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   debtRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: Spacing.screen, paddingBottom: Spacing.sm },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border, backgroundColor: Colors.white },
   payRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.md },
