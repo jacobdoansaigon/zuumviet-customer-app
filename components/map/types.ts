@@ -83,6 +83,20 @@ export const boundsOf = (points: LatLng[]): [number, number, number, number] => 
   Math.max(...points.map((p) => p.lat)),
 ];
 
+/**
+ * Khung để canh bản đồ (điện thoại): các điểm gần như trùng nhau — vd tài xế / thợ đã đến điểm đón — thì fitBounds phóng tới
+ * mức ~22+, quá mức có nền Goong → bản đồ trắng trơn. Nới mỗi chiều ra tối thiểu `minMeters` quanh tâm (≈ mức 16–17, như
+ * maxZoom 16 của bản web).
+ */
+export const fitBoundsOf = (points: LatLng[], minMeters = 400): [number, number, number, number] => {
+  const [w, s, e, n] = boundsOf(points);
+  const midLat = (s + n) / 2;
+  const midLng = (w + e) / 2;
+  const halfLat = minMeters / 2 / 111_320;
+  const halfLng = halfLat / Math.max(0.1, Math.cos((midLat * Math.PI) / 180));
+  return [Math.min(w, midLng - halfLng), Math.min(s, midLat - halfLat), Math.max(e, midLng + halfLng), Math.max(n, midLat + halfLat)];
+};
+
 /** các đường → một FeatureCollection; màu / độ dày / nét đứt nằm trong properties (lớp vẽ đọc bằng biểu thức) */
 export const linesFeature = (lines: ZMapLine[] = []): GeoJSON.FeatureCollection<GeoJSON.LineString> => ({
   type: 'FeatureCollection',

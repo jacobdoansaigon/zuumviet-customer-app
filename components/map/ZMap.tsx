@@ -15,7 +15,7 @@ import {
   type LineLayerSpecification,
 } from '@maplibre/maplibre-react-native';
 import { goongStyleUrl } from '@/services/maps';
-import { addInsets, boundsOf, circleFeature, EMPTY_FEATURES, LINE_LAYERS, linesFeature, RADAR_LAYERS, type ZMapHandle, type ZMapProps } from './types';
+import { addInsets, circleFeature, fitBoundsOf, EMPTY_FEATURES, LINE_LAYERS, linesFeature, RADAR_LAYERS, type ZMapHandle, type ZMapProps } from './types';
 import { useRadar } from './useRadar';
 
 /** thời gian flyTo (ms) */
@@ -62,7 +62,7 @@ export const ZMap = forwardRef<ZMapHandle, ZMapProps>(
         cam.easeTo({ center: [p.lng, p.lat], zoom: fit.singleZoom ?? 15, padding, duration: 400 });
       } else {
         // MapLibre native: padding của fitBounds thay hẳn padding camera → gồm cả phần bị che + lề thêm
-        cam.fitBounds(boundsOf(fit.points), { padding: addInsets(padding, fit.margin), duration: 600 });
+        cam.fitBounds(fitBoundsOf(fit.points), { padding: addInsets(padding, fit.margin), duration: 600 });
       }
       // canh lại khi bộ điểm (key) hoặc phần bị che đổi
       // eslint-disable-next-line react-hooks/exhaustive-deps
