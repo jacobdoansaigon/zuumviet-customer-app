@@ -21,7 +21,7 @@ export function describeActiveOrder(o: OrderListItem): ActiveTripInfo {
   const target = o.status === 'picked_up' ? (o.stops.find((s) => s.status === 'pending' || s.status === 'arrived')?.address ?? o.pickupAddress) : o.pickupAddress;
   return {
     id: o.id,
-    status: activeStatusLabel(o.status),
+    status: activeStatusLabel(o.status, o.service),
     address: target,
     service: o.service.name,
     time: formatTime12(Date.parse(o.scheduledAt ?? o.createdAt)),

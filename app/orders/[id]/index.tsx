@@ -140,7 +140,7 @@ export default function OrderDetailScreen() {
             </AppText>
           ) : active ? (
             <AppText size={13} weight="semiBold" color={Colors.primary} style={styles.statusLine}>
-              {activeStatusLabel(order.status)}
+              {activeStatusLabel(order.status, order.service)}
             </AppText>
           ) : null}
           {order.cancellation && order.cancellation.fee > 0 ? (

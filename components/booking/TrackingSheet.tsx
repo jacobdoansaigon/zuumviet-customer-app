@@ -19,8 +19,10 @@ const STOP_TONE: Record<StopStatus, RouteStop['statusTone']> = {
   returned: 'primary',
 };
 
-const phaseStatus = (phase: TrackingPhase, L: ServiceLabels): string => {
+const phaseStatus = (phase: TrackingPhase, L: ServiceLabels, arrived: boolean): string => {
   const p = L.provider.toLowerCase();
+  // đã đến điểm đón / nơi làm việc: cùng trạng thái 'accepted' nhưng không còn "đang đến" (khớp tiêu đề phía trên)
+  if (phase === 'accepted' && arrived) return `${L.provider} đã đến`;
   switch (phase) {
     case 'scheduled':
       return 'Đã lên lịch';
@@ -289,7 +291,7 @@ export const TrackingSheet: React.FC<Props> = ({ order, etaMinutes, expanded, on
           Mã {order.code}
         </AppText>
         <AppText size={14} color={Colors.textSecondary}>
-          {phaseStatus(phase, L)}
+          {phaseStatus(phase, L, order.status === 'arrived_pickup')}
         </AppText>
         <Icon name={expanded ? Icons.chevronDown : Icons.chevronRight} size={18} color={Colors.textSecondary} style={{ marginLeft: 4 }} />
       </Pressable>

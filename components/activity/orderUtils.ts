@@ -28,19 +28,21 @@ export function isCompletedStatus(status: OrderStatus) {
   return status === 'completed';
 }
 
-/** Trạng thái tím 11px trên card "Đang trên đường" */
-export function activeStatusLabel(status: OrderStatus) {
+/** Trạng thái tím 11px trên card "Đang trên đường" — gọi đúng người làm theo nhóm dịch vụ (Tài xế / Thợ / Nhân công…) */
+export function activeStatusLabel(status: OrderStatus, service: Parameters<typeof groupOfOrder>[0]) {
+  const group = SERVICE_GROUPS[groupOfOrder(service)];
+  const provider = group.labels.provider;
   switch (status) {
     case 'scheduled':
-      return 'Đã hẹn giờ, chờ tới giờ đón';
+      return group.kind === 'onsite' ? 'Đã hẹn giờ' : 'Đã hẹn giờ, chờ tới giờ đón';
     case 'searching':
-      return 'Đang tìm tài xế';
+      return `Đang tìm ${provider.toLowerCase()}`;
     case 'assigned':
-      return 'Tài xế đang đến';
+      return `${provider} đang đến`;
     case 'arrived_pickup':
-      return 'Tài xế đã đến';
+      return `${provider} đã đến`;
     case 'picked_up':
-      return 'Đang trong chuyến';
+      return group.kind === 'onsite' ? group.labels.trackingDelivering : 'Đang trong chuyến';
     default:
       return ORDER_STATUS_LABEL[status];
   }

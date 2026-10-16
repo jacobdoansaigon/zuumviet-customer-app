@@ -43,7 +43,7 @@ export const ActiveTripCard: React.FC<CardProps> = ({ order, onPress }) => {
           </AppText>
         </View>
         <AppText size={11} weight="semiBold" color={Colors.primary} style={styles.status}>
-          {activeStatusLabel(order.status)}
+          {activeStatusLabel(order.status, order.service)}
         </AppText>
       </View>
       <View style={styles.route}>
