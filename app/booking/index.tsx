@@ -264,10 +264,11 @@ export default function BookingScreen() {
   // xong đi tiếp sang màn xác nhận.
   const needsJobs =
     state.service === 'handyman' && !!selected?.service.jobs.length && !state.options.handymanJobs.some((j) => selected.service.jobs.some((x) => x.id === j.id));
-  const confirmAfterJobs = useRef(false);
+  /** mở "Chi tiết công việc" từ nút Xác nhận (chưa chọn việc) → sheet nhắc chọn ≥ 1 việc, chọn xong đi tiếp sang xác nhận */
+  const [jobGate, setJobGate] = useState(false);
   const onConfirm = () => {
     if (needsJobs && selected) {
-      confirmAfterJobs.current = true;
+      setJobGate(true);
       setJobOption(selected);
       return;
     }
@@ -608,8 +609,9 @@ export default function BookingScreen() {
               }
             : EMPTY_JOB_DETAIL
         }
+        requireJobs={jobGate}
         onClose={() => {
-          confirmAfterJobs.current = false;
+          setJobGate(false);
           setJobOption(null);
         }}
         onSelect={(o, detail: HandymanJobDetail) => {
@@ -625,8 +627,8 @@ export default function BookingScreen() {
           });
           setJobOption(null);
           setExpanded(false);
-          if (confirmAfterJobs.current) {
-            confirmAfterJobs.current = false;
+          if (jobGate) {
+            setJobGate(false);
             router.push('/booking/confirm');
           }
         }}

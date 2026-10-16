@@ -17,6 +17,8 @@ interface BottomSheetProps {
   contentStyle?: StyleProp<ViewStyle>;
   scroll?: boolean;
   maxHeightRatio?: number;
+  /** phần đáy cố định (không cuộn theo nội dung) — vd tạm tính + nút chọn */
+  footer?: React.ReactNode;
 }
 
 export const BottomSheet: React.FC<BottomSheetProps> = ({
@@ -30,6 +32,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   contentStyle,
   scroll = false,
   maxHeightRatio = 0.9,
+  footer,
 }) => {
   const insets = useSafeAreaInsets();
   const Body = scroll ? ScrollView : View;
@@ -52,6 +55,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
             </View>
           ) : null}
           <Body style={[styles.content, contentStyle]}>{children}</Body>
+          {footer ? <View style={styles.footer}>{footer}</View> : null}
         </View>
       </View>
     </Modal>
@@ -70,6 +74,7 @@ const styles = StyleSheet.create({
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.gray300, marginBottom: Spacing.sm },
   titleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.screen, paddingVertical: Spacing.sm },
   content: { paddingHorizontal: Spacing.screen },
+  footer: { paddingHorizontal: Spacing.screen, paddingTop: Spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border },
 });
 
 export default BottomSheet;
