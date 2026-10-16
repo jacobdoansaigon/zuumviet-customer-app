@@ -2,15 +2,17 @@
 // (đã hẹn giờ / đang tìm tài xế / không tìm thấy / tài xế đang đến / đang thực hiện / hoàn thành / đã huỷ).
 // Nguồn: GET /v1/customer/orders/:id. Cập nhật realtime qua socket /customer: order.updated (tải lại đơn) +
 // partner.location (di chuyển ghim tài xế ngay); mỗi lần kết nối lại / push về đơn này cũng tải lại; dự phòng poll 30s.
-// ETA: ước lượng đường chim bay từ vị trí tài xế ở ~25 km/h (API chưa có ETA) — luôn ghi "khoảng".
+// Đang có tài xế chạy: báo server "đang xem" mỗi 20 s (POST /orders/:id/watch) → tài xế gửi GPS 30 s / lần thay vì 5 phút
+// (anh Jacob 16/10/2026); xe bám đường + bản đồ phóng gần: LiveTrackingMap.
+// ETA: theo tuyến đường xe → điểm kế (thời gian Goong); chưa có tuyến thì ước lượng đường chim bay ~25 km/h — luôn ghi "khoảng".
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, ScrollView, Linking, ActivityIndicator, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, ScrollView, Linking, ActivityIndicator, StyleSheet, useWindowDimensions, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppText, Button, Icons, Toast } from '@/components/ui';
 import { Colors, Spacing, BorderRadius, Shadow } from '@/constants/theme';
 import { SERVICE_GROUPS } from '@/constants/booking';
-import { circleEdgePoints, estimateEtaMinutes, getOrder, groupOfOrder, isActiveStatus, queueOrder, radiusLabel, retryOrder, searchPhaseAt, type OrderDetail, type OrderSearch, type SearchPhase } from '@/services/orders';
+import { circleEdgePoints, estimateEtaMinutes, getOrder, groupOfOrder, isActiveStatus, queueOrder, radiusLabel, retryOrder, searchPhaseAt, watchOrder, type OrderDetail, type OrderSearch, type SearchPhase } from '@/services/orders';
 import { nearbySupply, type SupplyMarkerData } from '@/services/supply';
 import type { ZMapMarker } from '@/components/map/types';
 import { ensureCatalog } from '@/services/catalog';
@@ -18,25 +20,32 @@ import { errorMessage, isApiError } from '@/services/zuum';
 import { useRealtime, useRealtimeRefetch } from '@/hooks/useRealtime';
 import { useOrderPushRefresh } from '@/hooks/useNotifications';
 import { cancelFeePending, mmss, useFreeCancelCountdown } from '@/hooks/useCancelCountdown';
-import { BookingMap, RoundIconButton, SupplyMarkerView, TrackingSheet, mapBottomPadding, type MapStop } from '@/components/booking';
+import { RoundIconButton, SupplyMarkerView, TrackingSheet, mapBottomPadding, type MapStop } from '@/components/booking';
+import { LiveTrackingMap } from '@/components/booking/LiveTrackingMap';
+import type { PartnerFix } from '@/components/booking/useLiveVehicle';
 import { SUPPORT_HOTLINE as SUPPORT_PHONE } from '@/constants/content';
 import { decodePolyline } from '@/components/map/polyline';
 import { orderArt } from '@/components/activity/orderUtils';
 import { useAnimatedSupply } from '@/components/booking/useAnimatedSupply';
 
 const FALLBACK_POLL_MS = 30_000;
+/** báo "đang xem" — server giữ 45 s */
+const WATCH_EVERY_MS = 20_000;
 /** hỏi "tài xế quanh bạn" mỗi bao lâu khi đang tìm */
 const SUPPLY_POLL_MS = 5_000;
 /** lề để vòng quét nằm gọn trong phần bản đồ nhìn thấy (trên: nút đóng) */
 const RADAR_FIT_MARGIN = { top: 110, right: 36, bottom: 36, left: 36 };
 
-type LatLng = { lat: number; lng: number };
+/** chỉ nhận vị trí đo sau vị trí đang có (socket / REST / watch có thể về lệch thứ tự) */
+const newerFix = (cur: PartnerFix | null, next: PartnerFix | null): PartnerFix | null =>
+  !next ? cur : !cur || Date.parse(next.at) >= Date.parse(cur.at) ? next : cur;
 
 export default function TrackingScreen() {
   const { orderId: orderIdParam, from } = useLocalSearchParams<{ orderId?: string; from?: string }>();
   const orderId = typeof orderIdParam === 'string' && orderIdParam ? orderIdParam : null;
   const [order, setOrder] = useState<OrderDetail | null>(null);
-  const [partnerLoc, setPartnerLoc] = useState<LatLng | null>(null);
+  const [partnerLoc, setPartnerLoc] = useState<PartnerFix | null>(null);
+  const [routeEta, setRouteEta] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [queueing, setQueueing] = useState(false);
@@ -55,7 +64,7 @@ export default function TrackingScreen() {
       failures.current = 0;
       setOrder(data);
       setLoadError(null);
-      setPartnerLoc(data.partnerLocation ? { lat: data.partnerLocation.lat, lng: data.partnerLocation.lng } : null);
+      setPartnerLoc((cur) => (data.partnerLocation ? newerFix(cur, data.partnerLocation) : null));
     } catch (e) {
       failures.current += 1;
       if (isApiError(e, 'order.not_found')) setLoadError(errorMessage(e));
@@ -76,7 +85,7 @@ export default function TrackingScreen() {
     if (p.orderId === orderId) void load();
   });
   useRealtime('partner.location', (p) => {
-    if (p.orderId === orderId) setPartnerLoc({ lat: p.lat, lng: p.lng });
+    if (p.orderId === orderId) setPartnerLoc((cur) => newerFix(cur, { lat: p.lat, lng: p.lng, heading: p.heading, at: p.at }));
   });
   useRealtimeRefetch(() => void load());
 
@@ -88,8 +97,34 @@ export default function TrackingScreen() {
     return () => clearInterval(t);
   }, [orderId, active, load]);
 
-  const showPartner = !!partnerLoc && (order?.status === 'assigned' || order?.status === 'arrived_pickup' || order?.status === 'picked_up');
-  const eta = order && showPartner ? estimateEtaMinutes(order, partnerLoc) : null;
+  const partnerRunning = !!order?.partner && (order.status === 'assigned' || order.status === 'arrived_pickup' || order.status === 'picked_up');
+  const showPartner = !!partnerLoc && partnerRunning;
+  const eta = order && showPartner ? (routeEta ?? estimateEtaMinutes(order, partnerLoc)) : null;
+
+  // Khách đang xem đơn có tài xế chạy → báo server mỗi 20 s (tài xế gửi GPS 30 s / lần); app ở nền thì thôi báo
+  useEffect(() => {
+    if (!orderId || !partnerRunning) return;
+    let alive = true;
+    const ping = async () => {
+      if (AppState.currentState !== 'active') return;
+      try {
+        const r = await watchOrder(orderId);
+        if (alive && r.partnerLocation) setPartnerLoc((cur) => newerFix(cur, r.partnerLocation));
+      } catch {
+        /* lần sau báo lại */
+      }
+    };
+    void ping();
+    const t = setInterval(() => void ping(), WATCH_EVERY_MS);
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active') void ping();
+    });
+    return () => {
+      alive = false;
+      clearInterval(t);
+      sub.remove();
+    };
+  }, [orderId, partnerRunning]);
 
   // ---- đang tìm: vòng quét (500 m → 1 km → 2 km…) theo lịch server trả, tính bằng đồng hồ máy từ `elapsedSeconds` ----
   const search = order?.status === 'searching' ? order.search : null;
@@ -169,9 +204,9 @@ export default function TrackingScreen() {
         label: order.stops.length > 1 ? `${L.mapDropLabel} ${i + 1}` : L.mapDropLabel,
       })),
     ];
-    if (showPartner && partnerLoc) list.push({ id: 'driver', lat: partnerLoc.lat, lng: partnerLoc.lng, type: 'driver', label: order.partner?.fullName });
+    // xe tài xế: LiveTrackingMap vẽ (đúng loại xe, bám đường, xoay theo hướng chạy)
     return list;
-  }, [order, partnerLoc, showPartner]);
+  }, [order]);
   // tuyến đã báo giá (theo đường) — đơn cũ không có thì nối thẳng
   const routePath = useMemo(() => decodePolyline(order?.routePolyline), [order?.routePolyline]);
 
@@ -232,7 +267,18 @@ export default function TrackingScreen() {
 
   return (
     <View style={styles.root}>
-      <BookingMap stops={stops} routePath={routePath} bottomPadding={mapBottomPadding(sheetH, height)} extraMarkers={supplyMarkers} radar={radar} fitOverride={fitOverride} />
+      <LiveTrackingMap
+        order={order}
+        fix={showPartner ? partnerLoc : null}
+        live={showPartner}
+        onEta={setRouteEta}
+        stops={stops}
+        routePath={routePath}
+        bottomPadding={mapBottomPadding(sheetH, height)}
+        extraMarkers={supplyMarkers}
+        radar={radar}
+        fitOverride={fitOverride}
+      />
       <RoundIconButton icon={Icons.close} onPress={close} style={[styles.close, { top: insets.top + Spacing.md }]} accessibilityLabel="Đóng" />
 
       <View style={styles.sheet} onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}>

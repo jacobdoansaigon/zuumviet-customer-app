@@ -2198,6 +2198,21 @@ export interface ZuumRoutes {
       cancelFeeIfNow?: number;
     };
   };
+  /** Đang mở màn theo dõi đơn — gửi lại mỗi ~20 s khi màn còn hiện. Tài xế gửi GPS 30 s / lần thay vì 5 phút; trả vị trí mới nhất của tài xế (null khi chưa có). Đơn không còn chạy → watching = false. */
+  'POST /v1/customer/orders/:id/watch': {
+    params: { id: string };
+    response: {
+      watching: boolean;
+      reportEverySeconds: number;
+      watchSeconds: number;
+      partnerLocation: null | {
+        lat: number;
+        lng: number;
+        heading: null | number;
+        at: string;
+      };
+    };
+  };
   /** Toạ độ + địa chỉ đầy đủ của gợi ý đã chọn */
   'GET /v1/customer/places/:placeId': {
     params: { placeId: string };
@@ -4099,6 +4114,7 @@ export interface ZuumRoutes {
     response: {
       accepted: number;
       rejected: number;
+      reportEverySeconds: number;
     };
   };
   'GET /v1/partner/me': {
@@ -8634,6 +8650,11 @@ export interface ZuumPartnerEvents {
   "offer.withdrawn": {
     offerId: string;
     orderId: string;
+  };
+  "tracking.watch": {
+    orderId: string;
+    reportEverySeconds: number;
+    forSeconds: number;
   };
   "availability.changed": {
     online: false;

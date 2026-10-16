@@ -1,6 +1,6 @@
 // Kiểu dùng chung cho BookingMap (bản đồ Goong qua ZMap, hoặc bản đồ thay thế khi chưa có Maptiles key)
 import type { StyleProp, ViewStyle } from 'react-native';
-import type { Insets, ZMapMarker, ZMapRadar } from '@/components/map/types';
+import type { Insets, ZMapLine, ZMapMarker, ZMapRadar } from '@/components/map/types';
 
 export type MapStopType = 'pickup' | 'dropoff' | 'driver';
 
@@ -41,4 +41,8 @@ export interface BookingMapProps {
   radar?: ZMapRadar | null;
   /** canh khung theo bộ điểm này thay vì theo lộ trình (vd: vừa vòng quét); đổi `key` → canh lại */
   fitOverride?: { key: string; points: { lat: number; lng: number }[]; margin?: Insets } | null;
+  /** màu đường lộ trình (mặc định tím thương hiệu) — vd nhạt đi khi đang vẽ đoạn tài xế đang chạy */
+  routeColor?: string;
+  /** đường vẽ thêm trên lộ trình (vd đoạn từ xe tới điểm kế, bám theo đường) */
+  extraLines?: ZMapLine[];
 }

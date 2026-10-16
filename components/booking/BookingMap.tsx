@@ -14,7 +14,7 @@ import type { BookingMapProps } from './mapTypes';
 const FIT_MARGIN = { top: 140, right: 60, bottom: 80, left: 60 };
 
 const GoongBookingMap = forwardRef<ZMapHandle, BookingMapProps>(function GoongBookingMap(
-  { stops, center, showsUserLocation = true, showRoute = true, routePath, bottomPadding = 0, style, onRegionChangeComplete, onPress, extraMarkers, radar, fitOverride },
+  { stops, center, showsUserLocation = true, showRoute = true, routePath, bottomPadding = 0, style, onRegionChangeComplete, onPress, extraMarkers, radar, fitOverride, routeColor, extraLines },
   ref,
 ) {
   const first = stops[0];
@@ -37,6 +37,10 @@ const GoongBookingMap = forwardRef<ZMapHandle, BookingMapProps>(function GoongBo
   }, [stopsKey]);
   // marker phụ (vị trí đã lưu…) vẽ trước → nằm dưới các điểm lộ trình
   const allMarkers = useMemo(() => (extraMarkers?.length ? [...extraMarkers, ...markers] : markers), [extraMarkers, markers]);
+  const lines = useMemo(
+    () => [...(showRoute && route.length >= 2 ? [{ id: 'route', coords: route, color: routeColor ?? Colors.primary, width: 4 }] : []), ...(extraLines ?? [])],
+    [showRoute, route, routeColor, extraLines],
+  );
 
   return (
     <ZMap
@@ -45,7 +49,7 @@ const GoongBookingMap = forwardRef<ZMapHandle, BookingMapProps>(function GoongBo
       initialCenter={initial}
       initialZoom={stops.length === 1 ? 15 : 14}
       markers={allMarkers}
-      lines={showRoute && route.length >= 2 ? [{ id: 'route', coords: route, color: Colors.primary, width: 4 }] : []}
+      lines={lines}
       radar={radar ?? null}
       insets={{ bottom: bottomPadding }}
       // "Chọn trên bản đồ": khách tự kéo — không canh lại khung (giữ mức phóng khách đang xem)

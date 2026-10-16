@@ -111,6 +111,14 @@ export function queueOrder(id: string): Promise<OrderDetail> {
   return api('POST /v1/customer/orders/:id/queue', { params: { id } });
 }
 
+/**
+ * Đang mở màn theo dõi đơn — gọi lại mỗi ~20 s khi màn còn hiện: tài xế gửi GPS 30 s / lần (bình thường 5 phút); trả vị
+ * trí mới nhất của tài xế.
+ */
+export function watchOrder(id: string) {
+  return api('POST /v1/customer/orders/:id/watch', { params: { id } });
+}
+
 export function rateOrder(id: string, body: ZuumRoutes['POST /v1/customer/orders/:id/rating']['body']) {
   return api('POST /v1/customer/orders/:id/rating', { params: { id }, body });
 }
