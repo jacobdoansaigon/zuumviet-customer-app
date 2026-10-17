@@ -1,6 +1,6 @@
 // HandymanJobDialog — Gọi thợ: bấm MỘT loại thợ mở "Chi tiết công việc" TRƯỚC khi chọn (anh Jacob 2026-10-13), gọn lại
 // 16/10/2026 ("nhiều chữ quá — cộng từng việc vào theo ô fill"):
-//   1. việc cần làm: lưới ô 2 cột (tên + giá công); chạm ô = cộng việc → ô tô tím, có "− n +" ngay trong ô
+//   1. việc cần làm: dải thẻ trượt ngang, 2 thẻ một lần, mỗi thẻ một việc có chi tiết (HandymanJobCarousel — 17/10/2026)
 //   2. ảnh hiện trạng (tối đa 5, chụp / thư viện) — tải lên kho lúc đặt đơn
 //   3. điều kiện: chip bật / tắt kèm phụ phí (leo trèo, thợ mang thang, cần gấp) · tầng / vị trí · mô tả sự cố
 //   Tạm tính + nút ở đáy cố định. Bấm "Xác nhận" khi chưa chọn việc (`requireJobs`) → mở sheet với dòng nhắc chọn ít nhất
@@ -12,6 +12,7 @@ import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 import { AppText, BottomSheet, Button, Icon, Icons, TextField } from '@/components/ui';
 import { serviceInfoLines, type ServiceOptionView, type CatalogJob } from '@/services/catalog';
 import { formatVnd } from '@/services/bookingStore';
+import { HandymanJobCarousel } from './HandymanJobCarousel';
 
 export interface HandymanJobDetail {
   jobs: { id: string; qty: number }[];
@@ -26,7 +27,6 @@ export interface HandymanJobDetail {
 export const EMPTY_JOB_DETAIL: HandymanJobDetail = { jobs: [], photos: [], height: false, ladder: false, floor: '', issueNote: '', urgent: false };
 const MAX_PHOTOS = 5;
 const MAX_JOBS = 10;
-const UNIT: Record<string, string> = { lan: 'lần', cai: 'cái', bo: 'bộ', may: 'máy', m2: 'm²' };
 
 interface Props {
   option: ServiceOptionView | null;
@@ -155,57 +155,7 @@ export const HandymanJobDialog: React.FC<Props> = ({ option, initial, requireJob
       ) : null}
 
       {jobs.length ? (
-        <>
-          <View style={styles.sectionRow}>
-            <AppText size={14} weight="bold">
-              Việc cần làm
-            </AppText>
-            <AppText size={11} color={Colors.textMuted}>
-              Giá công thợ, chưa gồm vật tư
-            </AppText>
-          </View>
-          <View style={styles.grid}>
-            {jobs.map((job) => {
-              const qty = qtyOf(job.id);
-              const on = qty > 0;
-              const price = job.price ? `${shortVnd(job.price)}/${UNIT[job.unit] ?? job.unit}` : 'Báo giá tại chỗ';
-              return (
-                <Pressable
-                  key={job.id}
-                  style={[styles.tile, on && styles.tileOn, showHint && styles.tileNudge]}
-                  onPress={() => (on ? undefined : setQty(job, 1))}
-                  accessibilityLabel={on ? `${job.name}, đã chọn ${qty}` : `Chọn ${job.name}`}
-                >
-                  <AppText size={13} weight="bold" color={on ? Colors.white : Colors.text} numberOfLines={2} style={styles.tileName}>
-                    {job.name}
-                  </AppText>
-                  <View style={styles.tileBottom}>
-                    <AppText size={12} weight="semiBold" color={on ? Colors.white : Colors.primary} numberOfLines={1} style={{ flex: 1 }}>
-                      {price}
-                    </AppText>
-                    {on ? (
-                      <View style={styles.stepper}>
-                        <Pressable onPress={() => setQty(job, qty - 1)} style={styles.stepBtn} hitSlop={6} accessibilityLabel="Bớt">
-                          <Icon name={'ion:remove' as never} size={14} color={Colors.primary} />
-                        </Pressable>
-                        <AppText size={13} weight="bold" color={Colors.white} style={{ minWidth: 16, textAlign: 'center' }}>
-                          {qty}
-                        </AppText>
-                        <Pressable onPress={() => setQty(job, qty + 1)} style={styles.stepBtn} hitSlop={6} accessibilityLabel="Thêm">
-                          <Icon name={'ion:add' as never} size={14} color={Colors.primary} />
-                        </Pressable>
-                      </View>
-                    ) : (
-                      <View style={styles.addDot}>
-                        <Icon name={'ion:add' as never} size={16} color={Colors.white} />
-                      </View>
-                    )}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        </>
+        <HandymanJobCarousel jobs={jobs} serviceCode={svc.code} qtyOf={qtyOf} onChange={setQty} />
       ) : (
         <>
           <AppText size={14} weight="bold" style={styles.section}>
@@ -299,24 +249,6 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     backgroundColor: '#FDECEC',
   },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
-  tile: {
-    width: `48.5%`,
-    minHeight: 76,
-    padding: Spacing.sm + 2,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.white,
-    justifyContent: 'space-between',
-  },
-  tileOn: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  tileNudge: { borderColor: Colors.error },
-  tileName: { lineHeight: 17 },
-  tileBottom: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
-  addDot: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  stepBtn: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.white },
   photos: { gap: Spacing.sm, paddingVertical: Spacing.xs },
   photo: { width: 56, height: 56 },
   photoImg: { width: 56, height: 56, borderRadius: BorderRadius.md },
